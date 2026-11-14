@@ -218,19 +218,28 @@
         <version>0.8.15</version>
         <configuration>
           <excludes>
-            <exclude>**/*Application*</exclude>
-            <exclude>**/*Configuration*</exclude>
+            <!-- Exclude only data carriers and bootstrap code, matched by exact suffix so that
+                 services such as RefundQueryService are measured (task 145, audit C-01). -->
+            <exclude>**/*Application.class</exclude>
+            <exclude>**/*Configuration.class</exclude>
+            <exclude>**/*Configuration$*.class</exclude>
             <exclude>**/config/**</exclude>
-            <exclude>**/*DO*</exclude>
-            <exclude>**/*VO*</exclude>
-            <exclude>**/*DTO*</exclude>
-            <exclude>**/*Request*</exclude>
-            <exclude>**/*Query*</exclude>
-            <exclude>**/*Command*</exclude>
-            <exclude>**/BaseEntity*</exclude>
-            <exclude>**/ErrorCode*</exclude>
-            <exclude>**/Role*</exclude>
-            <exclude>**/DataScope*</exclude>
+            <exclude>**/*DO.class</exclude>
+            <exclude>**/*DO$*.class</exclude>
+            <exclude>**/*VO.class</exclude>
+            <exclude>**/*VO$*.class</exclude>
+            <exclude>**/*DTO.class</exclude>
+            <exclude>**/*DTO$*.class</exclude>
+            <exclude>**/*Request.class</exclude>
+            <exclude>**/*Request$*.class</exclude>
+            <exclude>**/*Query.class</exclude>
+            <exclude>**/*Query$*.class</exclude>
+            <exclude>**/*Command.class</exclude>
+            <exclude>**/*Command$*.class</exclude>
+            <exclude>**/BaseEntity.class</exclude>
+            <exclude>**/ErrorCode.class</exclude>
+            <exclude>**/Role.class</exclude>
+            <exclude>**/DataScope.class</exclude>
           </excludes>
         </configuration>
         <executions>

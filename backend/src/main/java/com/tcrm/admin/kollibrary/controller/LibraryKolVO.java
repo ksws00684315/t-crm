@@ -1,10 +1,12 @@
 package com.tcrm.admin.kollibrary.controller;
 
 import com.tcrm.admin.kollibrary.service.LibraryKolDTO;
-import java.time.Instant;
 import java.util.List;
 
-/** A creator row of the list (requirement 1.2.5 ②): basic data and status only. */
+/**
+ * A creator row of the list (requirement 1.2.5 ②, revised 2026-11-10): the eight list columns only;
+ * the list is still ordered by the last change, which is not returned.
+ */
 public record LibraryKolVO(
     Long id,
     String platform,
@@ -14,10 +16,8 @@ public record LibraryKolVO(
     String countryCode,
     List<String> categories,
     String grade,
-    String cooperationStage,
     String outreachStatus,
-    String followUpOwner,
-    Instant updateTime) {
+    String followUpOwner) {
 
   public static LibraryKolVO from(LibraryKolDTO dto) {
     return new LibraryKolVO(
@@ -29,9 +29,7 @@ public record LibraryKolVO(
         dto.countryCode(),
         dto.categories(),
         dto.grade(),
-        dto.cooperationStage(),
         dto.outreachStatus(),
-        dto.followUpOwner(),
-        dto.updateTime());
+        dto.followUpOwner());
   }
 }

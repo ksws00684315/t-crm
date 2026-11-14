@@ -29,7 +29,6 @@ public record LibraryKolRequest(
     @Size(max = 8) String salesPotential,
     @Size(max = 8) String cooperationAttitude,
     @Size(max = 4) String grade,
-    @Size(max = 24) String cooperationStage,
     List<@Size(max = 20) String> tags,
     @Size(max = 1000) String remark,
     @Size(max = 16) String outreachStatus,
@@ -37,7 +36,8 @@ public record LibraryKolRequest(
     LocalDate lastContactDate,
     @Size(max = 16) String sampleStatus,
     @Size(max = 64) String trackingNo,
-    LocalDate sampleDate) {
+    LocalDate sampleDate,
+    @Size(max = 1000) String followUpRemark) {
 
   public LibraryKolCommand toCommand() {
     return new LibraryKolCommand(
@@ -58,7 +58,6 @@ public record LibraryKolRequest(
         salesPotential,
         cooperationAttitude,
         grade,
-        cooperationStage,
         tags,
         remark,
         outreachStatus,
@@ -66,6 +65,7 @@ public record LibraryKolRequest(
         lastContactDate,
         sampleStatus,
         trackingNo,
-        sampleDate);
+        sampleDate,
+        followUpRemark);
   }
 }

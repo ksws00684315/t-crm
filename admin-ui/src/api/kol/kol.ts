@@ -113,6 +113,19 @@ export function updateKolStatus(id: string, status: 0 | 1): Promise<null> {
   return http.request<null>({ method: "put", url: `/kol/kols/${id}/status`, data: { status } });
 }
 
+/** Answer of `POST /kol/kols/{id}/password-reset`; the plaintext is returned once, never stored. */
+export interface ResetKolPasswordVO {
+  password: string;
+}
+
+/** Super administrator only: replaces the creator password with a generated one (task 147). */
+export function resetKolPassword(id: string): Promise<ResetKolPasswordVO> {
+  return http.request<ResetKolPasswordVO>({
+    method: "post",
+    url: `/kol/kols/${id}/password-reset`
+  });
+}
+
 export function downloadKolTemplate(): Promise<DownloadedFile> {
   return http.download({ method: "get", url: "/kol/kol-imports/template" });
 }

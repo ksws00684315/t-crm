@@ -7,6 +7,7 @@ import com.tcrm.admin.kol.api.KolStatusChangedEvent;
 import com.tcrm.admin.kol.mapper.KolBdHistoryMapper;
 import com.tcrm.admin.kol.mapper.KolMapper;
 import com.tcrm.admin.kol.mapper.KolPlatformMapper;
+import com.tcrm.admin.kol.model.KolAuthTokenDO;
 import com.tcrm.admin.kol.model.KolBdHistoryDO;
 import com.tcrm.admin.kol.model.KolDO;
 import com.tcrm.admin.kol.model.KolPlatformDO;
@@ -16,6 +17,7 @@ import com.tcrm.admin.kol.model.ReviewStatus;
 import com.tcrm.admin.security.api.AccountDTO;
 import com.tcrm.admin.security.api.CurrentUserContext;
 import com.tcrm.admin.security.api.LoginFailureCounter;
+import com.tcrm.admin.security.api.StpKolUtil;
 import com.tcrm.admin.shared.BusinessException;
 import com.tcrm.admin.shared.ErrorCode;
 import com.tcrm.admin.shared.PageResult;
@@ -34,6 +36,7 @@ import java.util.Objects;
 import java.util.Set;
 import java.util.stream.Stream;
 import org.springframework.context.ApplicationEventPublisher;
+import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.transaction.support.TransactionTemplate;
@@ -57,6 +60,8 @@ public class KolService {
   private final BdTransferService transfers;
   private final KolPlatformMapper platforms;
   private final LoginFailureCounter loginFailures;
+  private final BCryptPasswordEncoder passwords;
+  private final KolAuthTokens tokens;
 
   public KolService(
       KolMapper kols,
@@ -71,7 +76,9 @@ public class KolService {
       BdTransferService transfers,
       KolPlatformMapper platforms,
       @org.springframework.beans.factory.annotation.Qualifier("kolLoginFailures")
-          LoginFailureCounter loginFailures) {
+          LoginFailureCounter loginFailures,
+      BCryptPasswordEncoder passwords,
+      KolAuthTokens tokens) {
     this.kols = kols;
     this.history = history;
     this.writer = writer;
@@ -84,6 +91,8 @@ public class KolService {
     this.transfers = transfers;
     this.platforms = platforms;
     this.loginFailures = loginFailures;
+    this.passwords = passwords;
+    this.tokens = tokens;
   }
 
   public PageResult<KolDTO> page(KolFilterDTO filter) {
@@ -333,6 +342,38 @@ public class KolService {
       throw new BusinessException(ErrorCode.AUTH_FORBIDDEN);
     }
     transfers.updateOne(id, bdUserId);
+  }
+
+  /**
+   * Super-administrator password reset (task 147): generates a random password that is returned
+   * once, stores its hash and bumps the credential version so every issued token dies with it (spec
+   * 06), signs the KOL out and invalidates the unused self-service reset links — a pending link
+   * must not be able to overwrite the password the administrator just set. Activated accounts only:
+   * an account still waiting for its invitation has no password to reset.
+   */
+  public String adminResetPassword(Long id) {
+    AccountDTO user = current.user();
+    KolDO kol = requireVisible(id, user);
+    if (!Integer.valueOf(1).equals(kol.getAccountStatus())) {
+      throw new BusinessException(ErrorCode.KOL_NOT_ACTIVATED);
+    }
+    String plain = RandomPasswords.next();
+    Instant now = Instant.now();
+    tx.executeWithoutResult(
+        txStatus -> {
+          requireUpdated(
+              kols.update(
+                  null,
+                  scoped(id, user)
+                      .set(KolDO::getPasswordHash, passwords.encode(plain))
+                      .setSql("credential_version = credential_version + 1")
+                      .set(KolDO::getUpdateBy, user.id())
+                      .set(KolDO::getUpdateTime, now)),
+              user);
+          tokens.invalidateUnused(id, KolAuthTokenDO.PURPOSE_RESET);
+        });
+    StpKolUtil.logout(id);
+    return plain;
   }
 
   /**

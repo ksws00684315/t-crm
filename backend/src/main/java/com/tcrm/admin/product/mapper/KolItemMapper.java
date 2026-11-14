@@ -18,10 +18,14 @@ import org.apache.ibatis.annotations.Update;
 
 @Mapper
 public interface KolItemMapper extends BaseMapper<KolItemDO> {
+  /** Explicit columns of {@link KolItemDO} instead of SELECT * (task 145, audit C-02). */
+  String SELECT_FROM =
+      "SELECT id, kol_id, product_id, shop_id, weidian_item_id, item_name, source, link_code, valid_from, valid_to, create_by, create_time, update_by, update_time, tenant_id FROM crm_kol_item ";
+
   /** Current mapping that occupies this exclusive item, or null. */
   @Select(
-      """
-      SELECT * FROM crm_kol_item
+      SELECT_FROM
+          + """
       WHERE shop_id = #{shopId} AND weidian_item_id = #{weidianItemId} AND valid_to IS NULL
       """)
   KolItemDO findCurrentByShopItem(
@@ -29,16 +33,16 @@ public interface KolItemMapper extends BaseMapper<KolItemDO> {
 
   /** Current mapping for this kol + original product, or null. */
   @Select(
-      """
-      SELECT * FROM crm_kol_item
+      SELECT_FROM
+          + """
       WHERE kol_id = #{kolId} AND product_id = #{productId} AND valid_to IS NULL
       """)
   KolItemDO findCurrentByKolProduct(@Param("kolId") Long kolId, @Param("productId") Long productId);
 
   /** Current exclusive mapping for this Weidian item id (any shop), or null. */
   @Select(
-      """
-      SELECT * FROM crm_kol_item
+      SELECT_FROM
+          + """
       WHERE weidian_item_id = #{weidianItemId} AND valid_to IS NULL
       LIMIT 1
       """)

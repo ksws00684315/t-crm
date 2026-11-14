@@ -1,92 +1,52 @@
-# 海外达人分销 CRM
+# 海外达人分销 CRM（SparkTrack）
 
-自研模块化单体，面向海外达人分销业务。交付范围以 `docs/01-报价与合同/` 的签约定稿为准，设计以 `docs/03-设计/系统详细设计说明书.md` 为准。当前后台包含管理员登录、用户管理、操作审计；独立跳转服务提供 302 跳转与 Redis 点击事件写入；管理端 `admin-ui` 提供登录、用户管理、操作日志、修改密码；达人端 `kol-portal` 仅有骨架（登录页占位）；`deploy/` 提供部署模板。其他业务模块目前仅占位。
+自研模块化单体，面向海外达人分销业务。交付范围以 `docs/01-报价与合同/` 的签约定稿为准，设计以 `docs/03-设计/系统详细设计说明书.md` 为准，功能口径以进度跟踪表「功能说明」原文和 [进度表基线偏离清单](docs/04-开发任务/进度表基线偏离清单.md) 为准。
 
-任务 02（工程化基线与规范整改）已通过 [PR #2](https://github.com/ksws00684315/t-crm/pull/2) 合并；Checkstyle 按 ADR-007 保留，ArchUnit 完整组合许可已声明。执行记录见 [执行报告](docs/04-开发任务/02-工程化基线与规范整改-执行报告.md)。任务 03（前端与部署）待执行。
+**现状**（2026-11-10 按全量审查 M-23 重写，任务 145）：正式环境部署在 AWS（ADR-037），自 `v0.1.0`（2026-11-05）起按发布标签上线。各任务的进度见 [开发任务索引](docs/04-开发任务/README.md)，未处理的问题见 [遗留问题清单](docs/04-开发任务/遗留问题清单.md)。
 
-## 目录
+## 工程
 
 | 目录 | 内容 |
 |---|---|
-| `backend/` | 后台 `crm-admin`，默认端口 8080 |
-| `redirect/` | 独立跳转服务 `crm-redirect`，默认端口 8081 |
-| `config/` | 两工程共用的 Checkstyle 规则及第三方许可证原文、声明 |
-| `scripts/` | 第三方通知生成脚本，仅使用 Python 标准库 |
-| `.github/` | Java / Docker / OSV 门禁，管理端、达人端、部署模板工作流，Dependabot、PR 模板 |
-| `docs/` | 合同、设计、开发任务、工程规范、ADR |
-| `admin-ui/` | 管理端（Vue 3 + TypeScript + Element Plus），源自 pure-admin-thin v6.2.0 的工具链与约定，见 `admin-ui/README.md` |
-| `kol-portal/` | 达人端骨架（英文界面，手机宽度适配），登录接口待后续任务 |
-| `deploy/` | 环境变量示例、开发依赖与生产 compose、Nginx、备份脚本，见 `deploy/README.md`；两个 Dockerfile 在 `backend/`、`redirect/` |
+| `backend/` | 后台 `crm-admin`（Java 21、Spring Boot 4.1、Sa-Token、MyBatis-Plus、Flyway、Redisson、PostgreSQL 17），默认端口 8080 |
+| `redirect/` | 独立跳转服务 `crm-redirect`（Java 21、Spring Boot 4.1、Redis），只读 Redis、不回源后台（ADR-012），默认端口 8081 |
+| `admin-ui/` | 管理端（Vue 3、TypeScript、Element Plus，基于 pure-admin-thin），中文 |
+| `kol-portal/` | 达人端（Vue 3、TypeScript、Element Plus），英文 |
+| `deploy/` | Docker Compose、Nginx、备份、本地预览与发布脚本，见 [deploy/README.md](deploy/README.md) 与 [RUNBOOK](deploy/RUNBOOK.md) |
+| `config/`、`scripts/` | 共用 Checkstyle 规则、第三方许可原文与通知生成脚本 |
+| `.github/` | CI 工作流、发布工作流、Dependabot、PR 模板 |
+| `docs/` | 需求、合同、设计、开发任务、工程规范、ADR |
+
+后台模块（`com.tcrm.admin` 的直接子包，规范 01）：`security`（登录、账号、权限）、`system`（公司、用户、系统配置、操作日志）、`kol`（达人）、`kollibrary`（TikTok 达人库，ADR-038）、`product`（店铺、商品、对应关系、推广表格、自动复制）、`link`（中转链接与点击）、`order`（订单与退款同步、结算流水）、`commission`（计佣、钱包、提现、预付）、`notification`（站内通知）、`integration`（微店接口）、`task`（导入导出任务）、`shared`（公共基础设施）。`stats`、`sheet` 目前只有包声明（占位；独立经营分析看板暂缓）。
 
 ## 版本
 
-| 项目 | 当前版本 |
-|---|---|
-| 两工程 | 0.1.0；Java 21；Spring Boot 4.1.1 |
-| Sa-Token / MyBatis-Plus / Redisson | 1.46.0 / 3.5.17 / 4.8.0（后台） |
-| PostgreSQL / JDBC / Flyway | PostgreSQL 17；JDBC、Flyway 由 Spring Boot 管理（Boot 4.1.1 解析为 42.7.13 / 12.4.0，后台） |
-| Tomcat / Jackson BOM | 11.0.26 / 3.1.7（按安全修复例外覆盖） |
-| Spotless / google-java-format | 3.10.3 / 1.28.0 |
-| Maven Checkstyle / Checkstyle 引擎 | 3.6.0 / 14.3.0（构建工具，见 ADR-007） |
-| JaCoCo / ArchUnit | 0.8.15 / 1.5.1 |
-| license-maven-plugin / Surefire / Failsafe | 2.7.1；后两者由 Spring Boot 管理（Boot 4.1.1 解析为 3.5.6） |
-| Testcontainers / 测试镜像 | 2.0.5；`postgres:17.11`、`redis:7.4.5` |
-| 前端工具链 | Node.js 24 LTS（`^22.13 \|\| >=24`）；pnpm 10.33.4；Vite 7.3.6；Vue 3.5.43；Element Plus 2.14.7；Vitest 5.0.3；TypeScript 5.9.3 |
-| 部署镜像 | `nginx:1.30.5-alpine`；运行镜像 `eclipse-temurin:21.0.12.1_1-jre` |
+镜像与交付包的版本只以 git 发布标签 `v{版本}` 为准；各工程 `pom.xml`、`package.json` 中的版本号是开发版本，发布时不改（规范 08 §8）。依赖版本以各工程 `pom.xml`、`pnpm-lock.yaml` 为准。
 
-pom 中未写 `<version>` 的依赖与插件跟随 Spring Boot 升级（见 `.github/dependabot.yml` 的策略说明），其余版本固定写在 `pom.xml`；实际版本以各工程 `pom.xml` 与 `mvn dependency:tree` 为准；新增版本、原文及兼容依据见执行报告。Redis 运行环境采用 7.x。
+## 本地开发
 
-## 本地启动顺序
+本机开发与 AI 代理联调共用一套 PostgreSQL / Redis，启动方式、连接配置和测试数据规则见 [deploy/README.md](deploy/README.md)「本地共享中间件与开发」；整套应用的本地预览用 `deploy/scripts/preview.sh`（同文件「本地预览」）。
 
-1. 数据库：`cp deploy/.env.example deploy/.env` 并填写，然后 `docker compose -f deploy/docker-compose.dev.yml --env-file deploy/.env up -d`（PostgreSQL 17、Redis 7）。宿主机 5432 / 6379 已被占用时，修改 `deploy/.env` 的 `TCRM_DB_PORT`、`TCRM_REDIS_PORT`，后台与跳转服务读取同名变量。
-2. 后台：导入 `deploy/.env` 的变量后在 `backend/` 运行 `mvn spring-boot:run -Dspring-boot.run.profiles=dev`（默认 8080；Flyway 自动建表）。
-3. 跳转服务：同样导入变量后在 `redirect/` 运行（默认 8081）。
-4. 管理端：`cd admin-ui && pnpm install --frozen-lockfile && pnpm dev`，`/admin-api` 代理到 `http://localhost:8080`（`VITE_ADMIN_API_TARGET` 可改）。
-5. 达人端：`cd kol-portal && pnpm install --frozen-lockfile && pnpm dev`。
-
-前端校验命令（两个前端相同）：`pnpm lint`、`pnpm typecheck`、`pnpm test`、`pnpm build`；依赖变化后运行 `pnpm notices` 重新生成 `THIRD-PARTY-NOTICES`，`pnpm notices:check` 校验与已提交文件一致。逐项验证见 [本机验证清单](docs/04-开发任务/01-项目骨架搭建-本机验证清单.md)。
-
-## 本地开发（后端工程）
-
-安装 JDK 21、Maven、Python 3；后台运行需要 PostgreSQL 17 和 Redis，跳转服务只需 Redis。复制 `deploy/.env.example` 到 `deploy/.env`，填写本机账号、密码、首次超管凭证、跳转回退地址、IP 哈希盐以及中转链接地址 `TCRM_LINK_BASE_URL`（必填，https、不带末尾斜杠，示例 `https://t.example.com`，生产为 `https://t.<域名>`）；在反向代理（Nginx / Cloudflare）之后部署时还必须设置 `TCRM_TRUSTED_PROXIES`（见下文）。不要提交 `.env`。Spring Boot 不会自动读取该文件，应通过 IDE 或终端把其中的值设为环境变量。首次超管凭证无默认值；不存在启用且未删除的超级管理员时，两个初始化变量均必须设置，缺少任意一个会启动失败并提示变量名。已有可用超管时无需初始化变量，也不会重复创建。
-
-在所选工程目录运行：
+常用检查命令（只跑改动涉及的工程，见规范 08）：
 
 ```bash
+# backend/ 或 redirect/（JDK 21）
 mvn spotless:apply
-mvn verify
-mvn spring-boot:run -Dspring-boot.run.profiles=dev
+mvn verify                 # 格式、静态检查、单元测试、ArchUnit、覆盖率
+mvn verify -Pdocker-it     # 集成测试（*IT，@Tag("docker")，需要 Docker）
+
+# admin-ui/ 或 kol-portal/
+pnpm install --frozen-lockfile
+pnpm lint && pnpm typecheck && pnpm test && pnpm build
 ```
 
-`verify` 校验格式、导入、输出、大括号、单行语句、变量声明、空 catch、switch 分支等规则，以及单元测试、ArchUnit、覆盖率。后台整体行/分支门槛为 70% / 60%，security 及未来 commission、order、stats 为 85% / 80%；跳转为 80% / 70%。`dev` 使用同一环境变量配置；当前没有引入 springdoc，原因见报告，不提供 OpenAPI 页面。
+依赖变化后按 [许可说明](config/licenses/README.md) 重新生成并提交各工程的 `THIRD-PARTY-NOTICES`。
 
-具备 Docker 的机器运行：
+## 接口约定
 
-```bash
-mvn verify -Pdocker-it
-```
+后台信封为 `{code,msg,data,errorCode,traceId}`，分页为 `{items,total,page,size}`，64 位整数与金额输出字符串，时间为 UTC `Instant`；接口清单在设计说明书中维护，不提供 OpenAPI 页面（ADR-040）。细则见规范 03。部署在代理之后时必须配置 `TCRM_TRUSTED_PROXIES`（ADR-009）。
 
-Docker 用例为 `*IT`、`@Tag("docker")`，普通 `verify` 编译但不执行它们。任务执行机未运行 Docker；GitHub Actions 实际运行 PostgreSQL / Redis 集成测试，并上传测试与 JaCoCo 报告。
-
-依赖变更后，在每个工程目录重新生成许可文件（需要 Maven Central 网络）：
-
-```bash
-mvn generate-resources dependency:build-classpath -DincludeScope=runtime -Dmdep.outputFile=target/runtime-classpath.txt
-python3 ../scripts/generate-notices.py .
-git diff -- THIRD-PARTY-NOTICES
-```
-
-运行时通知包含完整依赖列表和来源、共享原文索引与文本块；通过编号在文件内还原完整许可证、版权与致谢，相同内容只存一份。通知随 JAR 放入 `META-INF/THIRD-PARTY-NOTICES`；CI 先验证 5 项离线去重回归用例，重生成时逐份核对原文可还原性，再比较已提交文件，不一致即失败。原文来源见 [许可说明](config/licenses/README.md)。镜像：`backend/Dockerfile`、`redirect/Dockerfile` 以仓库根目录为构建上下文，镜像内 `/licenses/` 含 backend、redirect、admin-ui、kol-portal 四份第三方许可声明；静态资源由 `deploy/scripts/build-static.sh` 生成同样的声明。部署说明见 [deploy/README.md](deploy/README.md)。
-
-## 接口与规范
-
-后台管理员令牌放在 `X-Admin-Token` 请求头。认证接口前缀 `/admin-api/auth`；用户管理为 `/admin-api/system/users`，审计列表为 `/admin-api/system/oper-logs`，后两者要求 `SUPER_ADMIN`。后台信封为 `{code,msg,data,errorCode,traceId}`，分页为 `{items,total,page,size}`；64 位整数与金额输出字符串，时间采用 UTC `Instant`。每个请求返回 `X-Trace-Id`。跨域来源仅允许 `TCRM_CORS_ALLOWED_ORIGINS` 的逗号分隔白名单，默认关闭。列表接口 `page` 最大 10000、`size` 最大 100。
-
-**客户端 IP 与登录限流**：只有当 TCP 对端属于 `TCRM_TRUSTED_PROXIES`（逗号分隔的 IP/CIDR，默认空 = 不信任任何代理）时，才会读取 `CF-Connecting-IP`、`X-Forwarded-For`（可用 `TCRM_CLIENT_IP_HEADERS` 调整），详见 [ADR-009](docs/06-架构决策/ADR-009-可信代理与客户端IP解析.md)。登录失败在 15 分钟窗口内按“用户名+IP 5 次 / IP 20 次 / 用户名全部 IP 50 次”三层锁定 15 分钟（429），详见 [ADR-008](docs/06-架构决策/ADR-008-登录失败限流按用户名与来源IP分层.md)。未配置可信代理而部署在代理之后时，所有请求会被视为同一个 IP，20 次失败即全站锁定，生产环境必须配置。
-
-跳转服务继续返回 302 与纯文本健康检查，不使用后台信封。它只读 Redis、不回源后台（[ADR-012](docs/06-架构决策/ADR-012-跳转服务不回源后台.md)），链接索引由后台维护（任务 06）。链接索引值只接受 JSON（见设计说明书 §7.4）；点击流 `stream:click` 以近似 `MAXLEN` 写入，上限 `TCRM_CLICK_STREAM_MAXLEN`（默认 1000000；后台按它的 50% / 80% 做积压告警）。后台只有一个实例消费点击流（消费组 `crm-admin`），写入按月分区的 `crm_click_log`；中转链接列表为 `GET /admin-api/link/links?kolCode=`，超管手动重建链接索引为 `POST /admin-api/link/index-rebuilds`。
-
-## 遗留清单
+## 早期遗留（2026-10-05 审查）
 
 以下问题已在 2026-10-05 审查中确认，暂不处理，留给后续业务任务：
 
@@ -94,4 +54,4 @@ git diff -- THIRD-PARTY-NOTICES
 - 管理端允许同一账号多端同时登录，每次登录签发新令牌（Sa-Token 1.46 默认 `is-concurrent=true`、`is-share=false`），每个账号最多 12 个令牌；会话策略见设计说明书 §3.3（负责人已接受）。
 - 操作审计由 `@Async` 异步写入，写入失败或进程退出时可能丢失少量记录（内部系统，负责人已接受）。
 
-编码前读取 [AGENTS.md](AGENTS.md)、[工程规范](docs/05-工程规范/README.md) 和 [ADR](docs/06-架构决策/)。使用任务分支及 Conventional Commits；禁止直接推送 main。由负责人审查并合并 PR。
+编码前读取 [AGENTS.md](AGENTS.md)、[工程规范](docs/05-工程规范/README.md) 和 [ADR](docs/06-架构决策/)。在任务分支上开发并使用 Conventional Commits；禁止直接推送 `main`，由负责人审查并合并 PR。

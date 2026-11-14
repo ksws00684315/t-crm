@@ -1,12 +1,22 @@
 package com.tcrm.admin.integration.service;
 
 import com.tcrm.admin.integration.api.WeidianBusinessApi;
+import com.tcrm.admin.shared.BusinessException;
+import com.tcrm.admin.shared.ErrorCode;
+import java.util.Set;
 import org.springframework.stereotype.Service;
 import tools.jackson.databind.JsonNode;
 
 /** Executes the supported documented Weidian business APIs without adding business workflows. */
 @Service
 public class WeidianBusinessApiClient implements WeidianBusinessApi {
+  /** Weidian-side outages that affect every call of the shop, not one order or item. */
+  private static final Set<Integer> UNAVAILABLE_STATUS_CODES =
+      Set.of(10000, 10001, 10002, 10004, 10005);
+
+  /** The shop's authorization or token is unusable until it is authorized again. */
+  private static final Set<Integer> AUTH_STATUS_CODES = Set.of(10013, 10016, 10021, 10023, 10026);
+
   private final WeidianClient client;
   private final WeidianBusinessApiParser parser;
 
@@ -81,6 +91,28 @@ public class WeidianBusinessApiClient implements WeidianBusinessApi {
   }
 
   private JsonNode call(long shopId, String method, String version, Object request) {
-    return client.call(shopId, method, version, request);
+    try {
+      return client.call(shopId, method, version, request);
+    } catch (WeidianApiException error) {
+      throw shopWide(error);
+    }
+  }
+
+  /**
+   * Converts failures that concern the whole shop into the shared business vocabulary (task 145
+   * review): a caller such as order sync must fail the shop instead of skipping every order of the
+   * run and notifying once per order. Order- or item-specific Weidian errors keep their type, so
+   * the caller can still skip only the affected record. A response that succeeded without a {@code
+   * result} ({@link WeidianApiException#MISSING_RESULT}) is such a per-call failure.
+   */
+  private static RuntimeException shopWide(WeidianApiException error) {
+    int code = error.statusCode();
+    if (code == WeidianApiException.NO_USABLE_RESPONSE || UNAVAILABLE_STATUS_CODES.contains(code)) {
+      return new BusinessException(ErrorCode.WEIDIAN_API_FAILED);
+    }
+    if (AUTH_STATUS_CODES.contains(code)) {
+      return new BusinessException(ErrorCode.WEIDIAN_SHOP_NOT_AUTHORIZED);
+    }
+    return error;
   }
 }

@@ -82,6 +82,17 @@ public class KolController {
     return R.ok(null);
   }
 
+  /**
+   * Super administrator only (task 147): replaces the password with a generated one that is
+   * returned once, kills every session of the KOL and invalidates unused self-service reset links.
+   */
+  @PostMapping("/{id}/password-reset")
+  @SaCheckRole("SUPER_ADMIN")
+  @AuditLog(module = "KOL", action = "Reset password")
+  public R<ResetKolPasswordVO> resetPassword(@PathVariable @Min(1) Long id) {
+    return R.ok(new ResetKolPasswordVO(kols.adminResetPassword(id)));
+  }
+
   /** Same permission as editing a KOL (task 12a §4.3); 409 when already activated. */
   @PostMapping("/{id}/invite")
   @SaCheckPermission("kol:edit")

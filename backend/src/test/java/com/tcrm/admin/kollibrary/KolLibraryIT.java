@@ -3,6 +3,7 @@ package com.tcrm.admin.kollibrary;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.multipart;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
@@ -10,6 +11,10 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 
 import com.tcrm.admin.CompanySessions;
 import com.tcrm.admin.WeidianTestProperties;
+import java.io.ByteArrayInputStream;
+import java.io.ByteArrayOutputStream;
+import java.time.Duration;
+import java.time.LocalDate;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -20,6 +25,10 @@ import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
+import org.apache.poi.ss.usermodel.IndexedColors;
+import org.apache.poi.xssf.usermodel.XSSFRow;
+import org.apache.poi.xssf.usermodel.XSSFWorkbook;
+import org.awaitility.Awaitility;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
@@ -29,6 +38,7 @@ import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
 import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.http.MediaType;
 import org.springframework.jdbc.core.JdbcTemplate;
+import org.springframework.mock.web.MockMultipartFile;
 import org.springframework.test.context.DynamicPropertyRegistry;
 import org.springframework.test.context.DynamicPropertySource;
 import org.springframework.test.web.servlet.MockMvc;
@@ -139,7 +149,6 @@ class KolLibraryIT {
     body.put("salesPotential", "MEDIUM");
     body.put("cooperationAttitude", "HIGH");
     body.put("grade", "A");
-    body.put("cooperationStage", "REPEAT_INVESTMENT");
     body.put("tags", List.of("高转化", "坑位费贵"));
     body.put("remark", "note");
     body.put("outreachStatus", "REPLIED");
@@ -148,6 +157,7 @@ class KolLibraryIT {
     body.put("sampleStatus", "SHIPPED");
     body.put("trackingNo", "SF123");
     body.put("sampleDate", "2026-10-30");
+    body.put("followUpRemark", "first remark");
     return body;
   }
 
@@ -167,6 +177,121 @@ class KolLibraryIT {
             .getResponse()
             .getContentAsString();
     return json.readTree(response).at("/data/id").asText();
+  }
+
+  @Test
+  void shouldDownloadTemplateAndOnlyImportNewCreators() throws Exception {
+    String token = library.token();
+    String id = createOk(token, "old_creator", "Amy BD");
+    jdbc.update(
+        "UPDATE crm_library_kol SET followers = NULL, profile_url = NULL WHERE id = ?",
+        Long.parseLong(id));
+    byte[] template =
+        mvc.perform(
+                get(LIB + "/imports/template")
+                    .header(TOKEN, token)
+                    .header("Accept-Language", "zh-CN"))
+            .andExpect(status().isOk())
+            .andReturn()
+            .getResponse()
+            .getContentAsByteArray();
+    byte[] uploaded;
+    try (var book = new XSSFWorkbook(new ByteArrayInputStream(template));
+        var out = new ByteArrayOutputStream()) {
+      var sheet = book.getSheet("达人导入");
+      assertThat(sheet.getRow(1).getCell(0).getCellStyle().getFillForegroundColor())
+          .isEqualTo(IndexedColors.LIGHT_YELLOW.getIndex());
+      assertThat(sheet.getRow(1).getCell(6).getCellStyle().getFillForegroundColor())
+          .isNotEqualTo(IndexedColors.LIGHT_YELLOW.getIndex());
+      assertThat(sheet.getRow(1).getLastCellNum()).isEqualTo((short) 25);
+      assertThat(sheet.getDataValidations())
+          .hasSize(11)
+          .anySatisfy(
+              validation -> {
+                assertThat(validation.getValidationConstraint().getFormula1())
+                    .isEqualTo("KOL_PLATFORM");
+                assertThat(validation.getRegions().getCellRangeAddress(0).formatAsString())
+                    .isEqualTo("C3:C202");
+              });
+      assertThat(book.isSheetHidden(book.getSheetIndex("_options"))).isTrue();
+      assertThat(book.getSheet("_options").getRow(0).getCell(4).getStringCellValue())
+          .isEqualTo("美国");
+      var sample = book.getSheet("填写示例").getRow(2);
+      assertThat(sample.getCell(0).getStringCellValue()).isEqualTo("demo.creator");
+      assertThat(sheet.getRow(0).getCell(0).getStringCellValue())
+          .contains("必填项")
+          .doesNotContain("更新");
+      assertThat(sheet.getLastRowNum()).isEqualTo(1);
+      var fresh = sheet.createRow(2);
+      copyExample(sample, fresh, "demo.creator");
+      fresh.getCell(3).setCellValue(186_200);
+      var dateStyle = book.createCellStyle();
+      dateStyle.setDataFormat(book.createDataFormat().getFormat("yyyy-mm-dd"));
+      fresh.getCell(16).setCellValue(LocalDate.of(2026, 11, 6));
+      fresh.getCell(16).setCellStyle(dateStyle);
+      var malformed = sheet.createRow(3);
+      copyExample(sample, malformed, "bad_number");
+      malformed.getCell(3).setCellValue(1);
+      malformed.getCell(3).getCTCell().setV("1E+2147483647");
+      var existing = sheet.createRow(4);
+      copyExample(sample, existing, "@OLD_CREATOR");
+      existing.getCell(24).setCellValue("S");
+      copyExample(sample, sheet.createRow(5), "@DEMO.CREATOR");
+      var incomplete = sheet.createRow(6);
+      incomplete.createCell(0).setCellValue("incomplete_creator");
+      incomplete.createCell(2).setCellValue("TikTok");
+      book.write(out);
+      uploaded = out.toByteArray();
+    }
+    var file =
+        new MockMultipartFile(
+            "file",
+            "达人库导入模板.xlsx",
+            "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+            uploaded);
+    mvc.perform(
+            multipart(LIB + "/imports")
+                .file(file)
+                .header(TOKEN, token)
+                .header("Accept-Language", "zh-CN"))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.data.created").value(1))
+        .andExpect(jsonPath("$.data.updated").doesNotExist())
+        .andExpect(jsonPath("$.data.errors[0].row").value(4))
+        .andExpect(jsonPath("$.data.errors[0].column").value("粉丝数"))
+        .andExpect(jsonPath("$.data.errors[1].row").value(5))
+        .andExpect(jsonPath("$.data.errors[1].errorCode").value("KOL_LIBRARY_DUPLICATE"))
+        .andExpect(jsonPath("$.data.errors[2].row").value(6))
+        .andExpect(jsonPath("$.data.errors[2].errorCode").value("KOL_LIBRARY_IMPORT_DUPLICATE_ROW"))
+        .andExpect(jsonPath("$.data.errors[3].row").value(7))
+        .andExpect(jsonPath("$.data.errors[3].errorCode").value("KOL_LIBRARY_IMPORT_REQUIRED"));
+    assertThat(
+            jdbc.queryForObject(
+                "SELECT followers FROM crm_library_kol WHERE kol_username = ?",
+                Long.class,
+                "demo.creator"))
+        .isEqualTo(186_200L);
+    assertThat(
+            jdbc.queryForObject(
+                "SELECT last_contact_date FROM crm_library_kol WHERE kol_username = ?",
+                LocalDate.class,
+                "demo.creator"))
+        .isEqualTo(LocalDate.of(2026, 11, 6));
+    mvc.perform(get(LIB + "/" + id).header(TOKEN, token))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.data.followUpOwner").value("Amy BD"))
+        .andExpect(jsonPath("$.data.grade").value("A"))
+        .andExpect(jsonPath("$.data.followers").doesNotExist());
+    mvc.perform(get(LIB).header(TOKEN, other.token()))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.data.total").value(0));
+  }
+
+  private static void copyExample(XSSFRow example, XSSFRow row, String username) {
+    for (var cell : example) {
+      row.createCell(cell.getColumnIndex()).setCellValue(cell.getStringCellValue());
+    }
+    row.getCell(0).setCellValue(username);
   }
 
   private Map<String, Object> content(String day) {
@@ -493,8 +618,10 @@ class KolLibraryIT {
                             "lastContactDate", "2026-11-05",
                             "sampleStatus", "RECEIVED",
                             "trackingNo", "SF999",
-                            "sampleDate", "2026-11-02"))))
+                            "sampleDate", "2026-11-02",
+                            "followUpRemark", "dialog remark"))))
         .andExpect(status().isOk())
+        .andExpect(jsonPath("$.data.followUpRemark").value("dialog remark"))
         .andExpect(jsonPath("$.data.outreachStatus").value("COOPERATING"))
         .andExpect(jsonPath("$.data.sampleStatus").value("RECEIVED"))
         .andExpect(jsonPath("$.data.trackingNo").value("SF999"))
@@ -723,9 +850,12 @@ class KolLibraryIT {
     create(token, noId).andExpect(status().isBadRequest());
     var onlyAt = profile("@", "Amy BD");
     create(token, onlyAt).andExpect(status().isBadRequest());
-    var noCategories = profile("nocat", "Amy BD");
-    noCategories.put("categories", List.of());
-    create(token, noCategories).andExpect(status().isBadRequest());
+    var noFollowers = profile("nofollowers", "Amy BD");
+    noFollowers.remove("followers");
+    create(token, noFollowers).andExpect(status().isBadRequest());
+    var noUrl = profile("nourl", "Amy BD");
+    noUrl.remove("profileUrl");
+    create(token, noUrl).andExpect(status().isBadRequest());
     var unknownCategory = profile("badcat", "Amy BD");
     unknownCategory.put("categories", List.of("NOT_A_CATEGORY"));
     create(token, unknownCategory).andExpect(status().isBadRequest());
@@ -755,15 +885,135 @@ class KolLibraryIT {
                     "{\"outreachStatus\":\"COOPERATING\",\"sampleStatus\":\"SHIPPED\","
                         + "\"trackingNo\":\"SF1\"}"))
         .andExpect(status().isOk());
-    List<String> actions =
-        jdbc.queryForList(
-            "SELECT action FROM sys_oper_log WHERE module = 'Kol library' ORDER BY oper_time",
-            String.class);
-    assertThat(actions).contains("Create", "Update follow-up");
+    Awaitility.await()
+        .atMost(Duration.ofSeconds(5))
+        .untilAsserted(
+            () ->
+                assertThat(
+                        jdbc.queryForList(
+                            "SELECT action FROM sys_oper_log WHERE module = 'Kol library' AND tenant_id = ?",
+                            String.class,
+                            library.tenantId()))
+                    .contains("Create", "Update follow-up"));
     List<String> params =
         jdbc.queryForList(
-            "SELECT request_params FROM sys_oper_log WHERE action = 'Create'", String.class);
+            "SELECT request_params FROM sys_oper_log WHERE module = 'Kol library' AND action = 'Create' AND tenant_id = ?",
+            String.class,
+            library.tenantId());
     assertThat(params).isNotEmpty();
     assertThat(params.getFirst()).doesNotContain("555 0100");
+  }
+
+  @Test
+  void shouldKeepCategoriesAndCooperationStage_ofRowsWrittenBeforeTheRevision() throws Exception {
+    String token = library.token();
+    String id = createOk(token, "legacy", "Amy BD");
+    // A row of task 143 still carrying a cooperation stage and no follow-up remark.
+    jdbc.update(
+        "UPDATE crm_library_kol SET cooperation_stage = 'REPEAT_INVESTMENT', follow_up_remark = NULL"
+            + " WHERE id = ?",
+        Long.parseLong(id));
+    var edit = profile("legacy", "Bob BD");
+    edit.put("grade", "S");
+    mvc.perform(
+            put(LIB + "/" + id)
+                .header(TOKEN, token)
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(json.writeValueAsString(edit)))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.data.cooperationStage").doesNotExist())
+        .andExpect(jsonPath("$.data.followUpRemark").value("first remark"));
+    mvc.perform(
+            put(LIB + "/" + id + "/follow-up")
+                .header(TOKEN, token)
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("{\"outreachStatus\":\"REPLIED\",\"sampleStatus\":\"SHIPPED\"}"))
+        .andExpect(status().isOk());
+    Map<String, Object> stored =
+        jdbc.queryForMap(
+            "SELECT cooperation_stage, categories::text AS categories FROM crm_library_kol"
+                + " WHERE id = ?",
+            Long.parseLong(id));
+    assertThat(stored.get("cooperation_stage")).isEqualTo("REPEAT_INVESTMENT");
+    assertThat(stored.get("categories").toString()).contains("BEAUTY_PERSONAL_CARE", "HOME_DAILY");
+  }
+
+  @Test
+  void shouldSaveWithoutCategoriesAndOutreach_andWriteTheFollowUpRemarkEverywhere()
+      throws Exception {
+    String token = library.token();
+    var minimal = profile("minimal", "Amy BD");
+    minimal.put("categories", List.of());
+    minimal.remove("outreachStatus");
+    String id =
+        json.readTree(
+                create(token, minimal)
+                    .andExpect(status().isOk())
+                    .andExpect(jsonPath("$.data.categories.length()").value(0))
+                    .andExpect(jsonPath("$.data.outreachStatus").value("NOT_CONTACTED"))
+                    .andExpect(jsonPath("$.data.followUpRemark").value("first remark"))
+                    .andReturn()
+                    .getResponse()
+                    .getContentAsString())
+            .at("/data/id")
+            .asText();
+    // The table itself accepts an empty category array (the old "at least one" check is gone).
+    assertThat(
+            jdbc.queryForObject(
+                "SELECT categories::text FROM crm_library_kol WHERE id = ?",
+                String.class,
+                Long.parseLong(id)))
+        .isEqualTo("[]");
+    // An edit that leaves the outreach out keeps it; the follow-up remark is replaced.
+    jdbc.update(
+        "UPDATE crm_library_kol SET outreach_status = 'REPLIED' WHERE id = ?", Long.parseLong(id));
+    var edit = profile("minimal", "Amy BD");
+    edit.remove("outreachStatus");
+    edit.put("followUpRemark", "edited remark");
+    mvc.perform(
+            put(LIB + "/" + id)
+                .header(TOKEN, token)
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(json.writeValueAsString(edit)))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.data.outreachStatus").value("REPLIED"))
+        .andExpect(jsonPath("$.data.followUpRemark").value("edited remark"));
+    // The list returns the eight columns' data, not the remark or the change time.
+    mvc.perform(get(LIB).param("keyword", "minimal").header(TOKEN, token))
+        .andExpect(jsonPath("$.data.items[0].followers").value(12000))
+        .andExpect(jsonPath("$.data.items[0].grade").value("A"))
+        .andExpect(jsonPath("$.data.items[0].categories.length()").value(2))
+        .andExpect(jsonPath("$.data.items[0].outreachStatus").value("REPLIED"))
+        .andExpect(jsonPath("$.data.items[0].followUpOwner").value("Amy BD"))
+        .andExpect(jsonPath("$.data.items[0].followUpRemark").doesNotExist())
+        .andExpect(jsonPath("$.data.items[0].cooperationStage").doesNotExist())
+        .andExpect(jsonPath("$.data.items[0].updateTime").doesNotExist());
+    // The operation log is written asynchronously, so wait for the row instead of racing it.
+    List<String> params = List.of();
+    for (int attempt = 0; attempt < 20 && params.isEmpty(); attempt++) {
+      if (attempt > 0) {
+        Thread.sleep(50);
+      }
+      params =
+          jdbc.queryForList(
+              "SELECT request_params FROM sys_oper_log WHERE module = 'Kol library'", String.class);
+    }
+    assertThat(params).isNotEmpty().noneMatch(p -> p.contains("edited remark"));
+  }
+
+  @Test
+  void shouldFilterTheList_byPlatformAndCountryToo() throws Exception {
+    String token = library.token();
+    createOk(token, "usone", "Amy BD");
+    var uk = profile("ukone", "Amy BD");
+    uk.put("countryCode", "GB");
+    uk.put("platform", "INSTAGRAM");
+    create(token, uk).andExpect(status().isOk());
+    mvc.perform(get(LIB).param("countryCode", "GB").header(TOKEN, token))
+        .andExpect(jsonPath("$.data.total").value(1))
+        .andExpect(jsonPath("$.data.items[0].kolUsername").value("ukone"));
+    mvc.perform(get(LIB).param("platform", "TIKTOK").header(TOKEN, token))
+        .andExpect(jsonPath("$.data.total").value(1))
+        .andExpect(jsonPath("$.data.items[0].kolUsername").value("usone"));
   }
 }

@@ -10,7 +10,11 @@ import org.apache.ibatis.annotations.Update;
 
 @Mapper
 public interface CopyJobMapper extends BaseMapper<CopyJobDO> {
-  @Select("SELECT * FROM crm_copy_job WHERE job_code = #{jobCode} LIMIT 1")
+  /** Explicit columns of {@link CopyJobDO} instead of SELECT * (task 145, audit C-02). */
+  String SELECT_FROM =
+      "SELECT id, tenant_id, kol_id, token_id, job_code, caller_platform, target_shop_id, target_channel, status, total_count, success_count, fail_count, error_message, create_time, update_time, finish_time FROM crm_copy_job ";
+
+  @Select(SELECT_FROM + "WHERE job_code = #{jobCode} LIMIT 1")
   CopyJobDO findByCode(@Param("jobCode") String jobCode);
 
   @Select(

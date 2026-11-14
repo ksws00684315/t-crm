@@ -9,17 +9,21 @@ import org.apache.ibatis.annotations.Select;
 
 @Mapper
 public interface CopyJobItemMapper extends BaseMapper<CopyJobItemDO> {
+  /** Explicit columns of {@link CopyJobItemDO} instead of SELECT * (task 145, audit C-02). */
+  String SELECT_FROM =
+      "SELECT id, job_id, tenant_id, source_channel, source_product_id, source_shop_id, rule_id, status, target_item_id, error_message, update_time FROM crm_copy_job_item ";
+
   @Select(
-      """
-      SELECT * FROM crm_copy_job_item
+      SELECT_FROM
+          + """
       WHERE job_id = #{jobId}
       ORDER BY id
       """)
   List<CopyJobItemDO> listByJob(@Param("jobId") Long jobId);
 
   @Select(
-      """
-      SELECT * FROM crm_copy_job_item
+      SELECT_FROM
+          + """
       WHERE job_id = #{jobId} AND status = 'pending'
       ORDER BY id
       """)

@@ -4,7 +4,6 @@ import type {
   LibraryAudienceGender,
   LibraryCategory,
   LibraryContentForm,
-  LibraryCooperationStage,
   LibraryCountry,
   LibraryGrade,
   LibraryLevel,
@@ -56,12 +55,6 @@ export const LIBRARY_CATEGORIES = options<LibraryCategory>([
 ]);
 export const LIBRARY_LEVELS = options<LibraryLevel>(["HIGH", "MEDIUM", "LOW"]);
 export const LIBRARY_GRADES = options<LibraryGrade>(["S", "A", "B", "C"]);
-export const LIBRARY_COOPERATION_STAGES = options<LibraryCooperationStage>([
-  "FIRST_COOPERATION",
-  "REPEAT_INVESTMENT",
-  "LONG_TERM_PARTNERSHIP",
-  "EXCLUSIVE"
-]);
 export const LIBRARY_OUTREACH_STATUSES = options<LibraryOutreachStatus>(
   ["NOT_CONTACTED", "EMAIL_SENT", "REPLIED", "WHATSAPP_ADDED", "REJECTED", "COOPERATING"],
   "NOT_CONTACTED"
@@ -92,7 +85,6 @@ export type LibraryOptionFamily =
   | "category"
   | "level"
   | "grade"
-  | "cooperationStage"
   | "outreachStatus"
   | "sampleStatus"
   | "contentForm"
