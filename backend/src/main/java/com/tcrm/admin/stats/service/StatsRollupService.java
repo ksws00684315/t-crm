@@ -60,14 +60,23 @@ public class StatsRollupService {
     }
   }
 
+  /**
+   * Computes without holding the dirty-day row lock, so concurrent order writes can mark days
+   * freely; the day is dequeued only if no mark arrived while computing.
+   */
   @Transactional
   public boolean rebuildNext(long tenantId, Instant now) {
-    var day = mapper.lockNext(tenantId);
-    if (day == null) {
+    var candidate = mapper.peekNext(tenantId);
+    if (candidate == null) {
       return false;
     }
+    var day = candidate.statDate();
     var period = new StatsPeriod(day, day);
     var facts = source.rollup(tenantId, period.from(), period.until());
+    var marked = mapper.lockDay(tenantId, day);
+    if (!candidate.createTime().equals(marked)) {
+      return true;
+    }
     mapper.clear(tenantId, day);
     for (int start = 0; start < facts.size(); start += INSERT_BATCH_SIZE) {
       int end = Math.min(start + INSERT_BATCH_SIZE, facts.size());

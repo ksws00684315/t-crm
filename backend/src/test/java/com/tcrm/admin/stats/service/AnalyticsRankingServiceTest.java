@@ -12,7 +12,6 @@ import com.tcrm.admin.kol.api.KolOwnershipApi;
 import com.tcrm.admin.kol.api.KolOwnershipDTO;
 import com.tcrm.admin.kol.api.KolRefDTO;
 import com.tcrm.admin.order.api.OrderStatsApi;
-import com.tcrm.admin.order.api.OrderStatsApi.HighlightDTO;
 import com.tcrm.admin.order.api.OrderStatsApi.ProductFactsDTO;
 import com.tcrm.admin.order.api.OrderStatsApi.RankFactsDTO;
 import com.tcrm.admin.order.api.OrderStatsApi.TotalsDTO;
@@ -83,22 +82,16 @@ class AnalyticsRankingServiceTest {
             List.of(
                 new ProductRefDTO(
                     50L, "P1", "Item", "https://example.test/a", 1, "Category", "source-50")));
-    when(orders.productTrend(any(), any(), any(), any()))
-        .thenReturn(List.of(product(1L, "A", 2, 60)));
     var result = service.query(Board.PRODUCT, FILTER, "item", 1, 20, "rank", "desc");
-    assertThat(result.ranking().items().getLast().trend().getFirst().netSalesAmount())
-        .isEqualByComparingTo("60");
     assertThat(result.summary().metrics().paidOrderCount()).isEqualTo(3);
     assertThat(result.ranking().items()).extracting(Row::rank).containsExactly(2, 1);
-    assertThat(result.ranking().items()).extracting(Row::rankChange).containsExactly(-1, 1);
     assertThat(result.ranking().items().getLast().metrics().periodRefundedOrderRate())
         .isEqualByComparingTo("0.5");
-    assertThat(result.ranking().items().getFirst().category()).isEqualTo("Category");
     assertThat(result.ranking().items().getFirst().sourceItemId()).isEqualTo("source-50");
     assertThat(result.ranking().items().getFirst().code()).isEqualTo("B");
     for (String key :
         List.of(
-            "rankChange",
+            "rank",
             "refundedOrderCount",
             "kolCount",
             "paidOrderCount",
@@ -132,8 +125,6 @@ class AnalyticsRankingServiceTest {
     when(inviters.listByIds(any())).thenReturn(List.of(new BdUserDTO(9L, "bd", null, true)));
     when(orders.rankFacts(any(), any(), any(), any()))
         .thenReturn(List.of(person(11, 2), person(12, 0)));
-    when(orders.rankHighlights(any(), any(), any(), any()))
-        .thenReturn(List.of(new HighlightDTO(11L, "Item", null)));
     var result = service.query(Board.CREATOR, FILTER, "ABC", 1, 20, "spuCount", "asc");
     assertThat(result.summary().activeCount()).isEqualTo(1);
     assertThat(result.ranking().items())
@@ -145,7 +136,6 @@ class AnalyticsRankingServiceTest {
               assertThat(row.relationStatus()).isEqualTo("PROMOTING");
               assertThat(row.linkCount()).isEqualTo(1);
               assertThat(row.commissionRate()).isEqualByComparingTo("0.15");
-              assertThat(row.highlights()).containsExactly("Item");
             });
     org.mockito.Mockito.verify(orders, org.mockito.Mockito.atLeastOnce())
         .totals(
@@ -178,8 +168,6 @@ class AnalyticsRankingServiceTest {
                 new KolOwnershipDTO(12L, null, FROM, null)));
     when(orders.rankFacts(any(), any(), any(), any()))
         .thenReturn(List.of(person(9, 1), person(10, 1), person(0, 1)));
-    when(orders.rankHighlights(any(), any(), any(), any()))
-        .thenReturn(List.of(new HighlightDTO(9L, null, 11L)));
     when(orders.sellingCreators(any(), any(), any())).thenReturn(1L);
     var result = service.query(Board.INVITER, FILTER, null, 1, 20, "invitedCount", "desc");
     assertThat(result.summary().invitedCount()).isEqualTo(1);
@@ -187,7 +175,6 @@ class AnalyticsRankingServiceTest {
     assertThat(result.summary().sellingCreatorCount()).isEqualTo(1);
     assertThat(result.summary().sellingCount()).isEqualTo(2);
     assertThat(result.ranking().items()).extracting(Row::id).containsExactly("9", "10", "0");
-    assertThat(result.ranking().items().getFirst().highlights()).containsExactly("Alice");
     assertThat(
             service
                 .query(Board.INVITER, FILTER, "bd2", 1, 20, "effectiveCount", "asc")
@@ -236,7 +223,6 @@ class AnalyticsRankingServiceTest {
         ZERO,
         1,
         1,
-        DAY,
         FROM,
         null,
         FROM);

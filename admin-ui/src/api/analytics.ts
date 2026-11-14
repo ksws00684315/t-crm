@@ -75,9 +75,6 @@ export interface RankRow {
   linkCount?: Scalar;
   commissionRate?: Scalar;
   imageUrl?: string;
-  category?: string;
-  highlights?: string[];
-  trend?: { day: string; netSalesAmount: Scalar }[];
   metrics?: Metrics;
   [key: string]: unknown;
 }

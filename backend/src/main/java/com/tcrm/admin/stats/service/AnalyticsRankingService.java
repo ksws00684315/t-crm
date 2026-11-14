@@ -24,7 +24,6 @@ import com.tcrm.admin.system.api.BdUserApi;
 import com.tcrm.admin.system.api.BdUserDTO;
 import java.math.BigDecimal;
 import java.time.Instant;
-import java.time.LocalDate;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.HashMap;
@@ -144,39 +143,9 @@ public class AnalyticsRankingService {
             .collect(Collectors.toMap(ProductRefDTO::id, Function.identity()));
     var now = productRows(current, shopNames, products);
     var before = productRows(previous, shopNames, Map.of());
-    var ranks = new HashMap<String, Integer>();
-    for (int i = 0; i < before.size(); i++) {
-      ranks.put(before.get(i).id(), i + 1);
-    }
-    var trendStart = period.endDate().minusDays(6);
-    if (trendStart.isBefore(period.startDate())) {
-      trendStart = period.startDate();
-    }
-    var days = trendStart.datesUntil(period.endDate().plusDays(1)).toList();
-    var trend =
-        orders
-            .productTrend(
-                scope,
-                keyword,
-                trendStart.atStartOfDay(StatsPeriod.ZONE).toInstant(),
-                period.until())
-            .stream()
-            .collect(
-                Collectors.groupingBy(
-                    p -> p.shopId() + ":" + p.spu(),
-                    Collectors.toMap(
-                        ProductFactsDTO::day, p -> p.sales().subtract(p.cohortRefunds()))));
     var rows = new ArrayList<Row>();
     for (int i = 0; i < now.size(); i++) {
-      var row = now.get(i);
-      int rank = i + 1;
-      Integer previousRank = ranks.get(row.id());
-      var values = trend.getOrDefault(row.id(), Map.of());
-      var series =
-          days.stream()
-              .map(day -> new TrendPoint(day, values.getOrDefault(day, BigDecimal.ZERO)))
-              .toList();
-      rows.add(row.withRank(rank, previousRank == null ? null : previousRank - rank, series));
+      rows.add(now.get(i).withRank(i + 1));
     }
     var metrics = StatsOverviewService.metrics(productTotals(totals));
     var priorMetrics = StatsOverviewService.metrics(productTotals(previousTotals));
@@ -196,8 +165,7 @@ public class AnalyticsRankingService {
         rows,
         List.of(
             new UnavailableDTO("refundUnits", "REFUND_QUANTITY_PENDING"),
-            new UnavailableDTO("settlementAmount", "WEIDIAN_SETTLEMENT_PENDING"),
-            new UnavailableDTO("netUnits", "REFUND_QUANTITY_PENDING")));
+            new UnavailableDTO("settlementAmount", "WEIDIAN_SETTLEMENT_PENDING")));
   }
 
   private static List<Row> productRows(
@@ -219,16 +187,12 @@ public class AnalyticsRankingService {
                   null,
                   null,
                   null,
-                  null,
                   p.kolCount(),
                   null,
                   p.lastPaidAt(),
                   p.lastRefundedAt(),
                   StatsOverviewService.metrics(productTotals(p)),
                   product == null ? null : product.imageUrl(),
-                  product == null ? null : product.category(),
-                  List.of(),
-                  List.of(),
                   product == null ? null : product.sourceItemId(),
                   null,
                   null,
@@ -368,33 +332,13 @@ public class AnalyticsRankingService {
         overview.overview(
             new StatsOverviewService.ResolvedFilter(
                 scoped, period, filter.filters(), filter.dataScope()));
-    var facts = orders.rankHighlights(scoped, dimension, period.from(), period.until());
-    var highlightedCreators =
-        creators
-            .listByIdsIncludingDeleted(
-                facts.stream()
-                    .map(OrderStatsApi.HighlightDTO::creatorId)
-                    .filter(Objects::nonNull)
-                    .distinct()
-                    .toList())
-            .stream()
-            .collect(Collectors.toMap(k -> k.id(), k -> k.name()));
-    var highlights = new HashMap<Long, List<String>>();
-    for (var fact : facts) {
-      String name =
-          fact.creatorId() == null ? fact.name() : highlightedCreators.get(fact.creatorId());
-      if (name != null) {
-        highlights.computeIfAbsent(fact.entityId(), id -> new ArrayList<>()).add(name);
-      }
-    }
     var rows =
         peopleRows(
             board == Board.INVITER ? withInactivePeriods(now, matched) : now,
             identities,
             matched,
-            search,
-            highlights);
-    var previous = peopleRows(before, identities, matched, search, Map.of());
+            search);
+    var previous = peopleRows(before, identities, matched, search);
     var matchedIds = new java.util.HashSet<>(matched);
     long active =
         board == Board.CREATOR
@@ -486,8 +430,7 @@ public class AnalyticsRankingService {
       List<OrderStatsApi.RankFactsDTO> facts,
       Map<Long, Identity> identities,
       List<Long> matched,
-      boolean search,
-      Map<Long, List<String>> highlights) {
+      boolean search) {
     var matches = new java.util.HashSet<>(matched);
     return facts.stream()
         .filter(f -> !search || matches.contains(f.entityId()))
@@ -514,7 +457,6 @@ public class AnalyticsRankingService {
                   f.entityId(),
                   null,
                   null,
-                  null,
                   identity == null ? null : identity.invited(),
                   identity == null ? null : identity.effective(),
                   f.kolCount(),
@@ -523,9 +465,6 @@ public class AnalyticsRankingService {
                   f.lastRefundedAt(),
                   metrics,
                   null,
-                  null,
-                  highlights.getOrDefault(f.entityId(), List.of()),
-                  List.of(),
                   null,
                   identity == null ? null : identity.primaryPlatform(),
                   f.linkCount(),
@@ -559,7 +498,7 @@ public class AnalyticsRankingService {
   static Comparator<Row> comparator(Board board, StatsRanking sorting, String key) {
     boolean valid =
         switch (key) {
-          case "rank", "rankChange", "refundedOrderCount" -> board == Board.PRODUCT;
+          case "rank", "refundedOrderCount" -> board == Board.PRODUCT;
           case "invitedCount", "effectiveCount" -> board == Board.INVITER;
           case "kolCount" -> board != Board.CREATOR;
           case "spuCount", "linkCount", "commissionRate" -> board == Board.CREATOR;
@@ -579,7 +518,6 @@ public class AnalyticsRankingService {
     Comparator<Row> primary =
         switch (key) {
           case "rank" -> sorting.compare(Row::rank);
-          case "rankChange" -> sorting.compare(Row::rankChange);
           case "invitedCount" -> sorting.compare(Row::invitedCount);
           case "effectiveCount" -> sorting.compare(Row::effectiveCount);
           case "kolCount" -> sorting.compare(Row::kolCount);
@@ -632,8 +570,6 @@ public class AnalyticsRankingService {
       Long effectiveCount,
       Long sellingCreatorCount) {}
 
-  public record TrendPoint(LocalDate day, BigDecimal netSalesAmount) {}
-
   public record Row(
       String id,
       String name,
@@ -644,7 +580,6 @@ public class AnalyticsRankingService {
       Long entityId,
       Long shopId,
       Integer rank,
-      Integer rankChange,
       Long invitedCount,
       Long effectiveCount,
       Long kolCount,
@@ -653,15 +588,12 @@ public class AnalyticsRankingService {
       Instant lastRefundedAt,
       MetricsDTO metrics,
       String imageUrl,
-      String category,
-      List<String> highlights,
-      List<TrendPoint> trend,
       String sourceItemId,
       String primaryPlatform,
       Long linkCount,
       BigDecimal commissionRate,
       String relationStatus) {
-    Row withRank(int nextRank, Integer change, List<TrendPoint> series) {
+    Row withRank(int nextRank) {
       return new Row(
           id,
           name,
@@ -672,7 +604,6 @@ public class AnalyticsRankingService {
           entityId,
           shopId,
           nextRank,
-          change,
           invitedCount,
           effectiveCount,
           kolCount,
@@ -681,9 +612,6 @@ public class AnalyticsRankingService {
           lastRefundedAt,
           metrics,
           imageUrl,
-          category,
-          highlights,
-          series,
           sourceItemId,
           primaryPlatform,
           linkCount,

@@ -35,7 +35,6 @@ class ShopPerformanceExportTest {
             null);
     var zero = BigDecimal.ZERO;
     var m = new StatsOverviewService.MetricsDTO(0, 0, zero, zero, zero, zero, 0, null, null, null);
-    var point = new AnalyticsRankingService.TrendPoint(day, zero);
     var row =
         new AnalyticsRankingService.Row(
             "1",
@@ -47,7 +46,6 @@ class ShopPerformanceExportTest {
             1L,
             1L,
             1,
-            null,
             2L,
             1L,
             0L,
@@ -56,9 +54,6 @@ class ShopPerformanceExportTest {
             null,
             m,
             null,
-            "Category",
-            List.of("Top"),
-            List.of(point),
             "source-1",
             "TikTok",
             2L,

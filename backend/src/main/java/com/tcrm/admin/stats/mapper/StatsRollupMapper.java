@@ -43,12 +43,22 @@ public interface StatsRollupMapper {
 
   @Select(
       """
-      SELECT stat_date FROM agg_stats_dirty_day
+      SELECT stat_date, create_time FROM agg_stats_dirty_day
       WHERE tenant_id = #{tenantId}
       ORDER BY stat_date DESC
-      LIMIT 1 FOR UPDATE SKIP LOCKED
+      LIMIT 1
       """)
-  LocalDate lockNext(long tenantId);
+  DirtyDay peekNext(long tenantId);
+
+  @Select(
+      """
+      SELECT create_time FROM agg_stats_dirty_day
+      WHERE tenant_id = #{tenantId} AND stat_date = #{day}
+      FOR UPDATE
+      """)
+  Instant lockDay(@Param("tenantId") long tenantId, @Param("day") LocalDate day);
+
+  record DirtyDay(LocalDate statDate, Instant createTime) {}
 
   @Delete("DELETE FROM agg_stats_daily WHERE tenant_id = #{tenantId} AND stat_date = #{day}")
   void clear(@Param("tenantId") long tenantId, @Param("day") LocalDate day);

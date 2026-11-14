@@ -50,7 +50,10 @@ class StatsRollupServiceTest {
 
   @Test
   void rebuildWritesBoundedBatchesThenDequeuesOnlyOnSuccess() {
-    when(mapper.lockNext(4)).thenReturn(TODAY).thenReturn(null);
+    when(mapper.peekNext(4))
+        .thenReturn(new StatsRollupMapper.DirtyDay(TODAY, NOW))
+        .thenReturn(null);
+    when(mapper.lockDay(4, TODAY)).thenReturn(NOW);
     var zero = BigDecimal.ZERO;
     var fact = new DailyFactDTO("ORDER", 1, 0, 0, "", "", 1, 0, zero, zero, zero);
     when(source.rollup(eq(4L), any(), any())).thenReturn(Collections.nCopies(1001, fact));
@@ -66,13 +69,25 @@ class StatsRollupServiceTest {
 
   @Test
   void retainsDirtyDateWhenWritingFails() {
-    when(mapper.lockNext(4)).thenReturn(TODAY);
+    when(mapper.peekNext(4)).thenReturn(new StatsRollupMapper.DirtyDay(TODAY, NOW));
+    when(mapper.lockDay(4, TODAY)).thenReturn(NOW);
     var zero = BigDecimal.ZERO;
     when(source.rollup(eq(4L), any(), any()))
         .thenReturn(List.of(new DailyFactDTO("ITEM", 1, 2, 3, "A", "B", 0, 1, zero, zero, zero)));
     doThrow(IllegalStateException.class).when(mapper).write(eq(4L), eq(TODAY), eq(NOW), anyList());
     assertThatThrownBy(() -> service.rebuildNext(4, NOW)).isInstanceOf(IllegalStateException.class);
     verify(mapper, never()).remove(4, TODAY);
+  }
+
+  @Test
+  void keepsDirtyDateQueuedWhenMarkedAgainWhileComputing() {
+    when(mapper.peekNext(4)).thenReturn(new StatsRollupMapper.DirtyDay(TODAY, NOW));
+    when(mapper.lockDay(4, TODAY)).thenReturn(NOW.plusSeconds(1));
+    when(source.rollup(eq(4L), any(), any())).thenReturn(List.of());
+    assertThat(service.rebuildNext(4, NOW)).isTrue();
+    verify(mapper, never()).clear(eq(4L), any());
+    verify(mapper, never()).write(anyLong(), any(), any(), anyList());
+    verify(mapper, never()).remove(eq(4L), any());
   }
 
   @Test

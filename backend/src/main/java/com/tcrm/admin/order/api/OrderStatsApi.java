@@ -14,14 +14,7 @@ public interface OrderStatsApi {
 
   List<ProductFactsDTO> productFacts(ScopeDTO scope, String keyword, Instant from, Instant until);
 
-  List<ProductFactsDTO> productTrend(ScopeDTO scope, String keyword, Instant from, Instant until);
-
-  List<HighlightDTO> rankHighlights(
-      ScopeDTO scope, RankDimension dimension, Instant from, Instant until);
-
   long sellingCreators(ScopeDTO scope, Instant from, Instant until);
-
-  record HighlightDTO(Long entityId, String name, Long creatorId) {}
 
   enum RankDimension {
     SHOP,
@@ -101,7 +94,6 @@ public interface OrderStatsApi {
       BigDecimal completedRefunds,
       long refundedOrders,
       long cohortRefundedOrders,
-      LocalDate day,
       Instant lastPaidAt,
       Instant lastRefundedAt,
       Instant updatedAt) {}
