@@ -130,44 +130,6 @@ public interface OrderStatsMapper {
   @Select(
       SCOPED_PAID_ORDERS
           + """
-      <choose>
-        <when test="dimension.name() == 'KOL'">
-          grouped AS (
-            SELECT p.kol_id AS entity_id, MAX(i.item_name) AS name, NULL::bigint AS creator_id,
-                   ROW_NUMBER() OVER (PARTITION BY p.kol_id ORDER BY SUM(i.pay_amount) DESC,
-                     MAX(p.pay_time) DESC, p.shop_id, i.weidian_item_id) AS position
-            FROM paid p JOIN crm_order_item i ON i.order_id = p.id AND i.kol_id = p.kol_id
-            WHERE i.tenant_id = #{scope.tenantId} AND NOT i.is_deleted AND i.weidian_item_id != ''
-            GROUP BY p.kol_id, p.shop_id, i.weidian_item_id
-          )
-          SELECT entity_id, name, creator_id FROM grouped WHERE position &lt;= 3
-          ORDER BY entity_id, position
-        </when>
-        <otherwise>
-          grouped AS (
-            SELECT bd_user_id AS entity_id, NULL::text AS name, kol_id AS creator_id,
-                   ROW_NUMBER() OVER (PARTITION BY bd_user_id ORDER BY SUM(pay_amount) DESC,
-                     MAX(pay_time) DESC, kol_id) AS position
-            FROM scoped_orders
-            WHERE pay_time &gt;= #{from} AND pay_time &lt; #{until}
-              AND kol_id IS NOT NULL AND bd_user_id IS NOT NULL
-            GROUP BY bd_user_id, kol_id
-          )
-          SELECT entity_id, name, creator_id FROM grouped WHERE position = 1
-        </otherwise>
-      </choose>
-      </script>
-      """)
-  List<com.tcrm.admin.order.api.OrderStatsApi.HighlightDTO> rankHighlights(
-      @Param("scope") ScopeDTO scope,
-      @Param("dimension") RankDimension dimension,
-      @Param("from") Instant from,
-      @Param("until") Instant until);
-
-  @InterceptorIgnore(tenantLine = "true")
-  @Select(
-      SCOPED_PAID_ORDERS
-          + """
       ranked_orders AS NOT MATERIALIZED (
         SELECT id, shop_id, kol_id, pay_time, pay_amount,
         <choose>

@@ -78,26 +78,16 @@ public interface OrderDailyStatsMapper {
              COALESCE(SUM(completed), 0) AS completed_refunds,
              COUNT(DISTINCT refund_order) AS refunded_orders,
              COUNT(DISTINCT cohort_order) AS cohort_refunded_orders,
-             <choose>
-               <when test="daily">CAST(pay_time AT TIME ZONE 'Asia/Shanghai' AS date)</when>
-               <otherwise>NULL::date</otherwise>
-             </choose> AS day,
              MAX(pay_time) AS last_paid_at, MAX(finish_time) AS last_refunded_at, MAX(updated_at) AS updated_at
       FROM events
-      <choose>
-        <when test="daily">
-          WHERE pay_time IS NOT NULL GROUP BY shop_id, spu, CAST(pay_time AT TIME ZONE 'Asia/Shanghai' AS date)
-        </when>
-        <otherwise>GROUP BY GROUPING SETS ((shop_id, spu), ())</otherwise>
-      </choose>
+      GROUP BY GROUPING SETS ((shop_id, spu), ())
       </script>
       """)
   List<ProductFactsDTO> productFacts(
       @Param("scope") ScopeDTO scope,
       @Param("keyword") String keyword,
       @Param("from") Instant from,
-      @Param("until") Instant until,
-      @Param("daily") boolean daily);
+      @Param("until") Instant until);
 
   @InterceptorIgnore(tenantLine = "true")
   @Select(
@@ -192,6 +182,7 @@ public interface OrderDailyStatsMapper {
                0, i.quantity, i.pay_amount, 0, 0
         FROM crm_order_item i JOIN paid p ON p.id = i.order_id
         WHERE i.tenant_id = #{tenantId} AND NOT i.is_deleted AND i.kol_id IS NOT NULL
+          AND i.weidian_item_id != ''
           AND p.attribution_status = 'ATTRIBUTED'
         UNION ALL
         SELECT 'ORDER', shop_id, kol_id, owner_id, '', '', 0, 0, 0,
@@ -204,6 +195,7 @@ public interface OrderDailyStatsMapper {
                CASE WHEN NOT r.cohort THEN r.amount ELSE 0 END
         FROM refund_facts r JOIN crm_order_item i ON i.id = r.order_item_id AND i.order_id = r.order_id
         WHERE i.tenant_id = #{tenantId} AND NOT i.is_deleted AND i.kol_id IS NOT NULL
+          AND i.weidian_item_id != ''
           AND r.attribution_status = 'ATTRIBUTED'
       )
       SELECT grain, shop_id, kol_id, owner_id, product_code, sku_code,

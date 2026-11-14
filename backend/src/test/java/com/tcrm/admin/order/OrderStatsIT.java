@@ -147,7 +147,7 @@ class OrderStatsIT {
 
       var daily = session.getMapper(OrderDailyStatsMapper.class);
       var productScope = new ScopeDTO(4, 9L, null, 11L, null, java.util.List.of(1L));
-      var products = daily.productFacts(productScope, "a", FROM, UNTIL, false);
+      var products = daily.productFacts(productScope, "a", FROM, UNTIL);
       assertThat(products).hasSize(2);
       var product = products.stream().filter(row -> row.shopId() != null).findFirst().orElseThrow();
       assertThat(product.spu()).isEqualTo("A");
@@ -157,22 +157,13 @@ class OrderStatsIT {
       assertThat(product.cohortRefunds()).isEqualByComparingTo("32");
       assertThat(product.cohortRefundedOrders()).isEqualTo(1);
       assertThat(product.completedRefunds()).isZero();
-      assertThat(daily.productFacts(productScope, "not-matching", FROM, UNTIL, false))
+      assertThat(daily.productFacts(productScope, "not-matching", FROM, UNTIL))
           .singleElement()
           .satisfies(total -> assertThat(total.paidOrders()).isZero());
-      assertThat(daily.productFacts(productScope, null, FROM, UNTIL, true))
-          .singleElement()
-          .satisfies(row -> assertThat(row.day()).isEqualTo(LocalDate.of(2026, 11, 3)));
       assertThat(mapper.sellingCreators(productScope, FROM, UNTIL)).isEqualTo(1);
       assertThat(mapper.rankFacts(productScope, RankDimension.KOL, FROM, UNTIL))
           .singleElement()
           .satisfies(row -> assertThat(row.linkCount()).isEqualTo(1));
-      assertThat(mapper.rankHighlights(productScope, RankDimension.KOL, FROM, UNTIL))
-          .singleElement()
-          .satisfies(top -> assertThat(top.name()).isEqualTo("A"));
-      assertThat(mapper.rankHighlights(productScope, RankDimension.INVITER, FROM, UNTIL))
-          .singleElement()
-          .satisfies(top -> assertThat(top.creatorId()).isEqualTo(11L));
       var dailyFacts = daily.rollup(4, FROM, UNTIL);
       assertThat(dailyFacts.stream().filter(row -> "ITEM".equals(row.grain())))
           .extracting(row -> row.skuCode())
