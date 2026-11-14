@@ -1,0 +1,261 @@
+# ALIBABA CLOUD PRODUCTION TEMPLATE (task 150). Independent from docker-compose.prod.yml (AWS):
+# same five services, same single 4-core / 8 GB host layout, same release / ops scripts (they all
+# accept TCRM_COMPOSE_FILE; set it in deploy/.env, see RUNBOOK-ALIYUN.md). Differences from prod:
+#   - pgBackRest repository is POSIX on local disk (TCRM_PGBACKREST_REPO_DIR), not S3: no bucket,
+#     no instance-role credentials, no conf.d mount. Off-host disaster recovery is the ECS automatic
+#     snapshot policy (daily, 7 days) configured in the console, NOT this repository. Whole-instance
+#     loss therefore loses up to one day of data; the ~5-minute ADR-037 target returns when the OSS
+#     repository phase lands (parked branch task/149-aliyun-backup-creds).
+#   - No PGBACKREST_REPO1_S3_* variables at all: pgBackRest rejects empty PGBACKREST_* values.
+# Review every value before use. Images are pulled from the registry (TCRM_IMAGE_REGISTRY, version
+# TCRM_VERSION; built and pushed by .github/workflows/release.yml), nothing is built on the host.
+# Release, update and roll back with deploy/scripts/release.sh from the repository root:
+#   deploy/scripts/release.sh deploy 1.0.0
+# First deployment: create the data volumes once (docker volume create tcrm_pgdata tcrm_redisdata)
+# and the repository directory owned by uid 999 (RUNBOOK-ALIYUN.md chapter 5).
+# Do not run a plain "up -d" after a release: use "up -d --no-deps <service>" (deploy/README.md).
+# Only Nginx publishes ports (80/443); PostgreSQL, Redis, crm-admin and crm-redirect are reachable
+# only inside the compose network. Memory limits follow the design: PostgreSQL 2G, Redis 1.5G,
+# crm-admin 2G, crm-redirect 512M, the rest is left for Nginx and the operating system.
+name: tcrm
+
+x-restart: &restart
+  restart: unless-stopped
+
+# Rotate container logs (json-file keeps them until the container is removed): 5 x 50 MB per service.
+x-logging: &logging
+  logging:
+    driver: json-file
+    options:
+      max-size: 50m
+      max-file: "5"
+
+services:
+  nginx:
+    <<: [*restart, *logging]
+    image: nginx:1.30.5-alpine
+    ports:
+      - "80:80"
+      - "443:443"
+    environment:
+      TCRM_DOMAIN: ${TCRM_DOMAIN:-example.com}
+      # Only substitute our own variables in the templates; nginx variables ($host, ...) stay.
+      NGINX_ENVSUBST_FILTER: ^TCRM_
+    volumes:
+      - ./nginx/templates:/etc/nginx/templates:ro
+      - ./nginx/snippets:/etc/nginx/snippets:ro
+      # The PARENT directory is mounted, not "current": a bind mount resolves a symlink once, at mount
+      # time, so mounting "current" would pin the first release (deploy/README.md, "Release and rollback").
+      - ${TCRM_STATIC_DIR:-./www}:/usr/share/nginx/sites:ro
+      - ${TCRM_CERT_DIR:-./certs}:/etc/nginx/certs:ro
+    # service_started (not healthy): the redirect service must stay reachable even when the backend
+    # is down, so Nginx only needs the upstream names to exist.
+    depends_on:
+      crm-admin:
+        condition: service_started
+      crm-redirect:
+        condition: service_started
+    mem_limit: 256m
+
+  crm-admin:
+    <<: [*restart, *logging]
+    image: ${TCRM_IMAGE_REGISTRY:?TCRM_IMAGE_REGISTRY is required (deploy/.env)}/crm-admin:${TCRM_VERSION:?TCRM_VERSION is required (deploy/.env)}
+    environment:
+      TCRM_ADMIN_PORT: "8080"
+      TCRM_DB_HOST: postgres
+      # Inside the compose network PostgreSQL always listens on 5432 (TCRM_DB_PORT is a host-side port).
+      TCRM_DB_PORT: "5432"
+      TCRM_DB_NAME: ${TCRM_DB_NAME:-tcrm}
+      TCRM_DB_USERNAME: ${TCRM_DB_USERNAME}
+      TCRM_DB_PASSWORD: ${TCRM_DB_PASSWORD}
+      TCRM_REDIS_HOST: redis
+      TCRM_REDIS_PORT: "6379"
+      TCRM_REDIS_PASSWORD: ${TCRM_REDIS_PASSWORD}
+      TCRM_BOOTSTRAP_ADMIN_USERNAME: ${TCRM_BOOTSTRAP_ADMIN_USERNAME:-}
+      TCRM_BOOTSTRAP_ADMIN_PASSWORD: ${TCRM_BOOTSTRAP_ADMIN_PASSWORD:-}
+      TCRM_CORS_ALLOWED_ORIGINS: ${TCRM_CORS_ALLOWED_ORIGINS:-}
+      # Required: https://t.<domain>, no trailing slash; startup fails when missing or malformed.
+      TCRM_LINK_BASE_URL: ${TCRM_LINK_BASE_URL}
+      TCRM_UPLOAD_BASE_URL: ${TCRM_UPLOAD_BASE_URL:-}
+      # Required KOL portal base (https, no trailing slash) for invitation and reset mail links.
+      TCRM_KOL_PORTAL_BASE_URL: ${TCRM_KOL_PORTAL_BASE_URL}
+      # Required Weidian OAuth callback base (https, no trailing slash).
+      TCRM_ADMIN_BASE_URL: ${TCRM_ADMIN_BASE_URL}
+      # Required default for the system configuration url.redirect-fallback (task 34).
+      TCRM_REDIRECT_FALLBACK_URL: ${TCRM_REDIRECT_FALLBACK_URL}
+      # Required 32-byte Base64 AES-256-GCM key for encrypted integration credentials.
+      TCRM_SECRET_KEY: ${TCRM_SECRET_KEY}
+      # Shared with crm-redirect: buyer ID hashes use the same protected salt.
+      TCRM_IP_HASH_SALT: ${TCRM_IP_HASH_SALT}
+      # Resend API key for KOL invitation / reset mails; empty means the logging fallback.
+      TCRM_MAIL_API_KEY: ${TCRM_MAIL_API_KEY:-}
+      # Sender address; REQUIRED when TCRM_MAIL_API_KEY is set (startup fails otherwise).
+      TCRM_MAIL_FROM: ${TCRM_MAIL_FROM:-}
+      # Same value as crm-redirect: the backlog alarm compares against it.
+      TCRM_CLICK_STREAM_MAXLEN: ${TCRM_CLICK_STREAM_MAXLEN:-1000000}
+      # Fixed to the compose network subnet; not taken from .env (ADR-009).
+      TCRM_TRUSTED_PROXIES: 172.30.0.0/24
+      # Empty falls back to CF-Connecting-IP,X-Forwarded-For in ClientIpResolver.
+      TCRM_CLIENT_IP_HEADERS: ${TCRM_CLIENT_IP_HEADERS:-}
+      JAVA_TOOL_OPTIONS: -XX:MaxRAMPercentage=70
+      # Fail startup when the database schema is newer than this image (rollback safety, #106).
+      TCRM_FLYWAY_IGNORE_MIGRATION_PATTERNS: ${TCRM_FLYWAY_IGNORE_MIGRATION_PATTERNS:-}
+    expose:
+      - "8080"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    healthcheck:
+      # JRE image has no curl. CMD-SHELL uses /bin/sh (dash), which has no /dev/tcp;
+      # invoke bash explicitly (Temurin JRE ships bash).
+      test:
+        [
+          "CMD",
+          "bash",
+          "-c",
+          "exec 3<>/dev/tcp/127.0.0.1/8080 && printf 'GET /actuator/health HTTP/1.0\r\n\r\n' >&3 && grep -q '\"status\":\"UP\"' <&3"
+        ]
+      interval: 15s
+      timeout: 5s
+      retries: 10
+      start_period: 60s
+    mem_limit: 2g
+
+  crm-redirect:
+    <<: [*restart, *logging]
+    image: ${TCRM_IMAGE_REGISTRY:?TCRM_IMAGE_REGISTRY is required (deploy/.env)}/crm-redirect:${TCRM_VERSION:?TCRM_VERSION is required (deploy/.env)}
+    environment:
+      TCRM_REDIRECT_PORT: "8081"
+      TCRM_REDIS_HOST: redis
+      TCRM_REDIS_PORT: "6379"
+      TCRM_REDIS_PASSWORD: ${TCRM_REDIS_PASSWORD}
+      TCRM_REDIRECT_FALLBACK_URL: ${TCRM_REDIRECT_FALLBACK_URL}
+      TCRM_IP_HASH_SALT: ${TCRM_IP_HASH_SALT}
+      # Fixed to the compose network subnet; not taken from .env (ADR-009).
+      TCRM_TRUSTED_PROXIES: 172.30.0.0/24
+      # Empty falls back to CF-Connecting-IP,X-Forwarded-For in ClientIpResolver.
+      TCRM_CLIENT_IP_HEADERS: ${TCRM_CLIENT_IP_HEADERS:-}
+      TCRM_CLICK_STREAM_MAXLEN: ${TCRM_CLICK_STREAM_MAXLEN:-1000000}
+      JAVA_TOOL_OPTIONS: -XX:MaxRAMPercentage=70
+    expose:
+      - "8081"
+    depends_on:
+      redis:
+        condition: service_healthy
+    healthcheck:
+      test:
+        [
+          "CMD",
+          "bash",
+          "-c",
+          "exec 3<>/dev/tcp/127.0.0.1/8081 && printf 'GET /healthz HTTP/1.0\r\n\r\n' >&3 && head -n 1 <&3 | grep -q ' 200'"
+        ]
+      interval: 15s
+      timeout: 5s
+      retries: 10
+      start_period: 30s
+    mem_limit: 512m
+
+  postgres:
+    <<: [*restart, *logging]
+    # PostgreSQL 17.11 plus a pinned pgBackRest, built once by the release workflow from
+    # deploy/postgres/Dockerfile. Tag is TCRM_POSTGRES_VERSION (falls back to TCRM_VERSION);
+    # release.sh never restarts the database (L-073).
+    image: ${TCRM_IMAGE_REGISTRY:?TCRM_IMAGE_REGISTRY is required (deploy/.env)}/crm-postgres:${TCRM_POSTGRES_VERSION:-${TCRM_VERSION:?TCRM_VERSION is required (deploy/.env)}}
+    # A real init as PID 1 is REQUIRED for archive-async (see docker-compose.prod.yml).
+    init: true
+    environment:
+      POSTGRES_DB: ${TCRM_DB_NAME:-tcrm}
+      # Superuser, used only for administration (initdb script, backups); crm-admin never gets it.
+      POSTGRES_USER: ${TCRM_DB_SUPERUSER_USERNAME}
+      POSTGRES_PASSWORD: ${TCRM_DB_SUPERUSER_PASSWORD}
+      # Application account; initdb/01-app-role.sh creates it on first start of an empty data volume.
+      TCRM_DB_USERNAME: ${TCRM_DB_USERNAME}
+      TCRM_DB_PASSWORD: ${TCRM_DB_PASSWORD}
+      TZ: UTC
+      # pgBackRest with a POSIX repository on local disk (task 150). No S3 variables and no credentials
+      # fragment: the repository needs neither. The host directory must exist, be owned by uid 999
+      # (postgres inside the image) and be empty before stanza-create (RUNBOOK-ALIYUN.md chapter 5).
+      # Client-side encryption still applies: the snapshot copies ciphertext, not plaintext.
+      PGBACKREST_PG1_USER: ${TCRM_DB_SUPERUSER_USERNAME}
+      PGBACKREST_PG1_DATABASE: ${TCRM_DB_NAME:-tcrm}
+      PGBACKREST_REPO1_TYPE: ${PGBACKREST_REPO1_TYPE:-posix}
+      PGBACKREST_REPO1_PATH: ${PGBACKREST_REPO1_PATH:-/pgbackrest}
+      PGBACKREST_REPO1_CIPHER_PASS: ${PGBACKREST_REPO1_CIPHER_PASS}
+    # PostgreSQL shared memory; Docker's 64 MB default is too small.
+    shm_size: 256m
+    command:
+      - postgres
+      - -c
+      - shared_buffers=512MB
+      # Slow query log threshold from the design document (100 ms).
+      - -c
+      - log_min_duration_statement=100
+      # Continuous WAL archiving into the local repository; archive_timeout bounds the local PITR
+      # data-loss window to about 5 minutes. Off-host loss is bounded by the snapshot interval.
+      - -c
+      - archive_mode=on
+      - -c
+      - archive_timeout=300
+      - -c
+      - archive_command=pgbackrest --stanza=tcrm archive-push %p
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+      - ./postgres/initdb:/docker-entrypoint-initdb.d:ro
+      # Local pgBackRest repository (WAL archive + full/differential backups).
+      - ${TCRM_PGBACKREST_REPO_DIR:-./backups/pgbackrest}:/pgbackrest
+    expose:
+      - "5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $$POSTGRES_USER -d $$POSTGRES_DB"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+    mem_limit: 2g
+
+  redis:
+    <<: [*restart, *logging]
+    image: redis:7.4.5
+    # Streams and the link index live here, so nothing may be evicted (noeviction). Authentication
+    # is mandatory.
+    command:
+      - sh
+      - -c
+      - >-
+        [ -n "$$TCRM_REDIS_PASSWORD" ] || { echo "TCRM_REDIS_PASSWORD must be set" >&2; exit 1; };
+        exec redis-server --appendonly yes --maxmemory 1280mb --maxmemory-policy noeviction
+        --requirepass "$$TCRM_REDIS_PASSWORD"
+    environment:
+      TCRM_REDIS_PASSWORD: ${TCRM_REDIS_PASSWORD:-}
+    volumes:
+      - redisdata:/data
+    expose:
+      - "6379"
+    healthcheck:
+      test:
+        - CMD-SHELL
+        - >-
+          REDISCLI_AUTH="$$TCRM_REDIS_PASSWORD" redis-cli ping | grep -q PONG
+      interval: 10s
+      timeout: 5s
+      retries: 10
+    mem_limit: 1536m
+
+# Fixed subnet so the proxy address range is stable (ADR-009). Must not overlap the host VPC.
+networks:
+  default:
+    ipam:
+      config:
+        - subnet: 172.30.0.0/24
+
+# Data volumes are created by hand once and are external, so "docker compose down -v" cannot delete
+# them (ADR-037; deploy/README.md).
+volumes:
+  pgdata:
+    external: true
+    name: tcrm_pgdata
+  redisdata:
+    external: true
+    name: tcrm_redisdata

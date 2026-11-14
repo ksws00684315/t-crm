@@ -7,7 +7,7 @@ import java.util.List;
 /**
  * Create or edit a library profile (requirement 1.2.1, 1.2.2, 1.2.6 ①). The follow-up fields are
  * also updated by their own dialog; this command carries the whole profile because the screen edits
- * all six groups at once (requirement 1.2.5 ④).
+ * all three form tabs at once (requirement 1.2.5 ④).
  */
 public record LibraryKolCommand(
     String platform,
@@ -27,7 +27,6 @@ public record LibraryKolCommand(
     String salesPotential,
     String cooperationAttitude,
     String grade,
-    String cooperationStage,
     List<String> tags,
     String remark,
     String outreachStatus,
@@ -35,4 +34,5 @@ public record LibraryKolCommand(
     LocalDate lastContactDate,
     String sampleStatus,
     String trackingNo,
-    LocalDate sampleDate) {}
+    LocalDate sampleDate,
+    String followUpRemark) {}

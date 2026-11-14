@@ -23,7 +23,7 @@
 #
 # Environment (all optional):
 #   TCRM_ENV_FILE                  default deploy/.env
-#   TCRM_COMPOSE_FILE              default deploy/docker-compose.prod.yml (also used by pg-backup.sh)
+#   TCRM_COMPOSE_FILE              caller env wins, then deploy/.env, then deploy/docker-compose.prod.yml
 #   TCRM_RELEASE_LOG               default deploy/releases.log
 #   TCRM_RELEASE_HEALTH_TIMEOUT    seconds to wait for crm-admin / crm-redirect (default 300)
 #   TCRM_RELEASE_KEEP              static versions to keep (default 5)
@@ -33,7 +33,9 @@ set -euo pipefail
 
 DEPLOY_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 ENV_FILE="${TCRM_ENV_FILE:-$DEPLOY_DIR/.env}"
-COMPOSE_FILE="${TCRM_COMPOSE_FILE:-$DEPLOY_DIR/docker-compose.prod.yml}"
+# Caller wins; otherwise resolved from the env file in require_tools (task 150: the aliyun template
+# sets TCRM_COMPOSE_FILE in deploy/.env), falling back to the prod compose file.
+COMPOSE_FILE="${TCRM_COMPOSE_FILE:-}"
 RELEASE_LOG="${TCRM_RELEASE_LOG:-$DEPLOY_DIR/releases.log}"
 HEALTH_TIMEOUT="${TCRM_RELEASE_HEALTH_TIMEOUT:-300}"
 KEEP_RELEASES="${TCRM_RELEASE_KEEP:-5}"
@@ -48,11 +50,13 @@ UPDATE_POSTGRES_VERSION="" # set by deploy --postgres <ver>; empty = do not touc
 POSTGRES_PIN_WRITTEN=""    # set by ensure_postgres_version_pinned; first deploy pre-pulls this crm-postgres tag
 
 # Variables without a default in docker-compose.prod.yml (and TCRM_BACKUP_PASSPHRASE_FILE for
-# pg-backup.sh; TCRM_PGBACKREST_CREDS_DIR is the pgBackRest credentials mount source, task 106).
+# pg-backup.sh). The S3 repository additionally needs PGBACKREST_REPO1_S3_BUCKET and
+# TCRM_PGBACKREST_CREDS_DIR (the credentials mount source, task 106); check_env appends them unless
+# PGBACKREST_REPO1_TYPE=posix (task 150: the aliyun template keeps the repository on local disk).
 REQUIRED_ENV="TCRM_IMAGE_REGISTRY TCRM_DOMAIN TCRM_DB_USERNAME TCRM_DB_PASSWORD TCRM_DB_SUPERUSER_USERNAME \
 TCRM_DB_SUPERUSER_PASSWORD TCRM_REDIS_PASSWORD TCRM_LINK_BASE_URL TCRM_KOL_PORTAL_BASE_URL TCRM_ADMIN_BASE_URL \
-TCRM_REDIRECT_FALLBACK_URL TCRM_SECRET_KEY TCRM_IP_HASH_SALT PGBACKREST_REPO1_S3_BUCKET \
-PGBACKREST_REPO1_CIPHER_PASS TCRM_PGBACKREST_CREDS_DIR TCRM_BACKUP_PASSPHRASE_FILE"
+TCRM_REDIRECT_FALLBACK_URL TCRM_SECRET_KEY TCRM_IP_HASH_SALT \
+PGBACKREST_REPO1_CIPHER_PASS TCRM_BACKUP_PASSPHRASE_FILE"
 
 ACTION=""
 TARGET_VERSION=""
@@ -174,6 +178,10 @@ require_tools() {
   done
   docker compose version > /dev/null 2>&1 || die_early "缺少 Docker Compose 插件"
   docker info > /dev/null 2>&1 || die_early "Docker 没有在运行或当前用户无权使用"
+  if [ -z "$COMPOSE_FILE" ]; then
+    COMPOSE_FILE="$(env_get TCRM_COMPOSE_FILE)"
+    COMPOSE_FILE="${COMPOSE_FILE:-$DEPLOY_DIR/docker-compose.prod.yml}"
+  fi
   [ -f "$COMPOSE_FILE" ] || die_early "找不到 Compose 文件：$COMPOSE_FILE"
   [ -f "$ENV_FILE" ] || die_early "找不到 ${ENV_FILE}，请先按 .env.example 创建"
 }
@@ -186,6 +194,10 @@ die_early() {
 
 check_env() {
   local key missing=""
+  case "$(env_get PGBACKREST_REPO1_TYPE)" in
+    posix) ;;
+    *) REQUIRED_ENV="$REQUIRED_ENV PGBACKREST_REPO1_S3_BUCKET TCRM_PGBACKREST_CREDS_DIR" ;;
+  esac
   for key in $REQUIRED_ENV; do
     [ -n "$(env_get "$key")" ] || missing="$missing $key"
   done

@@ -10,16 +10,22 @@ import org.apache.ibatis.annotations.Select;
 /** Company settlement config versions (task 62, requirement 11.03). */
 @Mapper
 public interface CommissionRuleVersionMapper extends BaseMapper<CommissionRuleVersionDO> {
+  /**
+   * Explicit columns of {@link CommissionRuleVersionDO} instead of SELECT * (task 145, audit C-02).
+   */
+  String SELECT_FROM =
+      "SELECT id, tenant_id, version_no, currency, minimum_withdrawal_cny, channel_rules, actor_id, create_time FROM crm_commission_rule_version ";
 
   @Select(
-      """
-      SELECT * FROM crm_commission_rule_version ORDER BY version_no DESC LIMIT 1
+      SELECT_FROM
+          + """
+      ORDER BY version_no DESC LIMIT 1
       """)
   CommissionRuleVersionDO findLatest();
 
   @Select(
-      """
-      SELECT * FROM crm_commission_rule_version
+      SELECT_FROM
+          + """
       WHERE create_time <= #{payTime} ORDER BY version_no DESC LIMIT 1
       """)
   CommissionRuleVersionDO findEffectiveAt(@Param("payTime") Instant payTime);

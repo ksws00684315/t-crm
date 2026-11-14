@@ -5,7 +5,7 @@ import jakarta.validation.constraints.Size;
 import java.time.LocalDate;
 
 /**
- * Follow-up dialog (requirement 1.2.5 ⑤). Only these five fields are accepted, so a request cannot
+ * Follow-up dialog (requirement 1.2.5 ⑤). Only these six fields are accepted, so a request cannot
  * change anything else of the profile.
  */
 public record LibraryFollowUpRequest(
@@ -13,9 +13,10 @@ public record LibraryFollowUpRequest(
     LocalDate lastContactDate,
     @Size(max = 16) String sampleStatus,
     @Size(max = 64) String trackingNo,
-    LocalDate sampleDate) {
+    LocalDate sampleDate,
+    @Size(max = 1000) String followUpRemark) {
   public LibraryFollowUpCommand toCommand() {
     return new LibraryFollowUpCommand(
-        outreachStatus, lastContactDate, sampleStatus, trackingNo, sampleDate);
+        outreachStatus, lastContactDate, sampleStatus, trackingNo, sampleDate, followUpRemark);
   }
 }

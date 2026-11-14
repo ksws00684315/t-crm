@@ -75,11 +75,11 @@ class KolItemServiceTest {
   void shouldListWithoutPrecisionFilter_andOrderByCreateTime() {
     when(items.selectPage(any(), any())).thenAnswer(inv -> emptyPage(inv.getArgument(0)));
 
-    var result = service.page(new KolItemFilterDTO(null, null, null, 1, 20));
+    var result = service.page(new KolItemFilterDTO(null, null, null, null, 1, 20));
 
     assertThat(result.total()).isZero();
     String sql = capturedQuery().getSqlSegment().toLowerCase();
-    assertThat(sql).contains("create_time").contains("desc");
+    assertThat(sql).contains("create_time").contains("desc").doesNotContain("valid_from");
     verify(sales, never()).sumByKolItemIds(any());
     verifyNoInteractions(visits);
   }
@@ -88,9 +88,29 @@ class KolItemServiceTest {
   void shouldUppercaseLinkCode() {
     when(items.selectPage(any(), any())).thenAnswer(inv -> emptyPage(inv.getArgument(0)));
 
-    service.page(new KolItemFilterDTO("kpl-abcdef123456", null, null, 1, 20));
+    service.page(new KolItemFilterDTO("kpl-abcdef123456", null, null, null, 1, 20));
 
     assertThat(paramText(capturedQuery())).contains("KPL-ABCDEF123456");
+  }
+
+  @Test
+  void shouldKeepEnabledOnTheOpenWindow() {
+    when(items.selectPage(any(), any())).thenAnswer(inv -> emptyPage(inv.getArgument(0)));
+
+    service.page(new KolItemFilterDTO(null, null, null, "ENABLED", 1, 20));
+
+    String sql = capturedQuery().getSqlSegment().toLowerCase();
+    assertThat(sql).contains("valid_from <=").contains("valid_to >").doesNotContain("valid_to >=");
+  }
+
+  @Test
+  void shouldKeepDisabledOutsideTheOpenWindow() {
+    when(items.selectPage(any(), any())).thenAnswer(inv -> emptyPage(inv.getArgument(0)));
+
+    service.page(new KolItemFilterDTO(null, null, null, "DISABLED", 1, 20));
+
+    String sql = capturedQuery().getSqlSegment().toLowerCase();
+    assertThat(sql).contains("valid_from is null").contains("valid_from >").contains("valid_to <=");
   }
 
   @Test
@@ -100,7 +120,7 @@ class KolItemServiceTest {
         .thenReturn(List.of(new KolRefDTO(11L, "KOL-TAA001", "Alice", true, 7L)));
     when(items.selectPage(any(), any())).thenAnswer(inv -> emptyPage(inv.getArgument(0)));
 
-    service.page(new KolItemFilterDTO(null, null, null, 1, 20));
+    service.page(new KolItemFilterDTO(null, null, null, null, 1, 20));
 
     Wrapper<?> query = capturedQuery();
     assertThat(query.getSqlSegment()).contains("kol_id IN");
@@ -112,7 +132,7 @@ class KolItemServiceTest {
     when(current.user()).thenReturn(bd());
     when(kols.listByBdUserId(7L)).thenReturn(List.of());
 
-    var result = service.page(new KolItemFilterDTO(null, null, null, 1, 20));
+    var result = service.page(new KolItemFilterDTO(null, null, null, null, 1, 20));
 
     assertThat(result.items()).isEmpty();
     verifyNoInteractions(items, sales, visits);
@@ -122,7 +142,7 @@ class KolItemServiceTest {
   void shouldReturnEmptyWithoutQuery_whenKeywordMatchesNobody() {
     when(kols.findIdsByKeyword("nobody")).thenReturn(List.of());
 
-    var result = service.page(new KolItemFilterDTO(null, "nobody", null, 1, 20));
+    var result = service.page(new KolItemFilterDTO(null, "nobody", null, null, 1, 20));
 
     assertThat(result.items()).isEmpty();
     verifyNoInteractions(items);
@@ -136,7 +156,7 @@ class KolItemServiceTest {
     when(kols.findIdsByKeyword("alice")).thenReturn(List.of(11L, 12L));
     when(items.selectPage(any(), any())).thenAnswer(inv -> emptyPage(inv.getArgument(0)));
 
-    service.page(new KolItemFilterDTO(null, "alice", null, 1, 20));
+    service.page(new KolItemFilterDTO(null, "alice", null, null, 1, 20));
 
     String params = paramText(capturedQuery());
     assertThat(params).contains("11");
@@ -183,7 +203,7 @@ class KolItemServiceTest {
         .thenReturn(
             List.of(cleanup(1L, "SUCCESS", "done", null), cleanup(2L, "FAILED", "why", "api")));
 
-    var result = service.page(new KolItemFilterDTO(null, null, null, 1, 20));
+    var result = service.page(new KolItemFilterDTO(null, null, null, null, 1, 20));
 
     verify(sales).sumByKolItemIds(List.of(1L, 2L));
     verifyNoInteractions(visits);

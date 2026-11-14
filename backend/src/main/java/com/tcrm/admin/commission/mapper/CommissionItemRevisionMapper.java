@@ -14,6 +14,12 @@ import org.apache.ibatis.annotations.Select;
 /** Append-only commission item revisions (task 62). */
 @Mapper
 public interface CommissionItemRevisionMapper extends BaseMapper<CommissionItemRevisionDO> {
+  /**
+   * Explicit columns of {@link CommissionItemRevisionDO} instead of SELECT * (task 145, audit
+   * C-02).
+   */
+  String SELECT_FROM =
+      "SELECT id, tenant_id, item_state_id, source_version, basis_cny, successful_refund_cny, rate, config_version, rule_version_id, accrued_cny, delta_cny, release_basis, evidence, create_time FROM crm_commission_item_revision ";
 
   @Select(
       "SELECT rate FROM crm_commission_rate_supplement"
@@ -41,19 +47,21 @@ public interface CommissionItemRevisionMapper extends BaseMapper<CommissionItemR
 
   /** All revisions of the item states, oldest first; used to show rate snapshots per line. */
   @Select(
-      "<script>SELECT * FROM crm_commission_item_revision WHERE item_state_id IN "
+      "<script>"
+          + SELECT_FROM
+          + "WHERE item_state_id IN "
           + "<foreach collection='ids' item='id' open='(' separator=',' close=')'>#{id}</foreach>"
           + " ORDER BY item_state_id, create_time, id</script>")
   List<CommissionItemRevisionDO> listByItemStateIds(@Param("ids") Collection<Long> ids);
 
   /** Latest revision rows (one per item state) for line display. */
   @Select(
-      "<script>SELECT r.* FROM crm_commission_item_revision r JOIN ("
-          + " SELECT item_state_id, MAX(id) AS max_id FROM crm_commission_item_revision"
+      "<script>"
+          + SELECT_FROM
+          + "WHERE id IN (SELECT MAX(id) FROM crm_commission_item_revision"
           + " WHERE item_state_id IN "
           + "<foreach collection='ids' item='id' open='(' separator=',' close=')'>#{id}</foreach>"
-          + " GROUP BY item_state_id) m ON r.item_state_id = m.item_state_id AND r.id = m.max_id"
-          + "</script>")
+          + " GROUP BY item_state_id)</script>")
   List<CommissionItemRevisionDO> listLatestByItemStateIds(@Param("ids") Collection<Long> ids);
 
   /**

@@ -135,7 +135,11 @@ printf 'TCRM_PGBACKREST_CREDS_DIR=%s\nTCRM_SECRET_KEY=t106-fake-secret\n' "$ENV_
 ) || exit 1
 
 # 2) env file AND caller env: the caller's value wins (the pre-L-112 inline crontab form).
-( TCRM_ENV_FILE="$ENV_FILE_A" TCRM_PGBACKREST_CREDS_DIR="$CREDS_DIR" load_env_config
+# The caller values are separate statements on purpose: since bash 5.3, `VAR=x func` rolls VAR
+# back when the function returns, which is not how a caller's environment reaches this script.
+( TCRM_ENV_FILE="$ENV_FILE_A"
+  TCRM_PGBACKREST_CREDS_DIR="$CREDS_DIR"
+  load_env_config
   expect "$CREDS_DIR" "${TCRM_PGBACKREST_CREDS_DIR:-}" "caller value must win over env file"
 ) || exit 1
 

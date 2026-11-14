@@ -8,7 +8,6 @@ import com.tcrm.admin.kollibrary.mapper.LibraryKolMapper;
 import com.tcrm.admin.kollibrary.model.LibraryAudienceAge;
 import com.tcrm.admin.kollibrary.model.LibraryAudienceGender;
 import com.tcrm.admin.kollibrary.model.LibraryCategory;
-import com.tcrm.admin.kollibrary.model.LibraryCooperationStage;
 import com.tcrm.admin.kollibrary.model.LibraryCountry;
 import com.tcrm.admin.kollibrary.model.LibraryGrade;
 import com.tcrm.admin.kollibrary.model.LibraryKolContentDO;
@@ -146,7 +145,7 @@ public class LibraryKolService {
 
   /**
    * Replaces the profile of a creator; the follow-up fields are written here too, because the edit
-   * form contains all six groups. Editing the creator ID to another existing one is a duplicate.
+   * form contains all three tabs. Editing the creator ID to another existing one is a duplicate.
    */
   @Transactional(rollbackFor = Exception.class)
   public LibraryKolDTO.Detail update(Long id, LibraryKolCommand command) {
@@ -177,7 +176,7 @@ public class LibraryKolService {
     return toDetail(saved, totalsOf(List.of(id)).get(id));
   }
 
-  /** Follow-up dialog: only the five follow-up fields change. */
+  /** Follow-up dialog: only the six follow-up fields change. */
   @Transactional(rollbackFor = Exception.class)
   public LibraryKolDTO.Detail updateFollowUp(Long id, LibraryFollowUpCommand command) {
     require(id);
@@ -198,6 +197,7 @@ public class LibraryKolService {
             .set(LibraryKolDO::getSampleStatus, sample)
             .set(LibraryKolDO::getTrackingNo, strip(command.trackingNo()))
             .set(LibraryKolDO::getSampleDate, command.sampleDate())
+            .set(LibraryKolDO::getFollowUpRemark, text(command.followUpRemark(), 1000))
             .set(LibraryKolDO::getUpdateBy, current.id())
             .set(LibraryKolDO::getUpdateTime, Instant.now()));
     return get(id);
@@ -261,8 +261,11 @@ public class LibraryKolService {
     return result;
   }
 
-  /** Validates the command into {@code row}; the creator ID is normalised before validation. */
-  private void applyProfile(LibraryKolDO row, LibraryKolCommand command, boolean creating) {
+  /**
+   * Validates the command into {@code row}; the creator ID is normalised before validation. The
+   * retired cooperation stage (2026-11-10) is neither read nor written, so its history stays.
+   */
+  void applyProfile(LibraryKolDO row, LibraryKolCommand command, boolean creating) {
     String username = LibraryUsernames.normalize(command.kolUsername());
     if (!LibraryUsernames.valid(username)) {
       throw new BusinessException(ErrorCode.COMMON_VALIDATION_FAILED);
@@ -273,10 +276,13 @@ public class LibraryKolService {
     row.setCountryCode(
         required(LibraryCountry.class, command.countryCode(), ErrorCode.COMMON_VALIDATION_FAILED));
     row.setDisplayName(requiredText(command.displayName()));
-    List<String> categories = options(LibraryCategory.class, command.categories(), true);
+    // Categories are optional since 2026-11-10: none is stored as [].
+    List<String> categories = options(LibraryCategory.class, command.categories());
     row.setCategories(LibraryJson.write(categories));
-    row.setFollowers(nonNegative(command.followers()));
-    row.setProfileUrl(httpUrl(command.profileUrl()));
+    // Followers and profile link are required since 2026-11-10 (requirement 1.2.6 ①). Older rows
+    // may lack them; editing such a row has to fill them in.
+    row.setFollowers(nonNegative(requiredValue(command.followers())));
+    row.setProfileUrl(httpUrl(requiredValue(strip(command.profileUrl()))));
     row.setAvgViews(nonNegative(command.avgViews()));
     row.setEngagementRate(percent(command.engagementRate()));
     row.setAudienceCountry(text(command.audienceCountry(), 64));
@@ -287,16 +293,20 @@ public class LibraryKolService {
     row.setSalesPotential(optional(LibraryLevel.class, command.salesPotential()));
     row.setCooperationAttitude(optional(LibraryLevel.class, command.cooperationAttitude()));
     row.setGrade(optional(LibraryGrade.class, command.grade()));
-    row.setCooperationStage(optional(LibraryCooperationStage.class, command.cooperationStage()));
     row.setTags(tags(command.tags()));
     row.setRemark(text(command.remark(), 1000));
-    row.setOutreachStatus(
-        creating && blank(command.outreachStatus())
-            ? LibraryOutreachStatus.NOT_CONTACTED
-            : required(
-                LibraryOutreachStatus.class,
-                command.outreachStatus(),
-                ErrorCode.COMMON_VALIDATION_FAILED));
+    // Optional since 2026-11-10: a new creator starts as "not contacted", an edit keeps the value.
+    if (blank(command.outreachStatus())) {
+      if (creating) {
+        row.setOutreachStatus(LibraryOutreachStatus.NOT_CONTACTED);
+      }
+    } else {
+      row.setOutreachStatus(
+          required(
+              LibraryOutreachStatus.class,
+              command.outreachStatus(),
+              ErrorCode.COMMON_VALIDATION_FAILED));
+    }
     row.setFollowUpOwner(requiredText(command.followUpOwner()));
     row.setLastContactDate(command.lastContactDate());
     row.setSampleStatus(
@@ -308,6 +318,7 @@ public class LibraryKolService {
                 ErrorCode.COMMON_VALIDATION_FAILED));
     row.setTrackingNo(text(command.trackingNo(), 64));
     row.setSampleDate(command.sampleDate());
+    row.setFollowUpRemark(text(command.followUpRemark(), 1000));
   }
 
   /** Writes every profile column of {@code row} onto the update, nulls included. */
@@ -333,7 +344,6 @@ public class LibraryKolService {
         .set(LibraryKolDO::getSalesPotential, row.getSalesPotential())
         .set(LibraryKolDO::getCooperationAttitude, row.getCooperationAttitude())
         .set(LibraryKolDO::getGrade, row.getGrade())
-        .set(LibraryKolDO::getCooperationStage, row.getCooperationStage())
         .set(
             LibraryKolDO::getTags,
             row.getTags(),
@@ -344,7 +354,8 @@ public class LibraryKolService {
         .set(LibraryKolDO::getLastContactDate, row.getLastContactDate())
         .set(LibraryKolDO::getSampleStatus, row.getSampleStatus())
         .set(LibraryKolDO::getTrackingNo, row.getTrackingNo())
-        .set(LibraryKolDO::getSampleDate, row.getSampleDate());
+        .set(LibraryKolDO::getSampleDate, row.getSampleDate())
+        .set(LibraryKolDO::getFollowUpRemark, row.getFollowUpRemark());
   }
 
   /** Fails with KOL_LIBRARY_DUPLICATE and the existing creator when platform + ID are taken. */
@@ -406,12 +417,8 @@ public class LibraryKolService {
         row.getCountryCode() == null ? null : row.getCountryCode().name(),
         LibraryJson.read(row.getCategories()),
         row.getGrade() == null ? null : row.getGrade().name(),
-        row.getCooperationStage() == null ? null : row.getCooperationStage().name(),
         row.getOutreachStatus() == null ? null : row.getOutreachStatus().name(),
-        row.getFollowUpOwner(),
-        row.getLastContactDate(),
-        row.getSampleStatus() == null ? null : row.getSampleStatus().name(),
-        row.getUpdateTime());
+        row.getFollowUpOwner());
   }
 
   static LibraryKolDTO.Detail toDetail(LibraryKolDO row, LibraryMetrics.Totals totals) {
@@ -442,7 +449,6 @@ public class LibraryKolService {
         name(row.getSalesPotential()),
         name(row.getCooperationAttitude()),
         name(row.getGrade()),
-        name(row.getCooperationStage()),
         LibraryJson.read(row.getTags()),
         row.getRemark(),
         name(row.getOutreachStatus()),
@@ -451,6 +457,7 @@ public class LibraryKolService {
         name(row.getSampleStatus()),
         row.getTrackingNo(),
         row.getSampleDate(),
+        row.getFollowUpRemark(),
         row.getCreateTime(),
         row.getUpdateTime(),
         dtoTotals);
@@ -470,9 +477,9 @@ public class LibraryKolService {
     return blank(value) ? null : required(type, value, ErrorCode.COMMON_VALIDATION_FAILED);
   }
 
-  /** Multi-choice values in registry order; at least one when required. */
+  /** Multi-choice values in registry order; none is an empty list. */
   private static <E extends Enum<E> & LibraryOption> List<String> options(
-      Class<E> type, List<String> values, boolean required) {
+      Class<E> type, List<String> values) {
     EnumSet<E> selected = EnumSet.noneOf(type);
     if (values != null) {
       for (String value : values) {
@@ -481,9 +488,6 @@ public class LibraryKolService {
         }
         selected.add(required(type, value, ErrorCode.COMMON_VALIDATION_FAILED));
       }
-    }
-    if (required && selected.isEmpty()) {
-      throw new BusinessException(ErrorCode.COMMON_VALIDATION_FAILED);
     }
     return selected.stream().map(Enum::name).toList();
   }
@@ -498,6 +502,13 @@ public class LibraryKolService {
       throw new BusinessException(ErrorCode.COMMON_VALIDATION_FAILED);
     }
     return LibraryJson.write(tags);
+  }
+
+  private static <T> T requiredValue(T value) {
+    if (value == null) {
+      throw new BusinessException(ErrorCode.COMMON_VALIDATION_FAILED);
+    }
+    return value;
   }
 
   private static String requiredText(String value) {

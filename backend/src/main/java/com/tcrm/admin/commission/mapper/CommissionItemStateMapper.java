@@ -17,34 +17,45 @@ import org.apache.ibatis.annotations.Update;
  */
 @Mapper
 public interface CommissionItemStateMapper extends BaseMapper<CommissionItemStateDO> {
+  /**
+   * Explicit columns of {@link CommissionItemStateDO} instead of SELECT * (task 145, audit C-02).
+   */
+  String SELECT_FROM =
+      "SELECT id, tenant_id, order_id, order_item_id, kol_id, source_key, source_version, source_updated_at, basis_cny, successful_refund_cny, basis_includes_refund, settlement_state, settlement_time, completed_time, after_sales, verified, config_version, rule_version_id, accrued_commission_cny, released_commission_cny, release_basis, release_at, create_by, create_time, update_by, update_time, is_deleted FROM crm_commission_item_state ";
 
   @Select(
-      """
-      SELECT * FROM crm_commission_item_state WHERE order_item_id = #{orderItemId} FOR UPDATE
+      SELECT_FROM
+          + """
+      WHERE order_item_id = #{orderItemId} FOR UPDATE
       """)
   CommissionItemStateDO lockByOrderItemId(@Param("orderItemId") long orderItemId);
 
   @Select(
-      """
-      SELECT * FROM crm_commission_item_state WHERE order_item_id = #{orderItemId}
+      SELECT_FROM
+          + """
+      WHERE order_item_id = #{orderItemId}
       """)
   CommissionItemStateDO findByOrderItemId(@Param("orderItemId") long orderItemId);
 
   @Select(
-      "<script>SELECT * FROM crm_commission_item_state WHERE order_item_id IN "
+      "<script>"
+          + SELECT_FROM
+          + "WHERE order_item_id IN "
           + "<foreach collection='ids' item='id' open='(' separator=',' close=')'>#{id}</foreach>"
           + " AND is_deleted = FALSE ORDER BY order_item_id</script>")
   List<CommissionItemStateDO> listByOrderItemIds(@Param("ids") Collection<Long> ids);
 
   @Select(
-      "<script>SELECT * FROM crm_commission_item_state WHERE order_id IN "
+      "<script>"
+          + SELECT_FROM
+          + "WHERE order_id IN "
           + "<foreach collection='ids' item='id' open='(' separator=',' close=')'>#{id}</foreach>"
           + " AND is_deleted = FALSE ORDER BY order_id, order_item_id</script>")
   List<CommissionItemStateDO> listByOrderIds(@Param("ids") Collection<Long> ids);
 
   @Select(
-      """
-      SELECT * FROM crm_commission_item_state
+      SELECT_FROM
+          + """
       WHERE verified AND is_deleted = FALSE AND release_at IS NOT NULL AND release_at <= #{now}
         AND accrued_commission_cny > released_commission_cny
       ORDER BY release_at, id
@@ -53,7 +64,7 @@ public interface CommissionItemStateMapper extends BaseMapper<CommissionItemStat
   List<CommissionItemStateDO> listDueForRelease(
       @Param("now") Instant now, @Param("limit") int limit);
 
-  @Select("SELECT * FROM crm_commission_item_state WHERE id = #{id} FOR UPDATE")
+  @Select(SELECT_FROM + "WHERE id = #{id} FOR UPDATE")
   CommissionItemStateDO lockById(@Param("id") long id);
 
   /**
@@ -108,8 +119,8 @@ public interface CommissionItemStateMapper extends BaseMapper<CommissionItemStat
 
   /** All live snapshot rows of the KOL, newest business update first (income detail lines). */
   @Select(
-      """
-      SELECT * FROM crm_commission_item_state
+      SELECT_FROM
+          + """
       WHERE is_deleted = FALSE AND kol_id = #{kolId}
       ORDER BY update_time DESC, order_item_id DESC
       """)
@@ -120,8 +131,8 @@ public interface CommissionItemStateMapper extends BaseMapper<CommissionItemStat
    * time, then order item id). Verified, live, not blocked by after-sales, release actually due.
    */
   @Select(
-      """
-      SELECT * FROM crm_commission_item_state
+      SELECT_FROM
+          + """
       WHERE is_deleted = FALSE AND kol_id = #{kolId} AND verified = TRUE
         AND after_sales = FALSE AND release_basis IN ('CONFIRMED', 'FALLBACK')
         AND release_at <= #{now} AND released_commission_cny > 0

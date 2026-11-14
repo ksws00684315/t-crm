@@ -35,8 +35,10 @@ public class AuditSanitizer {
             || lower.contains("authorization")
             || lower.contains("credential")
             // The creator library keeps the creator's WhatsApp/telephone in "contact": personal
-            // data, so it must not reach the operation log either (standard 06 §4, task 143).
-            || lower.equals("contact")) {
+            // data, so it must not reach the operation log either (standard 06 §4, task 143); its
+            // follow-up remark (task 146) is free text about the creator and is kept out as well.
+            || lower.equals("contact")
+            || lower.equals("followupremark")) {
           obj.put(key, "[REDACTED]");
         } else {
           redact(obj.get(key));

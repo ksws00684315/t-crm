@@ -103,6 +103,25 @@ class WeidianTokenCenterTest {
     assertThat(auth.getLastError()).doesNotContain("old-access", "old-refresh");
   }
 
+  @Test
+  void shouldTreatATokenResponseWithoutResultAsShopWide() throws Exception {
+    // A token response without result breaks every call of the shop (task 145 review), so it must
+    // not be reported as a per-call missing result.
+    CenterFixture fixture = new CenterFixture();
+    WeidianShopAuthDO auth = authorizedService(fixture.cipher, NOW.plusSeconds(60));
+    fixture.returnAuth(auth);
+    fixture.returnApp();
+    when(fixture.gateway.oauthGet(anyString(), any()))
+        .thenReturn(envelope("{\"status\":{\"status_code\":0}}"));
+    fixture.runLockInline();
+
+    assertThatThrownBy(() -> fixture.center.accessToken(SHOP_ID))
+        .isInstanceOfSatisfying(
+            WeidianApiException.class,
+            error ->
+                assertThat(error.statusCode()).isEqualTo(WeidianApiException.NO_USABLE_RESPONSE));
+  }
+
   private void assertRenewal(WeidianAuthMode mode, String expectedPath) throws Exception {
     CenterFixture fixture = new CenterFixture();
     WeidianShopAuthDO auth =

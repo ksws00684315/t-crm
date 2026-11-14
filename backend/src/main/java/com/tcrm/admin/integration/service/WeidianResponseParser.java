@@ -21,7 +21,8 @@ final class WeidianResponseParser {
     }
     JsonNode result = envelope.get("result");
     if (result == null || result.isNull()) {
-      throw new WeidianApiException(-1, "Weidian API response is missing result", false);
+      throw new WeidianApiException(
+          WeidianApiException.MISSING_RESULT, "Weidian API response is missing result", false);
     }
     return result;
   }

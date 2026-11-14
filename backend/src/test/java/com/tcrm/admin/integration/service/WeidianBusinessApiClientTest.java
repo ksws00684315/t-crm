@@ -1,16 +1,21 @@
 package com.tcrm.admin.integration.service;
 
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.ArgumentMatchers.isNull;
 import static org.mockito.ArgumentMatchers.nullable;
+import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import com.tcrm.admin.integration.api.WeidianBusinessApi;
+import com.tcrm.admin.shared.BusinessException;
+import com.tcrm.admin.shared.ErrorCode;
 import java.util.List;
 import org.junit.jupiter.api.Test;
 import tools.jackson.databind.json.JsonMapper;
@@ -66,5 +71,38 @@ class WeidianBusinessApiClientTest {
     verify(client).call(eq(1L), eq("vdian.item.saveItemDetail"), eq("1.0"), isNull());
     verify(client).call(eq(1L), eq("weidian.item.onSale"), eq("1.0"), any());
     verify(client).call(eq(1L), eq("vdian.item.delete"), eq("1.0"), any());
+  }
+
+  @Test
+  void shouldConvertShopWideFailuresIntoBusinessErrors() {
+    for (int code : new int[] {-1, 10001}) {
+      doThrow(new WeidianApiException(code, "Weidian API request failed", false))
+          .when(client)
+          .call(anyLong(), anyString(), anyString(), nullable(Object.class));
+      assertThatThrownBy(() -> api.orderDetail(1, new WeidianBusinessApi.OrderDetailRequest(3L)))
+          .isInstanceOfSatisfying(
+              BusinessException.class,
+              error -> assertThat(error.getErrorCode()).isEqualTo(ErrorCode.WEIDIAN_API_FAILED));
+    }
+    for (int code : new int[] {10013, 10026}) {
+      doThrow(new WeidianApiException(code, "Weidian authorization is expired", false))
+          .when(client)
+          .call(anyLong(), anyString(), anyString(), nullable(Object.class));
+      assertThatThrownBy(() -> api.orderDetail(1, new WeidianBusinessApi.OrderDetailRequest(3L)))
+          .isInstanceOfSatisfying(
+              BusinessException.class,
+              error ->
+                  assertThat(error.getErrorCode())
+                      .isEqualTo(ErrorCode.WEIDIAN_SHOP_NOT_AUTHORIZED));
+    }
+  }
+
+  @Test
+  void shouldKeepOrderSpecificFailuresTypedAsWeidianErrors() {
+    doThrow(new WeidianApiException(200056, "Weidian API error 200056", false))
+        .when(client)
+        .call(anyLong(), anyString(), anyString(), nullable(Object.class));
+    assertThatThrownBy(() -> api.orderDetail(1, new WeidianBusinessApi.OrderDetailRequest(3L)))
+        .isInstanceOf(WeidianApiException.class);
   }
 }

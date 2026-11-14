@@ -48,7 +48,6 @@ function detail(id: string, name: string): LibraryKolDetailVO {
     salesPotential: null,
     cooperationAttitude: null,
     grade: null,
-    cooperationStage: null,
     tags: [],
     remark: null,
     outreachStatus: "NOT_CONTACTED",
@@ -57,6 +56,7 @@ function detail(id: string, name: string): LibraryKolDetailVO {
     sampleStatus: "NOT_SENT",
     trackingNo: null,
     sampleDate: null,
+    followUpRemark: null,
     createTime: "2026-10-01T00:00:00Z",
     updateTime: "2026-11-01T00:00:00Z",
     totals: { contentCount: 0, clicks: 0, orders: 0, gmv: "0.00", totalCost: "0.00", roi: null }

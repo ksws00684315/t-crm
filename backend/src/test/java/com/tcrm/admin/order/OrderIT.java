@@ -3,6 +3,7 @@ package com.tcrm.admin.order;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyLong;
+import static org.mockito.Mockito.doReturn;
 import static org.mockito.Mockito.reset;
 import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
@@ -15,6 +16,7 @@ import com.tcrm.admin.CompanySessions;
 import com.tcrm.admin.WeidianTestProperties;
 import com.tcrm.admin.integration.api.WeidianAuthorizationApi;
 import com.tcrm.admin.integration.api.WeidianBusinessApi;
+import com.tcrm.admin.integration.service.WeidianApiException;
 import com.tcrm.admin.kol.api.KolOwnershipApi;
 import com.tcrm.admin.order.service.OrderNormalizer;
 import com.tcrm.admin.order.service.OrderSnapshotCorrection;
@@ -22,6 +24,8 @@ import com.tcrm.admin.order.service.OrderSync;
 import com.tcrm.admin.order.service.OrderSyncCoordinator;
 import com.tcrm.admin.order.service.OrderWriter;
 import com.tcrm.admin.product.api.OrderMappingApi;
+import com.tcrm.admin.shared.BusinessException;
+import com.tcrm.admin.shared.ErrorCode;
 import com.tcrm.admin.shared.TenantScope;
 import java.math.BigDecimal;
 import java.sql.Timestamp;
@@ -142,6 +146,8 @@ class OrderIT {
             "crm_order_item",
             "crm_order",
             "crm_order_sync_state",
+            "crm_order_sync_retry",
+            "crm_order_sync_failure",
             "crm_kol_item",
             "crm_weidian_shop_auth",
             "crm_product",
@@ -351,6 +357,131 @@ class OrderIT {
         .isEqualByComparingTo("2.30");
     assertThat(jdbc.queryForObject("SELECT refund_amount FROM crm_order_item", BigDecimal.class))
         .isEqualByComparingTo("2.30");
+  }
+
+  @Test
+  void shouldSkipAndRetryOnlyTheFailingOrder_whenOneOrderDetailFails() {
+    // Audit B-5: one bad order detail used to fail the whole shop and roll both cursors back.
+    var good = new WeidianBusinessApi.OrderListItem("2002", null, null, null, PAID, null);
+    var bad = new WeidianBusinessApi.OrderListItem("2001", null, null, null, PAID, null);
+    when(remote.orderList(anyLong(), any()))
+        .thenReturn(
+            new WeidianBusinessApi.OrderListResponse(2, 2, List.of(bad, good), false, null, null));
+    when(remote.orderDetail(anyLong(), any()))
+        .thenAnswer(
+            call -> {
+              long id = call.<WeidianBusinessApi.OrderDetailRequest>getArgument(1).orderId();
+              // 2001 answers with another order's identity until it is fixed upstream
+              return detail(id == 2001 ? "9999" : String.valueOf(id), PAID, line("90", "1"));
+            });
+
+    TenantScope.runCompany(1, () -> assertThat(sync.synchronize(10)).isTrue());
+
+    assertThat(jdbc.queryForList("SELECT weidian_order_id FROM crm_order", String.class))
+        .containsExactly("2002");
+    assertThat(
+            jdbc.queryForMap(
+                "SELECT tenant_id, order_id, fail_count, last_error FROM crm_order_sync_retry"))
+        .containsEntry("tenant_id", 1L)
+        .containsEntry("order_id", "2001")
+        .containsEntry("fail_count", 1)
+        .containsEntry(
+            "last_error", "Order synchronization failed for order 2001: inspect API status logs");
+    assertThat(
+            jdbc.queryForObject(
+                "SELECT count(*) FROM crm_order_sync_failure WHERE shop_id = 10", Integer.class))
+        .isEqualTo(1);
+    assertThat(
+            jdbc.queryForObject(
+                "SELECT order_cursor IS NOT NULL AND last_error IS NULL FROM crm_order_sync_state"
+                    + " WHERE shop_id = 10",
+                Boolean.class))
+        .isTrue();
+
+    // The next run retries 2001 although it is no longer in the order list.
+    // doReturn: re-stubbing with when() would first invoke the answer above with null arguments
+    doReturn(new WeidianBusinessApi.OrderListResponse(0, 0, List.of(), false, null, null))
+        .when(remote)
+        .orderList(anyLong(), any());
+    doReturn(detail("2001", PAID, line("90", "1"))).when(remote).orderDetail(anyLong(), any());
+    TenantScope.runCompany(1, () -> assertThat(sync.synchronize(10)).isTrue());
+
+    assertThat(jdbc.queryForList("SELECT weidian_order_id FROM crm_order", String.class))
+        .containsExactlyInAnyOrder("2001", "2002");
+    assertThat(jdbc.queryForObject("SELECT count(*) FROM crm_order_sync_retry", Integer.class))
+        .isZero();
+  }
+
+  @Test
+  void shouldFailTheShopAndQueueNoRetries_whenOrderDetailsHitAShopWideFailure() {
+    // Task 145 review: a converted Weidian outage must not be treated as one bad order per
+    // detail: no retry rows, one failure record and both cursors kept.
+    var first = new WeidianBusinessApi.OrderListItem("2001", null, null, null, PAID, null);
+    var second = new WeidianBusinessApi.OrderListItem("2002", null, null, null, PAID, null);
+    when(remote.orderList(anyLong(), any()))
+        .thenReturn(
+            new WeidianBusinessApi.OrderListResponse(
+                2, 2, List.of(first, second), false, null, null));
+    when(remote.orderDetail(anyLong(), any()))
+        .thenThrow(new BusinessException(ErrorCode.WEIDIAN_API_FAILED));
+
+    TenantScope.runCompany(1, () -> assertThat(sync.synchronize(10)).isFalse());
+
+    assertThat(jdbc.queryForObject("SELECT count(*) FROM crm_order_sync_retry", Integer.class))
+        .isZero();
+    assertThat(
+            jdbc.queryForObject(
+                "SELECT count(*) FROM crm_order_sync_failure WHERE shop_id = 10", Integer.class))
+        .isEqualTo(1);
+    assertThat(
+            jdbc.queryForObject(
+                "SELECT order_cursor IS NULL AND last_error = ? FROM crm_order_sync_state"
+                    + " WHERE shop_id = 10",
+                Boolean.class,
+                "Order synchronization failed for order 2001: WEIDIAN_API_FAILED"))
+        .isTrue();
+  }
+
+  @Test
+  void shouldSkipOnlyTheOrderWithoutResult_whenOtherOrdersSucceed() {
+    // Task 145 review: a detail without result must stay a per-order failure instead of failing
+    // the shop.
+    var missing = new WeidianBusinessApi.OrderListItem("2001", null, null, null, PAID, null);
+    var good = new WeidianBusinessApi.OrderListItem("2002", null, null, null, PAID, null);
+    when(remote.orderList(anyLong(), any()))
+        .thenReturn(
+            new WeidianBusinessApi.OrderListResponse(
+                2, 2, List.of(missing, good), false, null, null));
+    when(remote.orderDetail(anyLong(), any()))
+        .thenAnswer(
+            call -> {
+              long id = call.<WeidianBusinessApi.OrderDetailRequest>getArgument(1).orderId();
+              if (id == 2001) {
+                throw new WeidianApiException(
+                    WeidianApiException.MISSING_RESULT,
+                    "Weidian API response is missing result",
+                    false);
+              }
+              return detail(String.valueOf(id), PAID, line("90", "1"));
+            });
+
+    TenantScope.runCompany(1, () -> assertThat(sync.synchronize(10)).isTrue());
+
+    assertThat(jdbc.queryForList("SELECT weidian_order_id FROM crm_order", String.class))
+        .containsExactly("2002");
+    assertThat(jdbc.queryForMap("SELECT order_id, fail_count FROM crm_order_sync_retry"))
+        .containsEntry("order_id", "2001")
+        .containsEntry("fail_count", 1);
+    assertThat(
+            jdbc.queryForObject(
+                "SELECT count(*) FROM crm_order_sync_failure WHERE shop_id = 10", Integer.class))
+        .isEqualTo(1);
+    assertThat(
+            jdbc.queryForObject(
+                "SELECT order_cursor IS NOT NULL AND last_error IS NULL FROM crm_order_sync_state"
+                    + " WHERE shop_id = 10",
+                Boolean.class))
+        .isTrue();
   }
 
   @Test
