@@ -94,7 +94,28 @@ const zhCN = {
     unassigned: "未归属",
     highRefund: "高退",
     scope: { ALL: "公司数据", OWN: "本人数据" },
+    drilldown: {
+      overview: "经营概览",
+      creators: "归属达人",
+      skus: "SKU 表现",
+      contribution: "达人贡献",
+      creatorName: "达人",
+      orders: "订单商品",
+      refunds: "成功退款",
+      daily: "每日销售与退款",
+      clocks: "销售额按支付时间统计，退款金额按退款完结时间统计。",
+      orderNo: "订单号",
+      refundNo: "退款单号",
+      product: "订单商品",
+      itemAmount: "商品实付金额",
+      payTime: "支付时间",
+      refundTime: "退款完结时间",
+      beijingTime: "北京时间",
+      loading: "正在加载趋势",
+      emptyTrend: "所选期间无销售或退款记录"
+    },
     "shop-performance": {
+      detailTitle: "店铺经营详情",
       selling: "有成交店铺数",
       active: "全部店铺 {value}",
       identity: "店铺名称及编号",
@@ -105,6 +126,7 @@ const zhCN = {
       }
     },
     "best-sellers": {
+      detailTitle: "商品经营详情",
       selling: "成交 SPU 数",
       identity: "订单商品",
       channelCode: "渠道/ID",
@@ -134,6 +156,7 @@ const zhCN = {
       }
     },
     "kol-ranking": {
+      detailTitle: "达人经营详情",
       selling: "有销售达人",
       active: "有效达人 {value}",
       identity: "达人名/社媒/ID",
@@ -169,6 +192,7 @@ const zhCN = {
       }
     },
     "inviter-performance": {
+      detailTitle: "邀请人业绩详情",
       selling: "有销售邀请人",
       active: "有效邀请人 {value}",
       identity: "邀请人",

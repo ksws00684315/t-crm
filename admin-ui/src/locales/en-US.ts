@@ -92,7 +92,28 @@ const enUS: MessageSchema = {
     unassigned: "Unassigned",
     highRefund: "High refund",
     scope: { ALL: "Company scope", OWN: "Own scope" },
+    drilldown: {
+      overview: "Overview",
+      creators: "Assigned creators",
+      skus: "SKU performance",
+      contribution: "Creator contribution",
+      creatorName: "Creator",
+      orders: "Order items",
+      refunds: "Successful refunds",
+      daily: "Daily sales and refunds",
+      clocks: "Sales use payment time. Refunds use refund completion time.",
+      orderNo: "Order number",
+      refundNo: "Refund number",
+      product: "Order product",
+      itemAmount: "Item amount paid",
+      payTime: "Payment time",
+      refundTime: "Refund completion time",
+      beijingTime: "Beijing time",
+      loading: "Loading trend",
+      emptyTrend: "No sales or refunds in the selected period"
+    },
     "shop-performance": {
+      detailTitle: "Shop performance details",
       selling: "Shops with sales",
       active: "All shops {value}",
       identity: "Shop name / code",
@@ -104,6 +125,7 @@ const enUS: MessageSchema = {
       }
     },
     "best-sellers": {
+      detailTitle: "Product performance details",
       selling: "SPUs with sales",
       identity: "Order product",
       channelCode: "Channel / ID",
@@ -140,6 +162,7 @@ const enUS: MessageSchema = {
       }
     },
     "kol-ranking": {
+      detailTitle: "Creator performance details",
       selling: "Creators with sales",
       active: "Active creators {value}",
       identity: "Creator / social / ID",
@@ -185,6 +208,7 @@ const enUS: MessageSchema = {
       }
     },
     "inviter-performance": {
+      detailTitle: "Inviter performance details",
       selling: "Inviters with sales",
       active: "Active inviters {value}",
       identity: "Inviter",

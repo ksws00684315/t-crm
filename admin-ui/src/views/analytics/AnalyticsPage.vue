@@ -1,5 +1,13 @@
 <script setup lang="ts">
-import { computed, onActivated, onDeactivated, onMounted, onUnmounted, ref } from "vue";
+import {
+  computed,
+  defineAsyncComponent,
+  onActivated,
+  onDeactivated,
+  onMounted,
+  onUnmounted,
+  ref
+} from "vue";
 import { useRoute } from "vue-router";
 import { useI18n } from "vue-i18n";
 import { ElMessage } from "element-plus";
@@ -16,6 +24,7 @@ import {
 import { analyticsOptions, exportAnalytics, queryAnalytics } from "@/api/analytics";
 import type {
   AnalyticsResult,
+  DetailQuery,
   Filters,
   Metric,
   Options,
@@ -50,6 +59,7 @@ import QuerySummary from "./QuerySummary.vue";
 defineOptions({ name: "AnalyticsPage" });
 
 const { t, locale } = useI18n();
+const AnalyticsDetail = defineAsyncComponent(() => import("./AnalyticsDetail.vue"));
 const me = useUserStore();
 const board = boards[String(useRoute().name)]!;
 const shop = board === "shop-performance";
@@ -135,9 +145,27 @@ const customHeaders = computed(() =>
 const cellKeys = columnsByBoard[board].filter(
   key => key !== "rank" && (sortable.has(key) || pendingColumns.has(key))
 );
-const detailActions = computed(() => [
-  { key: "detail", label: t("analytics.detail"), disabled: true, tooltip: t("common.comingSoon") }
-]);
+const selectedDetail = ref<{ row: RankRow; filters: DetailQuery }>();
+
+function detailActions(row: RankRow) {
+  return [{ key: "detail", label: t("analytics.detail"), onClick: () => openDetail(row) }];
+}
+
+function openDetail(row: RankRow): void {
+  const meta = result.value?.meta;
+  if (!meta) return;
+  selectedDetail.value = {
+    row,
+    filters: {
+      ...meta.period,
+      ...meta.filters,
+      shopId: shop || product ? row.shopId : meta.filters.shopId,
+      productCode: product ? row.code : undefined,
+      keyword: product ? result.value?.keyword : undefined,
+      entityId: creator || inviter ? row.id : undefined
+    }
+  };
+}
 
 function identity(row: RankRow): string {
   if (creator && row.name && row.primaryPlatform) {
@@ -661,8 +689,16 @@ onUnmounted(stop);
         <span class="coverage-values__separator" aria-hidden="true">/</span>
         {{ display("invitedCount", valueOf(row, "invitedCount")) }}
       </template>
-      <template #actions><RowActions :actions="detailActions" /></template>
+      <template #actions="{ row }"><RowActions :actions="detailActions(row)" /></template>
     </DataTable>
+    <AnalyticsDetail
+      v-if="selectedDetail"
+      :board="board"
+      :row="selectedDetail.row"
+      :name="identity(selectedDetail.row)"
+      :filters="selectedDetail.filters"
+      @close="selectedDetail = undefined"
+    />
   </div>
 </template>
 

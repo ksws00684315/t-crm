@@ -40,7 +40,11 @@ public class StatsOverviewService {
   }
 
   boolean canViewCommission() {
-    return current.effectivePermissions(current.user()).contains("commission:view");
+    return canView("commission:view");
+  }
+
+  boolean canView(String permission) {
+    return current.effectivePermissions(current.user()).contains(permission);
   }
 
   ResolvedFilter resolve(FilterDTO filter) {

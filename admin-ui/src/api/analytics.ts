@@ -89,6 +89,62 @@ export interface AnalyticsResult {
   sortDirection: "asc" | "desc";
   keyword?: string;
 }
+export interface DetailQuery extends Filters {
+  entityId?: string;
+  productCode?: string;
+}
+export type ActivityKind = "ORDERS" | "REFUNDS";
+export interface EvidenceRow {
+  id: string;
+  orderNo: string;
+  refundNo?: string;
+  product?: string;
+  sku?: string;
+  units?: number;
+  amount: Scalar;
+  eventTime: string;
+}
+export interface DailyAmount {
+  day: string;
+  sales: Scalar;
+  refunds: Scalar;
+}
+interface DetailResult {
+  daily: DailyAmount[] | null;
+  activity: { items: EvidenceRow[]; total: Scalar; page: number; size: number } | null;
+}
+export function queryAnalyticsDetail(
+  board: Board,
+  params: DetailQuery & { kind?: ActivityKind; page?: number; size?: number }
+) {
+  return http.request<DetailResult>({ method: "get", url: `/stats/${board}/details`, params });
+}
+export type ProductBreakdown = "SKUS" | "CREATORS";
+export interface ProductGroup {
+  code: string;
+  name?: string;
+  paidOrderCount: Scalar;
+  units: Scalar;
+  salesAmount: Scalar;
+  completedRefundAmount: Scalar;
+  netSalesAmount: Scalar;
+}
+export function queryProductBreakdown(
+  params: DetailQuery & { group: ProductBreakdown; page: number; size: number }
+) {
+  return http.request<{ items: ProductGroup[]; total: Scalar }>({
+    method: "get",
+    url: "/stats/best-sellers/breakdowns",
+    params
+  });
+}
+export function queryInviterCreators(params: DetailQuery & { page: number; size: number }) {
+  return http.request<{ items: RankRow[]; total: Scalar; page: number; size: number }>({
+    method: "get",
+    url: "/stats/inviter-performance/creators",
+    params
+  });
+}
 export function queryAnalytics(board: Board, params: RankingQuery) {
   return http.request<AnalyticsResult>({ method: "get", url: `/stats/${board}`, params });
 }

@@ -2,9 +2,13 @@ package com.tcrm.admin.order;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
+import com.tcrm.admin.order.api.OrderEvidenceApi.Kind;
+import com.tcrm.admin.order.api.OrderEvidenceApi.ProductBreakdown;
+import com.tcrm.admin.order.api.OrderEvidenceApi.Selection;
 import com.tcrm.admin.order.api.OrderStatsApi.RankDimension;
 import com.tcrm.admin.order.api.OrderStatsApi.ScopeDTO;
 import com.tcrm.admin.order.mapper.OrderDailyStatsMapper;
+import com.tcrm.admin.order.mapper.OrderEvidenceMapper;
 import com.tcrm.admin.order.mapper.OrderStatsMapper;
 import com.tcrm.admin.order.service.OrderStatsService;
 import com.tcrm.admin.stats.mapper.StatsRollupMapper;
@@ -105,6 +109,7 @@ class OrderStatsIT {
     configuration.setMapUnderscoreToCamelCase(true);
     configuration.addMapper(OrderStatsMapper.class);
     configuration.addMapper(OrderDailyStatsMapper.class);
+    configuration.addMapper(OrderEvidenceMapper.class);
     configuration.addMapper(StatsRollupMapper.class);
     var factory = new SqlSessionFactoryBuilder().build(configuration);
 
@@ -118,6 +123,52 @@ class OrderStatsIT {
       assertThat(own.completedRefunds()).isEqualByComparingTo("20");
       assertThat(own.refundedOrders()).isEqualTo(1);
       assertThat(own.updatedAt()).isNotNull();
+
+      var evidence = session.getMapper(OrderEvidenceMapper.class);
+      var scope = new ScopeDTO(4, 9L, 1L, 11L, null, java.util.List.of(1L));
+      var shopEvidence = new Selection(scope, null, null, null, null, FROM, UNTIL);
+      var productEvidence = new Selection(scope, null, null, "A", null, FROM, UNTIL);
+      assertThat(evidence.count(shopEvidence, Kind.ORDERS)).isEqualTo(2);
+      assertThat(evidence.page(shopEvidence, Kind.ORDERS, 1, 1))
+          .singleElement()
+          .satisfies(row -> assertThat(row.units()).isEqualTo(2));
+      assertThat(evidence.page(shopEvidence, Kind.REFUNDS, 20, 0))
+          .extracting(row -> row.refundNo())
+          .containsExactly("t144-r4", "t144-r3");
+      assertThat(evidence.count(productEvidence, Kind.REFUNDS)).isZero();
+      assertThat(evidence.countProductGroups(productEvidence, ProductBreakdown.SKUS)).isEqualTo(2);
+      assertThat(evidence.productGroups(productEvidence, ProductBreakdown.SKUS, 1, 0))
+          .singleElement()
+          .satisfies(
+              row -> {
+                assertThat(row.code()).isEqualTo("2");
+                assertThat(row.netSalesAmount()).isEqualByComparingTo("40");
+              });
+      assertThat(evidence.productGroups(productEvidence, ProductBreakdown.CREATORS, 20, 0))
+          .singleElement()
+          .satisfies(
+              row -> {
+                assertThat(row.code()).isEqualTo("11");
+                assertThat(row.paidOrderCount()).isEqualTo(1);
+                assertThat(row.netSalesAmount()).isEqualByComparingTo("68");
+              });
+      assertThat(evidence.daily(productEvidence))
+          .singleElement()
+          .satisfies(
+              day -> {
+                assertThat(day.day()).isEqualTo(LocalDate.of(2026, 11, 3));
+                assertThat(day.sales()).isEqualByComparingTo("100");
+                assertThat(day.refunds()).isEqualByComparingTo("0");
+              });
+      assertThat(evidence.daily(shopEvidence))
+          .singleElement()
+          .satisfies(
+              day -> {
+                assertThat(day.sales()).isEqualByComparingTo(own.sales());
+                assertThat(day.refunds()).isEqualByComparingTo(own.completedRefunds());
+              });
+      var otherInviter = new Selection(scope, null, 10L, null, null, FROM, UNTIL);
+      assertThat(evidence.daily(otherInviter)).isEmpty();
 
       var all = mapper.totals(new ScopeDTO(4, null, null, null, null), FROM, UNTIL);
       assertThat(all.paidOrders()).isEqualTo(3);
