@@ -2,6 +2,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import type * as FinanceUtils from "@/utils/finance";
 import { http } from "../http";
 import { exportWithdrawals, listFinanceTasks, saveConfig } from "../commission/finance";
+import type { SettlementConfig } from "../commission/finance-types";
 
 vi.mock("../http", () => ({ http: { request: vi.fn(), download: vi.fn() } }));
 vi.mock("@/utils/finance", async importOriginal => {
@@ -12,11 +13,11 @@ vi.mock("@/utils/finance", async importOriginal => {
 beforeEach(() => vi.clearAllMocks());
 
 it.each([0, 30])("saves the withdrawal minimum with Weidian freeze days set to %i", async days => {
-  const config = {
+  const config: SettlementConfig = {
     currency: "CNY",
     minimum: "125.50",
     version: 3,
-    channels: [{ code: "WEIDIAN", name: "微店", days }]
+    channels: [{ code: "WEIDIAN", name: "微店", basis: "SETTLE_TIME", days }]
   };
   vi.mocked(http.request).mockResolvedValue(config);
 
