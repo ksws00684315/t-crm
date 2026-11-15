@@ -2,7 +2,7 @@ import type * as FinanceUtils from "@/utils/finance";
 import { flushPromises, mount } from "@vue/test-utils";
 import { createPinia, setActivePinia } from "pinia";
 import { createMemoryHistory, createRouter } from "vue-router";
-import ElementPlus from "element-plus";
+import ElementPlus, { ElMessage } from "element-plus";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import * as api from "@/api/commission/finance";
 import { createFinanceDemo } from "../../../../../preview/commission/finance-engine";
@@ -263,6 +263,20 @@ describe("finance admin pages", () => {
     await flushPromises();
     expect(wrapper.find('[data-test="config-save"]').exists()).toBe(false);
     expect(wrapper.get('[data-test="config-minimum"]').attributes("disabled")).toBeDefined();
+    wrapper.unmount();
+  });
+  it("blocks saving when the freeze days are cleared", async () => {
+    const config = createFinanceDemo().getConfig("SUPER_ADMIN", "data");
+    config.channels[0]!.days = null as unknown as number;
+    vi.mocked(api.getConfig).mockResolvedValue(config);
+    const error = vi.spyOn(ElMessage, "error").mockImplementation(() => ({ close: () => {} }));
+    const wrapper = mount(ConfigPage, { global });
+    await flushPromises();
+    await wrapper.get('[data-test="config-save"]').trigger("click");
+    await flushPromises();
+    expect(api.saveConfig).not.toHaveBeenCalled();
+    expect(error).toHaveBeenCalledWith("请输入 0 到 365 之间的冻结天数");
+    error.mockRestore();
     wrapper.unmount();
   });
   it("renders channel and release-basis labels without exposing translation keys", async () => {

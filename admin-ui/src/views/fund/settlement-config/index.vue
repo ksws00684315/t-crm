@@ -60,6 +60,11 @@ async function save() {
     !(await form.value?.validate().catch(() => false))
   )
     return;
+  const days = config.value?.channels.find(channel => channel.code === "WEIDIAN")?.days;
+  if (typeof days !== "number" || !Number.isInteger(days) || days < 0 || days > 365) {
+    ElMessage.error(t("finance.validFreezeDays"));
+    return;
+  }
   busy.value = true;
   try {
     config.value = await saveConfig(
