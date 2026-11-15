@@ -12,22 +12,27 @@ vi.mock("@/utils/finance", async importOriginal => {
 
 beforeEach(() => vi.clearAllMocks());
 
-it.each([0, 30])("saves the withdrawal minimum with Weidian freeze days set to %i", async days => {
-  const config: SettlementConfig = {
-    currency: "CNY",
-    minimum: "125.50",
-    version: 3,
-    channels: [{ code: "WEIDIAN", name: "微店", basis: "SETTLE_TIME", days }]
-  };
-  vi.mocked(http.request).mockResolvedValue(config);
+describe("settlement config API contract", () => {
+  it.each([0, 30])(
+    "saves the withdrawal minimum with Weidian freeze days set to %i",
+    async days => {
+      const config: SettlementConfig = {
+        currency: "CNY",
+        minimum: "125.50",
+        version: 3,
+        channels: [{ code: "WEIDIAN", name: "微店", basis: "SETTLE_TIME", days }]
+      };
+      vi.mocked(http.request).mockResolvedValue(config);
 
-  await expect(saveConfig(config)).resolves.toEqual(config);
+      await expect(saveConfig(config)).resolves.toEqual(config);
 
-  expect(http.request).toHaveBeenCalledWith({
-    url: "/commission/settlement-configs/current",
-    method: "put",
-    data: { version: 3, minimum: "125.50", days }
-  });
+      expect(http.request).toHaveBeenCalledWith({
+        url: "/commission/settlement-configs/current",
+        method: "put",
+        data: { version: 3, minimum: "125.50", days }
+      });
+    }
+  );
 });
 
 describe("finance task API contract", () => {

@@ -221,6 +221,6 @@ export interface SettlementQuery {
 export interface SettlementConfig {
   currency: "CNY";
   minimum: string;
-  version: number | string;
+  version: number;
   channels: { code: string; name: string; basis: string; days: number }[];
 }
