@@ -57,6 +57,8 @@ export interface LibraryKolQuery {
   category?: LibraryCategory;
   outreachStatus?: LibraryOutreachStatus;
   followUpOwner?: string;
+  sortBy?: "FOLLOWERS" | "GRADE";
+  sortOrder?: "ASC" | "DESC";
 }
 
 /** A list row: the data of the eight list columns (requirement 1.2.5 ②, 2026-11-10). */
@@ -166,7 +168,7 @@ export interface LibraryDuplicate {
   displayName: string;
 }
 
-/** Paged creator list, most recently changed first. */
+/** Paged creator list, most recently changed first by default. */
 export function listLibraryKols(query: LibraryKolQuery): Promise<PageResult<LibraryKolVO>> {
   return http.request<PageResult<LibraryKolVO>>({
     method: "get",

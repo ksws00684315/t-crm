@@ -30,6 +30,8 @@ export interface DataColumn {
   width?: number | string;
   minWidth?: ColumnMinWidth;
   amount?: boolean;
+  /** The caller sorts the full result set before paging. */
+  sortable?: boolean;
   /** Long content is left aligned; short content is centered by default. */
   align?: "left" | "center";
   /** Form controls supply their own focus handling and per-control descriptions. */
@@ -83,6 +85,8 @@ const props = withDefaults(
     ) => ReturnType<NonNullable<TableProps<object>["spanMethod"]>>;
     /** Grouped rows cannot merge correctly across Element Plus fixed-column clones. */
     fixedColumns?: boolean;
+    /** Evenly divides available space among the visible columns, with this minimum width. */
+    equalColumnWidth?: number;
     /** Preserve the independently approved order-list presentation from PR #138. */
     legacyOrderStyle?: boolean;
   }>(),
@@ -115,6 +119,7 @@ const emit = defineEmits<{
   clearFilters: [];
   export: [];
   selectionChange: [rows: object[]];
+  sortChange: [sort: { prop: string; order: "ascending" | "descending" | null }];
 }>();
 
 const tableRef = ref<TableInstance>();
@@ -169,12 +174,16 @@ const fullscreen = ref(false);
  * The opt-in fill mode instead uses flex space and preserves a readable minimum on short screens.
  */
 const rootEl = ref<HTMLElement | null>(null);
+const tableWidth = ref(0);
 const tableMaxHeight = ref<number | null>(null);
 const fillMinimumHeight = ref<number | null>(null);
 let resizeObserver: ResizeObserver | null = null;
 let measureFrame = 0;
 
-function measureHeights(): void {
+function measureLayout(): void {
+  if (props.equalColumnWidth !== undefined) {
+    tableWidth.value = (tableRef.value?.$el as HTMLElement | undefined)?.clientWidth ?? 0;
+  }
   if (props.plain) {
     fillMinimumHeight.value = null;
     tableMaxHeight.value = null;
@@ -273,7 +282,7 @@ function scheduleMeasure(): void {
   if (measureFrame) return;
   measureFrame = requestAnimationFrame(() => {
     measureFrame = 0;
-    measureHeights();
+    measureLayout();
   });
 }
 
@@ -287,7 +296,7 @@ onMounted(async () => {
   }
 
   await nextTick();
-  measureHeights();
+  measureLayout();
   const host = rootEl.value?.parentElement;
   if (host && typeof ResizeObserver !== "undefined") {
     resizeObserver = new ResizeObserver(scheduleMeasure);
@@ -391,8 +400,16 @@ function resolveWidth(value: ColumnMinWidth | undefined): number | string | unde
   return value;
 }
 
-const columnWidth = (column: DataColumn) => (isFlexColumn(column) ? undefined : column.width);
+function columnWidth(column: DataColumn, index: number): number | string | undefined {
+  if (props.equalColumnWidth === undefined) return isFlexColumn(column) ? undefined : column.width;
+  const count = visibleColumns.value.length;
+  const fixedWidth = (props.expandable ? 40 : 0) + (props.selectable && !props.plain ? 44 : 0);
+  const available = tableWidth.value - fixedWidth;
+  const width = Math.max(props.equalColumnWidth, Math.floor(available / count));
+  return width + (index < available - width * count ? 1 : 0);
+}
 const columnMinWidth = (column: DataColumn) =>
+  props.equalColumnWidth ??
   resolveWidth(isFlexColumn(column) ? (column.minWidth ?? column.width) : column.minWidth);
 
 const hiddenCount = computed(
@@ -592,6 +609,7 @@ function canMove(index: number, delta: -1 | 1): boolean {
         :default-expand-all="defaultExpandAll"
         :stripe="legacyOrderStyle"
         @selection-change="onSelection"
+        @sort-change="emit('sortChange', $event)"
       >
         <el-table-column
           v-if="expandable"
@@ -614,12 +632,14 @@ function canMove(index: number, delta: -1 | 1): boolean {
           header-align="center"
         />
         <el-table-column
-          v-for="column in visibleColumns"
+          v-for="(column, index) in visibleColumns"
           :key="column.key"
           :prop="column.key === 'actions' ? undefined : (column.prop ?? column.key)"
           :column-key="column.key"
           :label="column.label"
-          :width="columnWidth(column)"
+          :sortable="column.sortable ? 'custom' : false"
+          :resizable="equalColumnWidth === undefined"
+          :width="columnWidth(column, index)"
           :min-width="columnMinWidth(column)"
           :fixed="
             fixedColumns

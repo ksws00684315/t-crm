@@ -1,6 +1,7 @@
 package com.tcrm.admin.kollibrary.service;
 
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
+import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
 import com.baomidou.mybatisplus.core.conditions.update.LambdaUpdateWrapper;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.tcrm.admin.kollibrary.mapper.LibraryKolContentMapper;
@@ -59,9 +60,10 @@ public class LibraryKolService {
     this.current = current;
   }
 
-  /** Paged list, most recently changed first. */
+  /** Paged list. Unspecified sorting defaults to the most recently changed records. */
   public PageResult<LibraryKolDTO> page(LibraryKolFilter filter) {
-    LambdaQueryWrapper<LibraryKolDO> query = new LambdaQueryWrapper<>();
+    QueryWrapper<LibraryKolDO> orderedQuery = new QueryWrapper<>();
+    LambdaQueryWrapper<LibraryKolDO> query = orderedQuery.lambda();
     String keyword = strip(filter.keyword());
     if (keyword != null) {
       String pattern = "%" + escapeLike(keyword) + "%";
@@ -98,8 +100,22 @@ public class LibraryKolService {
     if (owner != null) {
       query.apply("follow_up_owner ILIKE {0}", "%" + escapeLike(owner) + "%");
     }
+    if (filter.sortBy() != null && filter.sortOrder() != null) {
+      String column =
+          switch (filter.sortBy()) {
+            case FOLLOWERS -> "followers";
+            case GRADE -> "grade";
+          };
+      String sortValue =
+          filter.sortBy() == LibraryKolFilter.SortField.GRADE
+              ? "CASE grade WHEN 'S' THEN 4 WHEN 'A' THEN 3 WHEN 'B' THEN 2 WHEN 'C' THEN 1 END"
+              : column;
+      // Missing values always go last. All SQL expressions are selected from fixed server values.
+      orderedQuery.orderByAsc("CASE WHEN " + column + " IS NULL THEN 1 ELSE 0 END");
+      orderedQuery.orderBy(true, filter.sortOrder() == LibraryKolFilter.SortOrder.ASC, sortValue);
+    }
     query.orderByDesc(LibraryKolDO::getUpdateTime, LibraryKolDO::getId);
-    var result = kols.selectPage(new Page<>(filter.page(), filter.size()), query);
+    var result = kols.selectPage(new Page<>(filter.page(), filter.size()), orderedQuery);
     return new PageResult<>(
         result.getRecords().stream().map(LibraryKolService::toDto).toList(),
         result.getTotal(),

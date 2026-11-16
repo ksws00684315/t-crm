@@ -16,8 +16,7 @@ vi.mock("@/api/kol-library/kol");
 
 /**
  * Creator list of the library (requirement 1.2.5 ② as revised on 2026-11-10/11): the eight
- * columns, the six filters, a plain-text nickname, and the Edit / View row actions. Delete moved
- * into the edit form.
+ * columns, the six filters, and the detail action.
  */
 
 const row: LibraryKolVO = {
@@ -192,21 +191,21 @@ describe("creator library list", () => {
     wrapper.unmount();
   });
 
-  it("lists Edit then View, and View opens the detail tab once", async () => {
+  it("lists only View details and opens the detail tab once", async () => {
     const { wrapper, router } = await mountPage();
     const tabs = useTabsStore();
     const actions = wrapper
       .find(".el-table__body tr:first-child")
       .findAll('[data-test^="library-"]')
       .map(button => button.text());
-    expect(actions).toEqual(["编辑", "查看"]);
+    expect(actions).toEqual(["查看明细"]);
     expect(wrapper.find('[data-test="library-delete-11"]').exists()).toBe(false);
 
     await wrapper.find('[data-test="library-view-11"]').trigger("click");
     await vi.waitFor(() => expect(router.currentRoute.value.path).toBe("/kol-library/kols/11"));
     const opened = tabs.tabs.find(tab => tab.path === "/kol-library/kols/11");
     // The tab carries the nickname, not a language key (requirement 1.2.5 ③).
-    expect(opened?.titleKey).toBe("Beauty by Amy");
+    expect(opened?.titleKey).toBe("详细信息：Beauty by Amy");
     expect(opened?.literalTitle).toBe(true);
 
     await router.push("/kol-library/kols");
@@ -216,31 +215,45 @@ describe("creator library list", () => {
     wrapper.unmount();
   });
 
-  it("opens the same form as Add, for this creator, from Edit", async () => {
-    const { wrapper, router } = await mountPage();
-    const tabs = useTabsStore();
-    await wrapper.find('[data-test="library-edit-11"]').trigger("click");
-    await vi.waitFor(() =>
-      expect(router.currentRoute.value.path).toBe("/kol-library/kols/11/edit")
+  it("requests a new first page for each server sort and clears the sort on the third click", async () => {
+    const { wrapper } = await mountPage();
+    const followers = wrapper.get(".el-table__header th:nth-child(3) .caret-wrapper");
+    const grade = wrapper.get(".el-table__header th:nth-child(8) .caret-wrapper");
+
+    await followers.trigger("click");
+    expect(libraryApi.listLibraryKols).toHaveBeenLastCalledWith(
+      expect.objectContaining({ page: 1, sortBy: "FOLLOWERS", sortOrder: "ASC" })
     );
-    const opened = tabs.tabs.find(tab => tab.path === "/kol-library/kols/11/edit");
-    expect(opened?.componentName).toBe("LibraryKolFormPage");
-    expect(opened?.titleKey).toContain("Beauty by Amy");
-    expect(router.currentRoute.value.matched.at(-1)?.path).toBe("/kol-library/kols/:id/edit");
+    await followers.trigger("click");
+    expect(libraryApi.listLibraryKols).toHaveBeenLastCalledWith(
+      expect.objectContaining({ page: 1, sortBy: "FOLLOWERS", sortOrder: "DESC" })
+    );
+    await grade.trigger("click");
+    expect(libraryApi.listLibraryKols).toHaveBeenLastCalledWith(
+      expect.objectContaining({ page: 1, sortBy: "GRADE", sortOrder: "ASC" })
+    );
+    await grade.trigger("click");
+    expect(libraryApi.listLibraryKols).toHaveBeenLastCalledWith(
+      expect.objectContaining({ page: 1, sortBy: "GRADE", sortOrder: "DESC" })
+    );
+    await grade.trigger("click");
+    const request = vi.mocked(libraryApi.listLibraryKols).mock.lastCall?.[0];
+    expect(request).not.toHaveProperty("sortBy");
+    expect(request).not.toHaveProperty("sortOrder");
     wrapper.unmount();
   });
 
-  it("shows the create button and Edit to a library super administrator", async () => {
+  it("shows the create button to a library super administrator", async () => {
     const { wrapper } = await mountPage();
     expect(wrapper.find('[data-test="library-create"]').exists()).toBe(true);
-    expect(wrapper.find('[data-test="library-edit-11"]').exists()).toBe(true);
+    expect(wrapper.find('[data-test="library-edit-11"]').exists()).toBe(false);
     wrapper.unmount();
   });
 
-  it("shows Edit to a sub-account with the edit permission", async () => {
+  it("shows only View details in the row even with the edit permission", async () => {
     staffPermissions = ["kol-library:view", "kol-library:edit"];
     const { wrapper } = await mountPage("KOL_LIBRARY", "STAFF");
-    expect(wrapper.find('[data-test="library-edit-11"]').exists()).toBe(true);
+    expect(wrapper.find('[data-test="library-edit-11"]').exists()).toBe(false);
     expect(wrapper.find('[data-test="library-view-11"]').exists()).toBe(true);
     wrapper.unmount();
   });

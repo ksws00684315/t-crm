@@ -1,12 +1,11 @@
 <script setup lang="ts">
-import { ElMessage, ElMessageBox } from "element-plus";
+import { ElMessage } from "element-plus";
 import type { FormInstance, FormRules } from "element-plus";
 import { computed, nextTick, onMounted, reactive, ref, watch } from "vue";
 import { useI18n } from "vue-i18n";
 import { useRoute, useRouter } from "vue-router";
 import {
   createLibraryKol,
-  deleteLibraryKol,
   getLibraryKol,
   updateLibraryKol,
   type LibraryDuplicate,
@@ -127,10 +126,7 @@ function emptyForm(): LibraryKolRequest {
 
 const form = reactive<LibraryKolRequest>(emptyForm());
 
-/**
- * The edit tab names the creator being edited: the route's title key alone would show as
- * "route.libraryKolEdit" in the tab strip.
- */
+/** The edit tab names the creator being edited. */
 watch(
   () => form.displayName,
   name => {
@@ -138,7 +134,7 @@ watch(
     if (!editing.value || !tab || !name.trim()) return;
     tabs.open({
       ...tab,
-      titleKey: `${t("route.libraryKolEdit")}: ${name.trim()}`,
+      titleKey: t("library.editTabTitle", { name: name.trim() }),
       literalTitle: true
     });
   },
@@ -335,7 +331,7 @@ async function submit(): Promise<void> {
     tabs.close(route.path);
     tabs.open({
       path: detailPath,
-      titleKey: saved.displayName,
+      titleKey: t("library.detailTabTitle", { name: saved.displayName }),
       literalTitle: true,
       affix: false,
       componentName: "LibraryKolDetailPage"
@@ -348,39 +344,6 @@ async function submit(): Promise<void> {
     notifyError(error);
   } finally {
     saving.value = false;
-  }
-}
-
-/**
- * Deletes the creator from its edit form; super administrators only (requirement 1.2.5 ④,
- * 2026-11-10). The form tab and any tab of the creator close, and the list reloads.
- */
-async function removeKol(): Promise<void> {
-  const id = editingId.value;
-  if (!id) return;
-  const name = form.displayName.trim() || form.kolUsername.trim();
-  try {
-    await ElMessageBox.confirm(t("library.confirmDelete", { name }), t("library.deleteTitle"), {
-      type: "warning",
-      confirmButtonText: t("common.delete"),
-      cancelButtonText: t("common.cancel")
-    });
-  } catch {
-    return;
-  }
-  try {
-    await deleteLibraryKol(id);
-    ElMessage.success(t("library.deleted"));
-    const detail = `/kol-library/kols/${id}`;
-    for (const path of tabs.tabs
-      .map(tab => tab.path)
-      .filter(path => path === detail || path.startsWith(`${detail}/`))) {
-      tabs.close(path);
-    }
-    tabs.refresh("/kol-library/kols");
-    await router.push("/kol-library/kols");
-  } catch (error) {
-    notifyError(error);
   }
 }
 
@@ -400,7 +363,9 @@ async function openDuplicate(): Promise<void> {
   const path = `/kol-library/kols/${found.id}`;
   tabs.open({
     path,
-    titleKey: found.displayName || t("route.libraryKolDetail"),
+    titleKey: found.displayName
+      ? t("library.detailTabTitle", { name: found.displayName })
+      : "route.libraryKolDetail",
     literalTitle: Boolean(found.displayName),
     affix: false,
     componentName: "LibraryKolDetailPage"
@@ -457,19 +422,8 @@ onMounted(() => {
           @imported="onWorkbookImported"
           @view-list="cancel"
         />
-        <el-button
-          v-if="editing && abilities.canDelete"
-          type="danger"
-          plain
-          data-test="form-delete"
-          @click="removeKol"
-        >
-          {{ t("common.delete") }}
-        </el-button>
       </header>
 
-      <!-- Requirement 1.2.5 ④ (2026-11-10): three second-level tabs, styled like the creator
-           list / assignment tabs; cards hold one column each (norm 13 §3.5). -->
       <el-tabs v-model="activeTab" class="form-tabs" data-test="form-tabs">
         <el-tab-pane :label="t('library.formTab.basic')" name="basic" data-test="tab-basic">
           <div class="form-tabs__cards">
@@ -543,20 +497,26 @@ onMounted(() => {
                     >
                       {{ tag }}
                     </el-tag>
-                    <el-input
-                      v-model="tagInput"
-                      maxlength="20"
-                      class="tags-editor__input"
-                      data-test="tag-input"
-                      :placeholder="t('library.field.tagPlaceholder')"
-                      @keyup.enter.prevent="addTag"
-                    />
-                    <el-button data-test="tag-add" @click="addTag">
-                      {{ t("library.addTag") }}
-                    </el-button>
+                    <div class="tags-editor__entry">
+                      <el-input
+                        v-model="tagInput"
+                        maxlength="20"
+                        class="tags-editor__input"
+                        data-test="tag-input"
+                        :placeholder="t('library.field.tagPlaceholder')"
+                        @keyup.enter.prevent="addTag"
+                      />
+                      <el-button data-test="tag-add" @click="addTag">
+                        {{ t("library.addTag") }}
+                      </el-button>
+                    </div>
                   </div>
                 </el-form-item>
-                <el-form-item :label="t('library.field.remark')" prop="remark">
+                <el-form-item
+                  class="form-card__wide"
+                  :label="t('library.field.remark')"
+                  prop="remark"
+                >
                   <el-input
                     v-model="form.remark"
                     type="textarea"
@@ -705,7 +665,11 @@ onMounted(() => {
                   data-test="sample-date"
                 />
               </el-form-item>
-              <el-form-item :label="t('library.field.followUpRemark')" prop="followUpRemark">
+              <el-form-item
+                class="form-card__wide"
+                :label="t('library.field.followUpRemark')"
+                prop="followUpRemark"
+              >
                 <el-input
                   v-model="form.followUpRemark"
                   type="textarea"
@@ -785,7 +749,7 @@ onMounted(() => {
   display: flex;
   flex-direction: column;
   gap: var(--tcrm-space-4);
-  max-width: 960px;
+  min-width: 0;
 }
 .form-page__duplicate {
   margin-bottom: var(--tcrm-space-2);
@@ -798,9 +762,9 @@ onMounted(() => {
 .form-page__header {
   display: flex;
   flex-wrap: wrap;
-  gap: var(--tcrm-space-2);
   align-items: center;
   justify-content: space-between;
+  gap: var(--tcrm-space-2);
 }
 .form-page__title {
   margin: 0;
@@ -812,11 +776,17 @@ onMounted(() => {
   flex-direction: column;
   gap: var(--tcrm-space-4);
 }
-/* The creator being entered, read-only at the top of the outreach tab. */
+.form-card {
+  container-type: inline-size;
+}
+.form-card__grid,
 .form-card__identity {
-  display: flex;
-  flex-wrap: wrap;
-  gap: var(--tcrm-space-2) var(--tcrm-space-6);
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  column-gap: var(--tcrm-space-5);
+}
+.form-card__identity {
+  row-gap: var(--tcrm-space-2);
   margin: 0 0 var(--tcrm-space-4);
 }
 .form-card__identity div {
@@ -830,11 +800,17 @@ onMounted(() => {
   margin: 0;
   word-break: break-all;
 }
-/* Norm 13 §3.5: one column, fields at a readable width (at most 640px, §3.10). */
-.form-card__grid {
-  display: grid;
-  grid-template-columns: minmax(0, 640px);
-  gap: 0 var(--tcrm-space-4);
+.form-card__wide {
+  grid-column: 1 / -1;
+}
+.form-card__grid :deep(.el-date-editor.el-input) {
+  width: 100%;
+}
+@container (max-width: 600px) {
+  .form-card__grid,
+  .form-card__identity {
+    grid-template-columns: minmax(0, 1fr);
+  }
 }
 .tags-editor {
   display: flex;
@@ -843,8 +819,15 @@ onMounted(() => {
   gap: var(--tcrm-space-2);
   width: 100%;
 }
+.tags-editor__entry {
+  display: flex;
+  flex: 1 1 240px;
+  gap: var(--tcrm-space-2);
+  min-width: 0;
+}
 .tags-editor__input {
-  width: 200px;
+  flex: 1;
+  min-width: 0;
 }
 .form-page__actions {
   display: flex;
