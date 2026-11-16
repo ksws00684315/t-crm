@@ -205,16 +205,21 @@ function reset(): void {
 .analytics-filter :deep(.list-search__row) {
   display: grid;
   grid-template-columns: minmax(0, 790px) max-content;
+  row-gap: var(--tcrm-space-4);
 }
-.analytics-filter__time,
-.analytics-filter__fields {
+.analytics-filter__time {
   display: flex;
+  grid-column: 1 / -1;
   align-items: center;
   gap: var(--tcrm-space-2);
   min-width: 0;
 }
-.analytics-filter__time {
-  grid-column: 1 / -1;
+.analytics-filter__fields {
+  display: grid;
+  grid-template-columns: 5em repeat(3, minmax(0, 1fr));
+  align-items: center;
+  gap: var(--tcrm-space-2);
+  min-width: 0;
 }
 .analytics-filter__period {
   display: flex;
@@ -250,22 +255,17 @@ function reset(): void {
   color: var(--el-text-color-secondary);
   font-size: var(--tcrm-font-size-help);
 }
-.analytics-filter__shop {
-  flex: 1 1 210px;
-  min-width: 112px;
-}
-.analytics-filter__channel {
-  flex: 0 1 164px;
-  min-width: 100px;
-}
+.analytics-filter__shop,
+.analytics-filter__channel,
 .analytics-filter__creator {
-  flex: 1.5 1 320px;
-  min-width: 228px;
+  min-width: 0;
+  width: 100%;
 }
 .analytics-filter__search-icon {
   margin-inline-start: var(--tcrm-space-1);
 }
 .analytics-filter__failure {
+  grid-column: 1 / -1;
   color: var(--el-text-color-secondary);
 }
 .analytics-filter :deep(.list-search__actions) {
@@ -275,9 +275,11 @@ function reset(): void {
   .analytics-filter :deep(.list-search__row) {
     grid-template-columns: minmax(0, 1fr);
   }
-  .analytics-filter__time,
-  .analytics-filter__fields {
+  .analytics-filter__time {
     flex-wrap: wrap;
+  }
+  .analytics-filter__fields {
+    grid-template-columns: minmax(0, 1fr);
   }
   .analytics-filter__label {
     flex-basis: 100%;
@@ -289,9 +291,6 @@ function reset(): void {
   }
   .analytics-filter__period :deep(.el-button) {
     padding-inline: var(--tcrm-space-2);
-  }
-  .analytics-filter__creator {
-    flex-basis: 100%;
   }
 }
 </style>
