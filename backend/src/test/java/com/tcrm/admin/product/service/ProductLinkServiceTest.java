@@ -134,6 +134,21 @@ class ProductLinkServiceTest {
   }
 
   @Test
+  void shouldAcceptConvert_aboveTheOldFiveThousandCeiling_whenConfiguredHigher() {
+    ProductLinkService limited = withConvertLimit(6000);
+    when(tokens.authenticate("tok")).thenThrow(new BusinessException(ErrorCode.COPY_TOKEN_INVALID));
+
+    // Task 155: no fixed 5000 ceiling is left in the request or the database; the setting decides.
+    assertThatThrownBy(() -> limited.convert(convertOf(6000)))
+        .isInstanceOf(BusinessException.class)
+        .satisfies(
+            e ->
+                assertThat(((BusinessException) e).getErrorCode())
+                    .isEqualTo(ErrorCode.COPY_TOKEN_INVALID));
+    verify(tokens).authenticate("tok");
+  }
+
+  @Test
   void shouldRejectConvert_whenDailyQuotaIsShort_beforeCreatingAJob() {
     SystemConfigApi configs = mock(SystemConfigApi.class);
     when(configs.getInt("product-links.max-convert-items")).thenReturn(500);
