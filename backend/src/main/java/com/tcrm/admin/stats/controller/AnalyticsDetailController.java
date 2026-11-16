@@ -98,8 +98,9 @@ public class AnalyticsDetailController {
       @Valid @ModelAttribute StatsOverviewQuery filters,
       @RequestParam @Positive long entityId,
       @RequestParam(required = false) Integer page,
-      @RequestParam(required = false) Integer size) {
-    return R.ok(details.inviterCreators(filters.toFilter(), entityId, page, size));
+      @RequestParam(required = false) Integer size,
+      @RequestParam(defaultValue = "true") boolean currentTeam) {
+    return R.ok(details.inviterCreators(filters.toFilter(), entityId, page, size, currentTeam));
   }
 
   private R<Detail> query(

@@ -46,6 +46,11 @@ const enUS: MessageSchema = {
     settlementHint:
       "Based on Weidian settlement postings in the selected period. Increases in shop receivables are reduced by deductions such as refunds. Settlement data is pending integration.",
     pending: "In development",
+    refundPeriodHint:
+      "Counts refunds completed during the selected period, including refunds completed after the 30-day window.",
+    currentUnsettledPeriod: "Period orders · currently unsettled",
+    refreshingResults: "Updating. Showing the last successful results.",
+    staleResults: "Update failed. Showing the last successful results. Refresh to retry.",
     commissionForbidden: "No access",
     comparison: "vs prior period {value}",
     transactionTitle: "Transaction and settlement comparison",
@@ -94,7 +99,10 @@ const enUS: MessageSchema = {
     scope: { ALL: "Company scope", OWN: "Own scope" },
     drilldown: {
       overview: "Overview",
-      creators: "Assigned creators",
+      creators: "Period contributors",
+      currentTeam: "Current team",
+      currentInviter: "Current inviter: {name}",
+      transferred: "Transferred out",
       skus: "SKU performance",
       contribution: "Creator contribution",
       creatorName: "Creator",
@@ -176,7 +184,7 @@ const enUS: MessageSchema = {
       cumulativeCommission: "Cumulative commission",
       ranking: "Creator ranking",
       rankingCount: "{count} creator | {count} creators",
-      netCommission: "Net creator commission",
+      netCommission: "Estimated commission for the period",
       keyword: "Creator name / code / social",
       definitions: {
         identity:
@@ -218,7 +226,7 @@ const enUS: MessageSchema = {
       totalExpense: "Total paid out",
       ranking: "Inviter ranking",
       rankingCount: "{count} inviter | {count} inviters",
-      netCommission: "Net team creator commission",
+      netCommission: "Estimated team commission for the period",
       keyword: "Inviter name / code",
       definitions: {
         identity: "The inviter’s name and account.",

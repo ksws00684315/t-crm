@@ -24,6 +24,8 @@ import com.tcrm.admin.shared.PageResult;
 import com.tcrm.admin.stats.service.AnalyticsDetailService.Board;
 import com.tcrm.admin.stats.service.StatsOverviewService.FilterDTO;
 import com.tcrm.admin.stats.service.StatsOverviewService.ResolvedFilter;
+import com.tcrm.admin.system.api.BdUserApi;
+import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.util.List;
 import org.junit.jupiter.api.Test;
@@ -36,7 +38,8 @@ class AnalyticsDetailServiceTest {
   private final KolApi creators = mock(KolApi.class);
   private final OrderStatsApi orders = mock(OrderStatsApi.class);
   private final AnalyticsDetailService details =
-      new AnalyticsDetailService(overview, evidence, shops, creators, orders);
+      new AnalyticsDetailService(
+          overview, evidence, shops, creators, orders, mock(BdUserApi.class));
   private final LocalDate day = LocalDate.of(2026, 11, 3);
 
   @Test
@@ -68,7 +71,7 @@ class AnalyticsDetailServiceTest {
     var filters = filters(null);
     when(overview.canView("kol:view")).thenReturn(true);
     when(overview.resolve(filters)).thenReturn(resolved(new ScopeDTO(4, 9L, null, null, null)));
-    assertThatThrownBy(() -> details.inviterCreators(filters, 10L, 1, 20))
+    assertThatThrownBy(() -> details.inviterCreators(filters, 10L, 1, 20, false))
         .isInstanceOf(BusinessException.class);
     verifyNoInteractions(creators, orders);
   }
@@ -81,12 +84,51 @@ class AnalyticsDetailServiceTest {
     when(shops.listShops()).thenReturn(List.of(new ShopAccessDTO(1L, "Shop", "remote", 1, "S1")));
     when(creators.listByBdUserId(9L))
         .thenReturn(List.of(new KolRefDTO(11L, "C11", "Creator", true, 9L)));
-    assertThat(details.inviterCreators(filters, 9L, 1, 20).items())
+    assertThat(details.inviterCreators(filters, 9L, 1, 20, true).items())
         .singleElement()
         .satisfies(
             row -> {
               assertThat(row.id()).isEqualTo(11L);
               assertThat(row.metrics().paidOrderCount()).isZero();
+            });
+  }
+
+  @Test
+  void periodContributorsIncludeTransferredCreatorsWithOnlyRefunds() {
+    var filters = filters(null);
+    when(overview.canView("kol:view")).thenReturn(true);
+    when(overview.resolve(filters)).thenReturn(resolved(new ScopeDTO(4, 9L, null, null, null)));
+    when(shops.listShops()).thenReturn(List.of(new ShopAccessDTO(1L, "Shop", "remote", 1, "S1")));
+    var scope = new ScopeDTO(4, 9L, null, null, 9L, List.of(1L));
+    var period = new StatsPeriod(day, day);
+    when(orders.rankFacts(scope, OrderStatsApi.RankDimension.KOL, period.from(), period.until()))
+        .thenReturn(
+            List.of(
+                new OrderStatsApi.RankFactsDTO(
+                    11L,
+                    0,
+                    0,
+                    0,
+                    0,
+                    0,
+                    BigDecimal.ZERO,
+                    BigDecimal.ZERO,
+                    new BigDecimal("30.00"),
+                    1,
+                    null,
+                    period.from(),
+                    0)));
+    when(creators.listByIdsIncludingDeleted(List.of(11L)))
+        .thenReturn(List.of(new KolRefDTO(11L, "C11", "Creator", true, 10L)));
+
+    assertThat(details.inviterCreators(filters, 9L, 1, 20, false).items())
+        .singleElement()
+        .satisfies(
+            row -> {
+              assertThat(row.transferred()).isTrue();
+              assertThat(row.currentInviter()).isNull();
+              assertThat(row.enabled()).isNull();
+              assertThat(row.metrics().completedRefundAmount()).isEqualByComparingTo("30.00");
             });
   }
 

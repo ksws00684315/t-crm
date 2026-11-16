@@ -83,9 +83,11 @@ public class ShopPerformanceService {
         overview.overview(
             new ResolvedFilter(scope, period, resolved.filters(), resolved.dataScope()));
     long activeCount = rows.stream().filter(row -> row.paidOrderCount() > 0).count();
+    long shopCount =
+        includeShopsWithoutFacts ? visibleShops.size() : orders.countShopsWithPaidOrders(scope);
     return new ShopPerformanceDTO(
         totals.meta(),
-        new ShopSummaryDTO(totals.summary(), activeCount, rows.size()),
+        new ShopSummaryDTO(totals.summary(), activeCount, shopCount),
         totals.previous(),
         totals.change(),
         paged,

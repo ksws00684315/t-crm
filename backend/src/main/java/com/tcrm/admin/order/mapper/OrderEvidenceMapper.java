@@ -38,11 +38,22 @@ public interface OrderEvidenceMapper {
         FROM crm_order_item i
         WHERE i.tenant_id = #{s.scope.tenantId} AND NOT i.is_deleted
         <if test="s.productCode != null">
-          AND i.weidian_item_id = #{s.productCode} AND i.kol_id IS NOT NULL
+          AND i.kol_id IS NOT NULL
+          <choose>
+            <when test="s.productCode.startsWith('product:')">
+              AND ('product:' || i.product_id) = #{s.productCode}
+            </when>
+            <when test="s.productCode.startsWith('unmapped:')">
+              AND i.product_id IS NULL AND ('unmapped:' || i.weidian_item_id) = #{s.productCode}
+            </when>
+            <otherwise>
+              AND i.weidian_item_id = #{s.productCode}
+              <if test="s.keyword != null">
+                AND (strpos(lower(i.item_name), lower(#{s.keyword})) &gt; 0 OR i.weidian_item_id = #{s.keyword})
+              </if>
+            </otherwise>
+          </choose>
           <if test="s.scope.kolId != null">AND i.kol_id = #{s.scope.kolId}</if>
-          <if test="s.keyword != null">
-            AND (strpos(lower(i.item_name), lower(#{s.keyword})) &gt; 0 OR i.weidian_item_id = #{s.keyword})
-          </if>
         </if>
       ),
       """;

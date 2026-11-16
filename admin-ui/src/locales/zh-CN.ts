@@ -42,7 +42,11 @@ const zhCN = {
     units: "销量",
     unitsValue: "销量 {value}",
     netSalesAmount: "净销售额",
-    netHint: "销售额扣除同批订单在 30 个北京时间自然日内完结的成功退款。",
+    netHint: "销售额扣除同批订单在支付日起 30 个北京时间自然日内完结的成功退款，支付日计第 1 天。",
+    refundPeriodHint: "按所选期间退款完结时间统计，含超过支付日起 30 天才完结的退款。",
+    currentUnsettledPeriod: "本期订单 · 当前未结算",
+    refreshingResults: "正在更新，暂显示上次查询结果。",
+    staleResults: "更新失败，暂显示上次查询结果。可点击「刷新数据」重试。",
     settlement: "结算净应收",
     settlementFormula: "结算净应收 = 店铺应收增加 − 应收减少",
     settlementHint:
@@ -96,7 +100,10 @@ const zhCN = {
     scope: { ALL: "公司数据", OWN: "本人数据" },
     drilldown: {
       overview: "经营概览",
-      creators: "归属达人",
+      creators: "期间贡献达人",
+      currentTeam: "当前团队",
+      currentInviter: "当前归属：{name}",
+      transferred: "已转出",
       skus: "SKU 表现",
       contribution: "达人贡献",
       creatorName: "达人",
@@ -117,7 +124,7 @@ const zhCN = {
     "shop-performance": {
       detailTitle: "店铺经营详情",
       selling: "有成交店铺数",
-      active: "全部店铺 {value}",
+      active: "当前全部店铺 {value}",
       identity: "店铺名称及编号",
       ranking: "店铺经营排行",
       rankingCount: "共 {count} 家店铺",
@@ -158,7 +165,7 @@ const zhCN = {
     "kol-ranking": {
       detailTitle: "达人经营详情",
       selling: "有销售达人",
-      active: "有效达人 {value}",
+      active: "当前有效达人 {value}",
       identity: "达人名/社媒/ID",
       nameWithPlatform: "{name}（{platform}）",
       relationship: "邀请人/关系",
@@ -170,7 +177,7 @@ const zhCN = {
       cumulativeCommission: "累计佣金",
       ranking: "达人排行",
       rankingCount: "共 {count} 位达人",
-      netCommission: "达人净佣金",
+      netCommission: "本期预估佣金",
       keyword: "达人姓名／编号／社媒",
       definitions: {
         identity: "展示达人名称、核心社媒平台、社媒账号和达人编号。未设置核心平台时省略括号。",
@@ -185,16 +192,16 @@ const zhCN = {
         amountRefundRate: "所选期间内完结的成功退款金额除以同期销售额。",
         commissionRate: "达人推广配置中当前生效的默认佣金比例。历史订单按支付时适用的比例计佣。",
         estimatedCommission:
-          "未结算订单按各自计佣金额和适用佣金比例计算的预估佣金合计。看板数据待接入。",
-        commissionExpense: "已完成付款的佣金提现合计。看板数据待接入。",
+          "所选支付期间内，当前尚未结算的订单按计佣金额和支付时佣金比例计算的合计。",
+        commissionExpense: "按所选期间的实际付款时间，汇总已完成付款的佣金提现金额。",
         cumulativeCommission:
-          "已核实订单的佣金合计，未结算按预估金额，已结算按实际金额，已提现佣金仍计入原订单。看板数据待接入。"
+          "截至当前的全量累计。未结算取预估，已结算取实际，已提现金额仍按原订单计一次。"
       }
     },
     "inviter-performance": {
       detailTitle: "邀请人业绩详情",
       selling: "有销售邀请人",
-      active: "有效邀请人 {value}",
+      active: "当前有效邀请人 {value}",
       identity: "邀请人",
       creatorCounts: "有效达人/累计达人",
       prepayExpense: "预付支出",
@@ -202,7 +209,7 @@ const zhCN = {
       totalExpense: "总支出",
       ranking: "邀请人业绩排行",
       rankingCount: "共 {count} 位邀请人",
-      netCommission: "团队达人净佣金",
+      netCommission: "团队本期预估佣金",
       keyword: "邀请人搜索",
       definitions: {
         identity: "展示邀请人姓名和账号。",

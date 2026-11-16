@@ -5,7 +5,7 @@ import type { EChartsCoreOption } from "echarts/core";
 import { CanvasRenderer } from "echarts/renderers";
 
 /**
- * The single place that registers ECharts modules (规范 11 §2). Registers the chart types used by the dashboard. Pages never call
+ * The single place that registers ECharts modules (engineering standard 11 §2). Registers the chart types used by the dashboard. Pages never call
  * `echarts.init`; `ChartPanel` is the only caller of `createChart`.
  */
 echarts.use([LineChart, GridComponent, LegendComponent, TooltipComponent, CanvasRenderer]);

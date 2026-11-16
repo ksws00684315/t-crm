@@ -138,8 +138,20 @@ export function queryProductBreakdown(
     params
   });
 }
-export function queryInviterCreators(params: DetailQuery & { page: number; size: number }) {
-  return http.request<{ items: RankRow[]; total: Scalar; page: number; size: number }>({
+export interface InviterCreatorRow {
+  id: string;
+  name: string | null;
+  code: string | null;
+  enabled: boolean | null;
+  metrics: Metrics;
+  transferred: boolean;
+  currentInviter: string | null;
+}
+
+export function queryInviterCreators(
+  params: DetailQuery & { page: number; size: number; currentTeam: boolean }
+) {
+  return http.request<{ items: InviterCreatorRow[]; total: Scalar; page: number; size: number }>({
     method: "get",
     url: "/stats/inviter-performance/creators",
     params

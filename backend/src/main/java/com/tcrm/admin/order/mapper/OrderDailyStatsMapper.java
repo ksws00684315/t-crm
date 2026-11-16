@@ -19,7 +19,9 @@ public interface OrderDailyStatsMapper {
       """
       <script>
       WITH lines AS NOT MATERIALIZED (
-        SELECT o.id AS order_id, o.shop_id, o.pay_time, i.id AS line_id, i.weidian_item_id AS spu,
+        SELECT o.id AS order_id, o.shop_id, o.pay_time, i.id AS line_id,
+               COALESCE('product:' || i.product_id, 'unmapped:' || i.weidian_item_id) AS spu,
+               i.weidian_item_id AS link_id,
                i.item_name, i.product_id, i.kol_id, i.quantity, i.pay_amount,
                GREATEST(o.update_time, i.update_time) AS updated_at
         FROM crm_order o JOIN crm_order_item i ON i.order_id = o.id
@@ -41,14 +43,21 @@ public interface OrderDailyStatsMapper {
           </choose>
         </if>
         <if test="scope.kolId != null">AND i.kol_id = #{scope.kolId}</if>
+      ), selected_lines AS NOT MATERIALIZED (
+        SELECT l.* FROM lines l
         <if test="keyword != null">
-          AND (strpos(lower(i.item_name), lower(#{keyword})) &gt; 0 OR i.weidian_item_id = #{keyword})
+          WHERE (l.shop_id, l.spu) IN (
+            SELECT m.shop_id, m.spu FROM lines m
+            WHERE strpos(lower(m.item_name), lower(#{keyword})) &gt; 0
+               OR m.link_id = #{keyword}
+               OR m.spu = #{keyword}
+          )
         </if>
       ),
       paid AS (
         SELECT order_id, shop_id, pay_time, line_id, spu, item_name, product_id,
                kol_id, quantity, pay_amount, updated_at
-        FROM lines WHERE pay_time &gt;= #{from} AND pay_time &lt; #{until}
+        FROM selected_lines WHERE pay_time &gt;= #{from} AND pay_time &lt; #{until}
       ),
       events AS (
         SELECT shop_id, spu, item_name, product_id, order_id, kol_id, quantity,
@@ -67,7 +76,7 @@ public interface OrderDailyStatsMapper {
         UNION ALL
         SELECT p.shop_id, p.spu, p.item_name, p.product_id, NULL, NULL, 0, 0, 0, r.amount,
                p.order_id, NULL, NULL, r.finish_time, r.update_time
-        FROM crm_refund r JOIN lines p ON r.order_item_id = p.line_id AND r.order_id = p.order_id
+        FROM crm_refund r JOIN selected_lines p ON r.order_item_id = p.line_id AND r.order_id = p.order_id
         WHERE r.tenant_id = #{scope.tenantId} AND NOT r.is_deleted AND r.refund_status = 'SUCCESS'
           AND r.finish_time &gt;= #{from} AND r.finish_time &lt; #{until}
       )
@@ -178,7 +187,8 @@ public interface OrderDailyStatsMapper {
         FROM crm_order_item i JOIN paid p ON p.id = i.order_id
         WHERE i.tenant_id = #{tenantId} AND NOT i.is_deleted
         UNION ALL
-        SELECT 'ITEM', p.shop_id, i.kol_id, p.owner_id, i.weidian_item_id, i.sku_id,
+        SELECT 'ITEM', p.shop_id, i.kol_id, p.owner_id,
+               COALESCE('product:' || i.product_id, i.weidian_item_id), i.sku_id,
                0, i.quantity, i.pay_amount, 0, 0
         FROM crm_order_item i JOIN paid p ON p.id = i.order_id
         WHERE i.tenant_id = #{tenantId} AND NOT i.is_deleted AND i.kol_id IS NOT NULL
@@ -190,7 +200,8 @@ public interface OrderDailyStatsMapper {
                CASE WHEN NOT cohort THEN amount ELSE 0 END
         FROM refund_facts
         UNION ALL
-        SELECT 'ITEM', r.shop_id, i.kol_id, r.owner_id, i.weidian_item_id, i.sku_id, 0, 0, 0,
+        SELECT 'ITEM', r.shop_id, i.kol_id, r.owner_id,
+               COALESCE('product:' || i.product_id, i.weidian_item_id), i.sku_id, 0, 0, 0,
                CASE WHEN r.cohort THEN r.amount ELSE 0 END,
                CASE WHEN NOT r.cohort THEN r.amount ELSE 0 END
         FROM refund_facts r JOIN crm_order_item i ON i.id = r.order_item_id AND i.order_id = r.order_id

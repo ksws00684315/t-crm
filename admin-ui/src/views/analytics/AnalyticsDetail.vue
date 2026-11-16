@@ -13,6 +13,7 @@ import {
   type DailyAmount,
   type DetailQuery,
   type EvidenceRow,
+  type InviterCreatorRow,
   type Metric,
   type ProductBreakdown,
   type ProductGroup,
@@ -30,14 +31,17 @@ const emit = defineEmits<{ close: [] }>();
 const { t, locale } = useI18n();
 const user = useUserStore();
 const access = computed(() => accessOf(user.user));
-const tab = ref<"overview" | "creators" | ActivityKind | ProductBreakdown>("overview");
+const tab = ref<"overview" | "creators" | "currentTeam" | ActivityKind | ProductBreakdown>(
+  "overview"
+);
+const isCreatorList = computed(() => tab.value === "creators" || tab.value === "currentTeam");
 const isBreakdown = computed(() => tab.value === "SKUS" || tab.value === "CREATORS");
 const page = ref(1);
 const size = ref(20);
 const tableId = computed(() => `analytics-detail-${tab.value}`);
 const daily = ref<DailyAmount[]>([]);
 const rows = ref<EvidenceRow[]>([]);
-const creatorRows = ref<RankRow[]>([]);
+const creatorRows = ref<InviterCreatorRow[]>([]);
 const productGroups = ref<ProductGroup[]>([]);
 const total = ref(0);
 const loading = ref(false);
@@ -45,6 +49,9 @@ const failed = ref(false);
 let request = 0;
 
 const heading = computed(() => t(`analytics.${props.board}.detailTitle`));
+const identityCode = computed(() =>
+  props.board === "best-sellers" ? props.row.sourceItemId : props.row.shopCode || props.row.code
+);
 const eventTime = computed(
   () =>
     new Intl.DateTimeFormat(locale.value, {
@@ -82,7 +89,13 @@ const cards = computed(() =>
               }).format(Number(value))
             : formatAmountWithCurrency(String(value));
     }
-    return [{ key, value: formatted }];
+    const hint =
+      key === "netSalesAmount"
+        ? t("analytics.netHint")
+        : key === "completedRefundAmount"
+          ? t("analytics.refundPeriodHint")
+          : undefined;
+    return [{ key, value: formatted, hint }];
   })
 );
 const columns = computed<DataColumn[]>(() => [
@@ -192,9 +205,10 @@ async function load(): Promise<void> {
       }
       return;
     }
-    if (section === "creators") {
+    if (section === "creators" || section === "currentTeam") {
       const result = await queryInviterCreators({
         ...props.filters,
+        currentTeam: section === "currentTeam",
         page: page.value,
         size: size.value
       });
@@ -267,7 +281,7 @@ function changeSize(next: number): void {
         <div>
           <h2>{{ name }}</h2>
           <div class="analytics-detail__metadata">
-            <CopyText v-if="row.shopCode || row.code" :value="row.shopCode ?? row.code" />
+            <CopyText v-if="identityCode" :value="identityCode" />
             <span v-if="row.related">{{ row.related }}</span>
           </div>
         </div>
@@ -295,6 +309,11 @@ function changeSize(next: number): void {
           name="creators"
         />
         <el-tab-pane
+          v-if="board === 'inviter-performance' && row.id !== '0' && access.can('kol:view')"
+          :label="t('analytics.drilldown.currentTeam')"
+          name="currentTeam"
+        />
+        <el-tab-pane
           v-if="access.can('order:view')"
           :label="t('analytics.drilldown.orders')"
           name="ORDERS"
@@ -312,6 +331,7 @@ function changeSize(next: number): void {
             :key="card.key"
             :label="t(`analytics.${card.key}`)"
             :value="card.value"
+            :hint="card.hint"
           />
         </div>
         <section class="analytics-detail__trend">
@@ -330,8 +350,8 @@ function changeSize(next: number): void {
         v-else
         :key="tab"
         :table-id="tableId"
-        :rows="isBreakdown ? productGroups : tab === 'creators' ? creatorRows : rows"
-        :columns="isBreakdown ? groupColumns : tab === 'creators' ? creatorColumns : columns"
+        :rows="isBreakdown ? productGroups : isCreatorList ? creatorRows : rows"
+        :columns="isBreakdown ? groupColumns : isCreatorList ? creatorColumns : columns"
         :row-key="isBreakdown ? 'code' : 'id'"
         :loading="loading"
         :failed="failed"
@@ -346,11 +366,23 @@ function changeSize(next: number): void {
         @update:size="changeSize"
       >
         <template #cell-name="{ row: entry }">
-          <div>{{ entry.name || "—" }}</div>
+          <div>
+            {{
+              entry.name || (isCreatorList && entry.id === "0" ? t("analytics.unassigned") : "—")
+            }}
+          </div>
           <CopyText v-if="entry.code && tab !== 'CREATORS'" :value="entry.code" />
+          <div v-if="tab === 'creators' && (entry.currentInviter || entry.transferred)">
+            {{
+              entry.currentInviter
+                ? t("analytics.drilldown.currentInviter", { name: entry.currentInviter })
+                : t("analytics.drilldown.transferred")
+            }}
+          </div>
         </template>
         <template #cell-enabled="{ row: entry }">
-          <el-tag :type="entry.enabled ? 'success' : 'info'" size="small">
+          <span v-if="entry.enabled == null">—</span>
+          <el-tag v-else :type="entry.enabled ? 'success' : 'info'" size="small">
             {{ t(entry.enabled ? "analytics.enabled" : "analytics.disabled") }}
           </el-tag>
         </template>

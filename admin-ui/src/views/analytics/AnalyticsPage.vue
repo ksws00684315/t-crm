@@ -38,6 +38,7 @@ import type { DataColumn } from "@/components/DataTable.vue";
 import RowActions from "@/components/RowActions.vue";
 import { useUserStore } from "@/stores/user";
 import { saveBlob } from "@/utils/download";
+import { ApiError } from "@/utils/http/error";
 import { formatAmountWithCurrency } from "@/utils/format";
 import { canExport } from "@/utils/permission";
 import { relationStatusLabelKey, relationTagType } from "@/utils/promotion";
@@ -73,6 +74,7 @@ const size = ref(20);
 const sortBy = ref("netSalesAmount");
 const sortDirection = ref<"asc" | "desc">("desc");
 const result = ref<AnalyticsResult>();
+const displayedQuery = ref<RankingQuery>();
 const options = ref<Options>();
 const loading = ref(false);
 const failed = ref(false);
@@ -91,6 +93,7 @@ const query = computed<RankingQuery>(() => ({
   sortDirection: sortDirection.value
 }));
 const metrics = computed(() => result.value?.summary.metrics);
+const displayedSort = computed(() => displayedQuery.value ?? query.value);
 const rows = computed(() => result.value?.ranking.items ?? []);
 const columnWidths: Record<string, DataColumn["minWidth"]> = {
   identity: product ? 180 : 184,
@@ -246,11 +249,11 @@ function isCommissionForbidden(key: string): boolean {
 
 function cellDisplay(row: RankRow, key: string): string {
   if (isCommissionForbidden(key)) return t("analytics.commissionForbidden");
-  return pendingColumns.has(key) ? t("analytics.pending") : display(key, valueOf(row, key));
-}
-
-function comparison(key: Metric): string {
-  return t("analytics.comparison", { value: percent(result.value?.change[key]) });
+  const value = valueOf(row, key);
+  const unavailable = result.value?.unavailable.some(field => field.field === key);
+  return value == null && unavailable && key !== "refundUnits"
+    ? t("analytics.pending")
+    : display(key, value);
 }
 
 const cards = computed(() => {
@@ -271,15 +274,13 @@ const cards = computed(() => {
     label: t("analytics.paidOrderCount"),
     value: display("", data?.paidOrderCount),
     detail:
-      shop || product ? undefined : t("analytics.unitsValue", { value: display("", data?.units) }),
-    comparison: comparison("paidOrderCount")
+      shop || product ? undefined : t("analytics.unitsValue", { value: display("", data?.units) })
   };
   const net = {
     tone: "green" as const,
     icon: TrendCharts,
     label: t(product ? "analytics.best-sellers.net" : "analytics.netSalesAmount"),
     value: display("netSalesAmount", data?.netSalesAmount),
-    comparison: comparison("netSalesAmount"),
     hint: t("analytics.netHint")
   };
   const last = product
@@ -287,13 +288,13 @@ const cards = computed(() => {
         tone: "amber" as const,
         icon: Goods,
         label: label("units"),
-        value: display("", data?.units),
-        comparison: comparison("units")
+        value: display("", data?.units)
       }
     : {
         tone: "amber" as const,
         icon: Wallet,
         label: label(shop ? "settlement" : "netCommission"),
+        detail: shop ? undefined : t("analytics.currentUnsettledPeriod"),
         value: t("analytics.pending"),
         unavailable: true,
         hint: shop ? t("analytics.settlementHint") : undefined
@@ -321,14 +322,22 @@ async function load(): Promise<void> {
     }
   }
   const id = ++request;
+  const requested = query.value;
   loading.value = true;
   failed.value = false;
   try {
-    const next = await queryAnalytics(board, query.value);
-    if (id === request) result.value = next;
-  } catch {
+    const next = await queryAnalytics(board, requested);
     if (id === request) {
-      result.value = undefined;
+      result.value = next;
+      displayedQuery.value = requested;
+    }
+  } catch (error) {
+    if (id === request) {
+      if (error instanceof ApiError && [401, 403].includes(error.status)) {
+        result.value = undefined;
+        displayedQuery.value = undefined;
+        selectedDetail.value = undefined;
+      }
       failed.value = true;
     }
   } finally {
@@ -367,12 +376,13 @@ function search(useLive = false): void {
     keyword: keyword?.trim() || undefined
   };
   page.value = 1;
-  result.value = undefined;
   void load();
 }
 
 function reset(): void {
   draft.value = dates();
+  sortBy.value = "netSalesAmount";
+  sortDirection.value = "desc";
   search();
 }
 function sort(key: string): void {
@@ -393,10 +403,10 @@ function changeSize(next: number): void {
   void load();
 }
 async function download(): Promise<void> {
-  if (exporting.value || loading.value || !result.value) return;
+  if (exporting.value || loading.value || !displayedQuery.value || !result.value) return;
   exporting.value = true;
   try {
-    const file = await exportAnalytics(board, query.value);
+    const file = await exportAnalytics(board, displayedQuery.value);
     saveBlob(file.blob, file.fileName ?? `${board}.xlsx`);
   } catch {
     ElMessage.error(t("analytics.exportFailed"));
@@ -417,6 +427,7 @@ function start(): void {
 function stop(): void {
   active = false;
   request++;
+  loading.value = false;
   clearInterval(timer);
 }
 onMounted(start);
@@ -438,6 +449,13 @@ onUnmounted(stop);
       @refresh="refresh"
     />
     <QuerySummary v-if="result" :result="result" :options="options" />
+    <el-alert
+      v-if="result && (loading || failed)"
+      :title="t(loading ? 'analytics.refreshingResults' : 'analytics.staleResults')"
+      :type="loading ? 'info' : 'warning'"
+      :closable="false"
+      show-icon
+    />
 
     <div
       class="analytics-cards"
@@ -494,13 +512,6 @@ onUnmounted(stop);
           :value="percent(metrics?.amountRefundRate)"
           :detail="`${display('completedRefundAmount', metrics?.completedRefundAmount)} / ${display('salesAmount', metrics?.salesAmount)}`"
         />
-        <MetricCard
-          :label="label('periodRefundedOrderRate')"
-          :icon="Warning"
-          tone="red"
-          :value="percent(metrics?.periodRefundedOrderRate)"
-          :detail="`${display('', metrics?.refundedOrderCount)} / ${display('', metrics?.paidOrderCount)}`"
-        />
       </div>
     </section>
     <section v-else-if="!product" class="analytics-topic">
@@ -514,8 +525,8 @@ onUnmounted(stop);
           :tone="(['neutral', 'blue', 'green'] as const)[index]"
           :value="display('', entry.value)"
           :detail="
-            index > 0
-              ? t(index === 1 ? 'analytics.effectiveRate' : 'analytics.activationRate', {
+            index === 2
+              ? t('analytics.activationRate', {
                   value: ratio(entry.value, conversion[index - 1]?.value)
                 })
               : undefined
@@ -533,9 +544,9 @@ onUnmounted(stop);
       :rows="rows"
       :row-key="shop ? 'shopId' : 'id'"
       :loading="loading"
-      :failed="failed"
-      :page="page"
-      :size="size"
+      :failed="failed && !result"
+      :page="displayedQuery?.page ?? page"
+      :size="displayedQuery?.size ?? size"
       :page-sizes="[20, 50, 100]"
       :total="Number(result?.ranking.total ?? 0)"
       :exportable="canExport(me.user)"
@@ -578,17 +589,23 @@ onUnmounted(stop);
                   ? t('analytics.sortLabel', {
                       label: label(key),
                       direction:
-                        sortBy === key ? t(`analytics.${sortDirection}`) : t('analytics.unsorted')
+                        displayedSort.sortBy === key
+                          ? t(`analytics.${displayedSort.sortDirection}`)
+                          : t('analytics.unsorted')
                     })
                   : undefined
               "
               class="analytics-column-heading"
-              :class="{ selected: sortBy === key }"
+              :class="{ selected: displayedSort.sortBy === key }"
               @click="sortable.has(key) && sort(key)"
             >
               {{ label(key) }}
               <span v-if="sortable.has(key)" aria-hidden="true">{{
-                sortBy === key ? (sortDirection === "asc" ? "↑" : "↓") : "↕"
+                displayedSort.sortBy === key
+                  ? displayedSort.sortDirection === "asc"
+                    ? "↑"
+                    : "↓"
+                  : "↕"
               }}</span>
               <el-icon v-if="help" class="analytics-column-heading__info" aria-hidden="true">
                 <InfoFilled />

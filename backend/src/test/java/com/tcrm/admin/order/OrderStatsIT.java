@@ -201,7 +201,7 @@ class OrderStatsIT {
       var products = daily.productFacts(productScope, "a", FROM, UNTIL);
       assertThat(products).hasSize(2);
       var product = products.stream().filter(row -> row.shopId() != null).findFirst().orElseThrow();
-      assertThat(product.spu()).isEqualTo("A");
+      assertThat(product.spu()).isEqualTo("unmapped:A");
       assertThat(product.paidOrders()).isEqualTo(1);
       assertThat(product.units()).isEqualTo(3);
       assertThat(product.sales()).isEqualByComparingTo("100");
@@ -246,6 +246,45 @@ class OrderStatsIT {
                   "SELECT COUNT(*) FROM agg_stats_daily WHERE tenant_id = 4 AND stat_date = '2026-11-03'",
                   Integer.class))
           .isEqualTo(dailyFacts.size());
+    }
+    jdbc.update("UPDATE crm_order_item SET product_id = 90 WHERE id IN (1, 2)");
+    jdbc.update("UPDATE crm_order_item SET weidian_item_id = 'B', kol_id = 12 WHERE id = 2");
+    jdbc.update("UPDATE crm_order SET shop_id = 2 WHERE id = 3");
+    jdbc.execute(
+        """
+        INSERT INTO crm_order_item (
+          id, tenant_id, order_id, sub_order_id, weidian_item_id, sku_id, item_name, sku_name, quantity,
+          pay_amount, refund_amount, kol_id, product_id, attribution_type, create_time, update_time
+        ) VALUES (4, 4, 3, 't144-copy', 'C', '4', 'C', 'SKU', 1, 200, 0, 11, 90, 1, now(), now())
+        """);
+    try (var session = factory.openSession()) {
+      var productMapper = session.getMapper(OrderDailyStatsMapper.class);
+      var visible = new ScopeDTO(4, null, null, null, null, java.util.List.of(1L, 2L));
+      assertThat(productMapper.productFacts(visible, null, FROM, UNTIL))
+          .filteredOn(row -> row.shopId() != null)
+          .hasSize(2)
+          .allSatisfy(row -> assertThat(row.spu()).isEqualTo("product:90"));
+      assertThat(productMapper.productFacts(visible, "B", FROM, UNTIL))
+          .filteredOn(row -> row.shopId() != null)
+          .singleElement()
+          .satisfies(
+              row -> {
+                assertThat(row.shopId()).isEqualTo(1L);
+                assertThat(row.sales()).isEqualByComparingTo("100");
+                assertThat(row.paidOrders()).isEqualTo(1);
+                assertThat(row.kolCount()).isEqualTo(2);
+              });
+      var shopScope = new ScopeDTO(4, null, 1L, null, null, java.util.List.of(1L));
+      assertThat(session.getMapper(OrderStatsMapper.class).countShopsWithPaidOrders(visible))
+          .isEqualTo(2);
+      assertThat(session.getMapper(OrderStatsMapper.class).countShopsWithPaidOrders(shopScope))
+          .isEqualTo(1);
+      var selection = new Selection(shopScope, null, null, "product:90", "B", FROM, UNTIL);
+      var evidence = session.getMapper(OrderEvidenceMapper.class);
+      assertThat(evidence.count(selection, Kind.ORDERS)).isEqualTo(2);
+      assertThat(evidence.daily(selection))
+          .singleElement()
+          .satisfies(day -> assertThat(day.sales()).isEqualByComparingTo("100"));
     }
     measureNinetyDayQueries(jdbc, factory);
   }

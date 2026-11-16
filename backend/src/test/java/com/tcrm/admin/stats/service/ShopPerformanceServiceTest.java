@@ -95,6 +95,12 @@ class ShopPerformanceServiceTest {
     assertThat(result.meta().filters().shopId()).isEqualTo(1L);
 
     when(account.ownScope()).thenReturn(false);
+    when(orders.countShopsWithPaidOrders(
+            new ScopeDTO(40, null, null, 8L, null, List.of(3L, 2L, 1L, 4L))))
+        .thenReturn(3L);
+    when(orders.countShopsWithPaidOrders(
+            new ScopeDTO(40, null, null, null, 9L, List.of(3L, 2L, 1L, 4L))))
+        .thenReturn(3L);
     assertThat(
             service
                 .query(new FilterDTO(DAY, DAY, null, 8L, null, null), 1, 20, null, null)

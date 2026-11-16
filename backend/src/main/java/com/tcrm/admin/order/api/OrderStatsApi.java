@@ -7,6 +7,8 @@ import java.util.List;
 
 /** Read-only aggregate of order facts for the management dashboard. */
 public interface OrderStatsApi {
+  /** Shops in the business scope with any paid order, regardless of the selected dates. */
+  long countShopsWithPaidOrders(ScopeDTO scope);
   TotalsDTO totals(ScopeDTO scope, Instant from, Instant until);
 
   List<RankFactsDTO> rankFacts(

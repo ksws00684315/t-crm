@@ -20,6 +20,11 @@ public class OrderStatsService implements OrderStatsApi {
   }
 
   @Override
+  public long countShopsWithPaidOrders(ScopeDTO scope) {
+    return mapper.countShopsWithPaidOrders(scope);
+  }
+
+  @Override
   public TotalsDTO totals(ScopeDTO scope, Instant from, Instant until) {
     return mapper.totals(scope, from, until);
   }

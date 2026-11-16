@@ -16,7 +16,7 @@ import org.apache.ibatis.annotations.Select;
  */
 @Mapper
 public interface OrderStatsMapper {
-  String SCOPED_PAID_ORDERS =
+  String SCOPED_ORDERS =
       """
       <script>
       WITH scoped_orders AS NOT MATERIALIZED (
@@ -55,12 +55,22 @@ public interface OrderStatsMapper {
             </otherwise>
           </choose>
         </if>
-      ),
+      )
+      """;
+
+  String SCOPED_PAID_ORDERS =
+      SCOPED_ORDERS
+          + """
+      ,
       paid AS (
         SELECT id, shop_id, kol_id, pay_time, pay_amount, update_time FROM scoped_orders
         WHERE pay_time &gt;= #{from} AND pay_time &lt; #{until}
       ),
       """;
+
+  @InterceptorIgnore(tenantLine = "true")
+  @Select(SCOPED_ORDERS + "SELECT COUNT(DISTINCT shop_id) FROM scoped_orders </script>")
+  long countShopsWithPaidOrders(@Param("scope") ScopeDTO scope);
 
   String COHORT_REFUND_WINDOW =
       """
@@ -151,7 +161,8 @@ public interface OrderStatsMapper {
       ),
       items AS (
         SELECT p.entity_id, SUM(i.quantity) AS units,
-               COUNT(DISTINCT (p.shop_id, i.weidian_item_id)) FILTER (WHERE i.weidian_item_id != '') AS spu_count,
+               COUNT(DISTINCT (p.shop_id, COALESCE('product:' || i.product_id, i.weidian_item_id)))
+                 FILTER (WHERE i.weidian_item_id != '') AS spu_count,
                COUNT(DISTINCT (p.shop_id, i.weidian_item_id, i.sku_id))
                  FILTER (WHERE i.weidian_item_id != '' AND i.sku_id != '') AS sku_count,
                COUNT(DISTINCT i.kol_item_id) FILTER (WHERE i.kol_id = p.kol_id) AS link_count
