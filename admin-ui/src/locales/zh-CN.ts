@@ -10,6 +10,38 @@ const zhCN = {
   prepay,
   finance,
   analytics: {
+    creatorCards: {
+      selling: "有销售达人",
+      sellingHint: "所选期间内有已支付订单的达人，按达人去重。",
+      effective: "有效达人",
+      effectiveHint: "所选期间内曾处于有效状态的达人数量，按达人去重。",
+      effectiveUnavailableHint:
+        "所选期间内曾处于有效状态的达人数量。启用状态历史未覆盖整个所选期间，暂显示横线。",
+      orders: "订单数",
+      ordersHint: "按支付时间统计筛选范围内各店铺的已支付订单，按订单去重。",
+      units: "销量",
+      unitsHint: "所选支付期间内，筛选范围内已支付订单的商品 SKU 件数合计。",
+      net: "净销售额",
+      netHint:
+        "所选期间支付的销售额，减去同批订单自支付日起 30 个北京时间自然日内完结的成功退款。支付日计第 1 天。",
+      totalCommission: "达人总佣金",
+      totalCommissionHint:
+        "所选期间内支付且已核实的订单佣金合计。未结算按预估，已结算按实际，已提现部分只计一次。",
+      commissionForbiddenHint: "达人总佣金按所选支付期间统计，查看金额需要佣金权限。",
+      relationship: "关系达人",
+      peopleCount: "{value} 位",
+      relationshipHint:
+        "截至查询时已建立商务归属的达人去重数，含有效和无效达人。选定店铺时限于在该店有过成交的达人。单独切换日期不影响人数。",
+      averageOrder: "平均订单价",
+      spu: "成交 SPU",
+      averageOrderHint:
+        "同一所选支付期间和筛选范围的销售额除以去重支付订单数。没有支付订单时显示横线。",
+      cohortRefund: "同批退款",
+      commissionBeforeClawback: "佣金",
+      clawback: "扣回",
+      clawbackHint:
+        "同批已核实订单发放佣金后，因成功退款确认入账的扣回，按正数展示。退款中暂时冻结、计佣前已减的退款及非退款调整不计入。无法核实原因时显示横线。"
+    },
     productCreatorCount: "达人数",
     productRefundHint:
       "商品退款金额统计可关联到商品行的成功退款，订单退款率以所选周期内支付的订单为分母。",

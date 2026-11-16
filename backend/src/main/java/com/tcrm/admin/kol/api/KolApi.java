@@ -1,6 +1,7 @@
 package com.tcrm.admin.kol.api;
 
 import com.tcrm.admin.system.api.BdUserDTO;
+import java.time.Instant;
 import java.util.Collection;
 import java.util.List;
 import java.util.Map;
@@ -32,6 +33,9 @@ public interface KolApi {
    * design capacity is a few hundred KOLs.
    */
   List<KolRefDTO> listAll();
+
+  /** Counts visible KOLs enabled at any time in the period; null if history is incomplete. */
+  Long countEnabledDuring(long tenantId, Collection<Long> visibleIds, Instant from, Instant until);
 
   /** Social accounts and display relation status for the scoped dashboard identities. */
   Map<Long, AnalyticsProfileDTO> analyticsProfiles(

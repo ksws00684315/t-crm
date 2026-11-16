@@ -40,6 +40,14 @@ public class KolLookupService implements KolApi {
   }
 
   @Override
+  public Long countEnabledDuring(
+      long tenantId, Collection<Long> visibleIds, Instant from, Instant until) {
+    return visibleIds.isEmpty()
+        ? Long.valueOf(0)
+        : kols.countEnabledDuring(tenantId, visibleIds, from, until);
+  }
+
+  @Override
   public KolRefDTO getByCode(String kolCode) {
     if (kolCode == null || kolCode.isBlank()) {
       return null;

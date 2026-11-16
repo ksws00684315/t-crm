@@ -315,7 +315,7 @@ public class KolService {
    */
   public void updateStatus(Long id, int status) {
     AccountDTO user = current.user();
-    requireVisible(id, user);
+    var kol = requireVisible(id, user);
     Instant now = Instant.now();
     tx.executeWithoutResult(
         txStatus -> {
@@ -327,6 +327,8 @@ public class KolService {
                       .set(KolDO::getUpdateBy, user.id())
                       .set(KolDO::getUpdateTime, now)),
               user);
+          // The update holds the row lock until this history entry commits with it.
+          kols.recordReportingStatus(kol.getTenantId(), id, status == 1, Instant.now());
           TransactionalEvents.publish(events, new KolStatusChangedEvent(id));
         });
   }

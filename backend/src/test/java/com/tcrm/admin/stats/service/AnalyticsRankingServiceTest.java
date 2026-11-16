@@ -186,6 +186,31 @@ class AnalyticsRankingServiceTest {
   }
 
   @Test
+  void creatorCardsUsePeriodStatusAndOnlyExposeAuthorizedCommission() {
+    var until = new StatsPeriod(DAY, DAY).until();
+    when(current.effectivePermissions(account)).thenReturn(List.of("commission:view"));
+    when(creators.listAll())
+        .thenReturn(
+            List.of(
+                new KolRefDTO(11L, "K1", "Alice", false, 9L),
+                new KolRefDTO(12L, "K2", "Bettina", true, null)));
+    when(creators.countEnabledDuring(40L, List.of(11L, 12L), FROM, until)).thenReturn(1L);
+    when(orders.rankFacts(any(), any(), any(), any())).thenReturn(List.of(person(11, 1)));
+    when(orders.creatorSpuCount(any(), eq(FROM), eq(until))).thenReturn(7L);
+    when(orders.creatorCommission(any(), eq(FROM), eq(until)))
+        .thenReturn(
+            new OrderStatsApi.CreatorCommissionDTO(new BigDecimal("8"), new BigDecimal("2")));
+
+    var cards =
+        service.query(Board.CREATOR, FILTER, null, 1, 20, null, null).summary().creatorCards();
+    assertThat(cards.periodEffectiveCount()).isEqualTo(1L);
+    assertThat(cards.relationshipCount()).isEqualTo(1);
+    assertThat(cards.spuCount()).isEqualTo(7);
+    assertThat(cards.commissionBeforeClawback()).isEqualByComparingTo("10");
+    assertThat(cards.totalCommission()).isEqualByComparingTo("8");
+  }
+
+  @Test
   void putsEarlierAchievementFirstInEitherDirection() {
     when(orders.rankFacts(any(), any(), any(), any()))
         .thenReturn(
@@ -198,6 +223,9 @@ class AnalyticsRankingServiceTest {
         .contains(
             new StatsOverviewService.UnavailableDTO("commissionRate", "COMMISSION_FORBIDDEN"));
     org.mockito.Mockito.verify(creators, org.mockito.Mockito.never()).listRatesByIds(any());
+    assertThat(restricted.summary().creatorCards().totalCommission()).isNull();
+    org.mockito.Mockito.verify(orders, org.mockito.Mockito.never())
+        .creatorCommission(any(), any(), any());
     for (String direction : List.of("asc", "desc")) {
       assertThat(
               service

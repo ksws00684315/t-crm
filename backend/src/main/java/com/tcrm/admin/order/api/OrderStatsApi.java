@@ -9,6 +9,7 @@ import java.util.List;
 public interface OrderStatsApi {
   /** Shops in the business scope with any paid order, regardless of the selected dates. */
   long countShopsWithPaidOrders(ScopeDTO scope);
+
   TotalsDTO totals(ScopeDTO scope, Instant from, Instant until);
 
   List<RankFactsDTO> rankFacts(
@@ -17,6 +18,16 @@ public interface OrderStatsApi {
   List<ProductFactsDTO> productFacts(ScopeDTO scope, String keyword, Instant from, Instant until);
 
   long sellingCreators(ScopeDTO scope, Instant from, Instant until);
+
+  /** Store participation by creators, independent of the selected reporting dates. */
+  List<Long> paidCreatorIds(ScopeDTO scope);
+
+  long creatorSpuCount(ScopeDTO scope, Instant from, Instant until);
+
+  /** Read-only CRM commission snapshots for the same paid-order cohort. */
+  CreatorCommissionDTO creatorCommission(ScopeDTO scope, Instant from, Instant until);
+
+  record CreatorCommissionDTO(BigDecimal total, BigDecimal clawback) {}
 
   enum RankDimension {
     SHOP,

@@ -3,6 +3,7 @@ package com.tcrm.admin.stats.service;
 import com.tcrm.admin.kol.api.KolApi;
 import com.tcrm.admin.kol.api.KolOwnershipApi;
 import com.tcrm.admin.kol.api.KolOwnershipDTO;
+import com.tcrm.admin.kol.api.KolRefDTO;
 import com.tcrm.admin.order.api.OrderStatsApi;
 import com.tcrm.admin.order.api.OrderStatsApi.ProductFactsDTO;
 import com.tcrm.admin.order.api.OrderStatsApi.RankDimension;
@@ -31,6 +32,7 @@ import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Objects;
+import java.util.Set;
 import java.util.function.Function;
 import java.util.stream.Collectors;
 import org.springframework.stereotype.Service;
@@ -367,10 +369,20 @@ public class AnalyticsRankingService {
         board == Board.INVITER
             ? orders.sellingCreators(scoped, period.from(), period.until())
             : null;
+    var creatorCards =
+        board == Board.CREATOR
+            ? creatorCards(scoped, period, directory, matchedIds, commissionVisible)
+            : null;
     return new Data(
         total.meta(),
         new Summary(
-            total.summary(), selling(rows), active, invitedCount, effectiveCount, sellingCreators),
+            total.summary(),
+            selling(rows),
+            active,
+            invitedCount,
+            effectiveCount,
+            sellingCreators,
+            creatorCards),
         new Summary(total.previous(), selling(previous), null, null, null, null),
         total.change(),
         rows,
@@ -381,6 +393,43 @@ public class AnalyticsRankingService {
                 new UnavailableDTO("prepayExpense", "INVITER_FINANCE_DASHBOARD_PENDING"),
                 new UnavailableDTO("totalEstimatedCommission", "INVITER_FINANCE_DASHBOARD_PENDING"),
                 new UnavailableDTO("totalExpense", "INVITER_FINANCE_DASHBOARD_PENDING")));
+  }
+
+  private CreatorCards creatorCards(
+      ScopeDTO scope,
+      StatsPeriod period,
+      List<KolRefDTO> directory,
+      Set<Long> matched,
+      boolean commissionVisible) {
+    var shopCreators =
+        scope.shopId() == null ? null : new java.util.HashSet<>(orders.paidCreatorIds(scope));
+    var eligible =
+        directory.stream()
+            .filter(k -> matched.contains(k.id()))
+            .filter(k -> scope.inviterId() == null || scope.inviterId().equals(k.bdUserId()))
+            .filter(k -> shopCreators == null || shopCreators.contains(k.id()))
+            .toList();
+    var now = Instant.now();
+    var statusUntil = period.until().isBefore(now) ? period.until() : now;
+    var valid =
+        period.from().isBefore(statusUntil)
+            ? creators.countEnabledDuring(
+                scope.tenantId(),
+                eligible.stream().map(KolRefDTO::id).toList(),
+                period.from(),
+                statusUntil)
+            : null;
+    var commission =
+        commissionVisible ? orders.creatorCommission(scope, period.from(), period.until()) : null;
+    return new CreatorCards(
+        valid,
+        eligible.stream().filter(k -> k.bdUserId() != null).count(),
+        orders.creatorSpuCount(scope, period.from(), period.until()),
+        commission == null ? null : commission.total(),
+        commission == null || commission.total() == null || commission.clawback() == null
+            ? null
+            : commission.total().add(commission.clawback()),
+        commission == null ? null : commission.clawback());
   }
 
   private static List<UnavailableDTO> creatorUnavailable(boolean authorized) {
@@ -580,7 +629,33 @@ public class AnalyticsRankingService {
       Long activeCount,
       Long invitedCount,
       Long effectiveCount,
-      Long sellingCreatorCount) {}
+      Long sellingCreatorCount,
+      CreatorCards creatorCards) {
+    public Summary(
+        MetricsDTO metrics,
+        long sellingCount,
+        Long activeCount,
+        Long invitedCount,
+        Long effectiveCount,
+        Long sellingCreatorCount) {
+      this(
+          metrics,
+          sellingCount,
+          activeCount,
+          invitedCount,
+          effectiveCount,
+          sellingCreatorCount,
+          null);
+    }
+  }
+
+  public record CreatorCards(
+      Long periodEffectiveCount,
+      long relationshipCount,
+      long spuCount,
+      BigDecimal totalCommission,
+      BigDecimal commissionBeforeClawback,
+      BigDecimal commissionClawback) {}
 
   public record Row(
       String id,

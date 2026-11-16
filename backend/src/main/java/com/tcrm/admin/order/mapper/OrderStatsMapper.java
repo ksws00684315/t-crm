@@ -1,6 +1,7 @@
 package com.tcrm.admin.order.mapper;
 
 import com.baomidou.mybatisplus.annotation.InterceptorIgnore;
+import com.tcrm.admin.order.api.OrderStatsApi.CreatorCommissionDTO;
 import com.tcrm.admin.order.api.OrderStatsApi.RankDimension;
 import com.tcrm.admin.order.api.OrderStatsApi.RankFactsDTO;
 import com.tcrm.admin.order.api.OrderStatsApi.ScopeDTO;
@@ -71,6 +72,76 @@ public interface OrderStatsMapper {
   @InterceptorIgnore(tenantLine = "true")
   @Select(SCOPED_ORDERS + "SELECT COUNT(DISTINCT shop_id) FROM scoped_orders </script>")
   long countShopsWithPaidOrders(@Param("scope") ScopeDTO scope);
+
+  @InterceptorIgnore(tenantLine = "true")
+  @Select(
+      SCOPED_ORDERS
+          + "SELECT DISTINCT kol_id FROM scoped_orders WHERE kol_id IS NOT NULL </script>")
+  List<Long> paidCreatorIds(@Param("scope") ScopeDTO scope);
+
+  @InterceptorIgnore(tenantLine = "true")
+  @Select(
+      SCOPED_ORDERS
+          + """
+      SELECT COUNT(DISTINCT (p.shop_id, COALESCE('product:' || i.product_id, i.weidian_item_id)))
+      FROM scoped_orders p JOIN crm_order_item i ON i.order_id = p.id AND i.tenant_id = #{scope.tenantId}
+      WHERE NOT i.is_deleted AND i.weidian_item_id != ''
+        AND p.pay_time &gt;= #{from} AND p.pay_time &lt; #{until}
+      </script>
+      """)
+  long creatorSpuCount(
+      @Param("scope") ScopeDTO scope, @Param("from") Instant from, @Param("until") Instant until);
+
+  // This read model uses wallet postings, not mutable release balances, for confirmed deductions.
+  @InterceptorIgnore(tenantLine = "true")
+  @Select(
+      SCOPED_ORDERS
+          + """
+      , verified AS MATERIALIZED (
+        SELECT s.id, s.kol_id, s.accrued_commission_cny AS total
+        FROM scoped_orders p
+        JOIN crm_commission_item_state s ON s.order_id = p.id AND s.kol_id = p.kol_id
+          AND s.tenant_id = #{scope.tenantId} AND s.verified AND NOT s.is_deleted
+        JOIN crm_order_item i ON i.id = s.order_item_id AND i.order_id = p.id
+          AND i.kol_id = s.kol_id AND i.tenant_id = #{scope.tenantId} AND NOT i.is_deleted
+        WHERE p.pay_time &gt;= #{from} AND p.pay_time &lt; #{until}
+      ), adjustments AS (
+        SELECT -l.amount_cny AS amount,
+          CASE
+            WHEN prior.id IS NULL THEN NULL
+            WHEN COALESCE(r.successful_refund_cny, 0) &lt;= COALESCE(prior.successful_refund_cny, 0) THEN FALSE
+            WHEN r.release_basis != 'AFTER_SALES'
+              AND r.rate IS NOT NULL AND r.rate = prior.rate
+              AND prior.basis_cny - r.basis_cny IN (
+                0, COALESCE(r.successful_refund_cny, 0) - COALESCE(prior.successful_refund_cny, 0))
+              THEN TRUE
+            ELSE NULL
+          END AS refund
+        FROM verified s
+        JOIN crm_commission_ledger l ON l.tenant_id = #{scope.tenantId} AND l.source_id = s.id
+          AND l.kol_id = s.kol_id AND l.source_type = 'COMMISSION'
+          AND l.entry_type = 'COMMISSION_ADJUSTMENT' AND l.amount_cny &lt; 0
+        LEFT JOIN crm_commission_item_revision r ON r.tenant_id = #{scope.tenantId}
+          AND r.item_state_id = s.id
+          AND l.source_key = 'COMMISSION_ITEM:' || s.id || ':' || r.source_version
+        LEFT JOIN LATERAL (
+          SELECT prev.id, prev.basis_cny, prev.successful_refund_cny, prev.rate
+          FROM crm_commission_item_revision prev
+          WHERE prev.tenant_id = #{scope.tenantId} AND prev.item_state_id = s.id
+            AND (prev.create_time, prev.id) &lt; (r.create_time, r.id)
+          ORDER BY prev.create_time DESC, prev.id DESC LIMIT 1
+        ) prior ON TRUE
+        WHERE l.source_key !~ ':K[0-9]+$'
+      )
+      SELECT (SELECT SUM(total) FROM verified) AS total,
+             CASE WHEN EXISTS (SELECT 1 FROM verified)
+               AND NOT EXISTS (SELECT 1 FROM adjustments WHERE refund IS NULL)
+               THEN (SELECT COALESCE(SUM(amount) FILTER (WHERE refund), 0) FROM adjustments)
+             END AS clawback
+      </script>
+      """)
+  CreatorCommissionDTO creatorCommission(
+      @Param("scope") ScopeDTO scope, @Param("from") Instant from, @Param("until") Instant until);
 
   String COHORT_REFUND_WINDOW =
       """

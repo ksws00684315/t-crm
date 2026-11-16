@@ -50,6 +50,14 @@ export interface Summary {
   invitedCount?: Scalar;
   effectiveCount?: Scalar;
   sellingCreatorCount?: Scalar;
+  creatorCards?: {
+    periodEffectiveCount: Scalar | null;
+    relationshipCount: Scalar;
+    spuCount: Scalar;
+    totalCommission: Scalar | null;
+    commissionBeforeClawback: Scalar | null;
+    commissionClawback: Scalar | null;
+  };
 }
 export interface Meta {
   period: Pick<Filters, "startDate" | "endDate">;

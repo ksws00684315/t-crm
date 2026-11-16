@@ -16,6 +16,7 @@ import {
   DataBoard,
   Goods,
   InfoFilled,
+  User,
   Tickets,
   TrendCharts,
   Wallet,
@@ -259,6 +260,99 @@ function cellDisplay(row: RankRow, key: string): string {
 const cards = computed(() => {
   const summary = result.value?.summary;
   const data = metrics.value;
+  if (creator) {
+    const extras = summary?.creatorCards;
+    const translate = (key: string) => t(`analytics.creatorCards.${key}`);
+    const term = (key: string, value?: string, hintKey = `${key}Hint`) => ({
+      label: translate(key),
+      hint: translate(hintKey),
+      value
+    });
+    const pair = (left: Scalar | null | undefined, right: Scalar | null | undefined) =>
+      `${display("", left)} / ${display("", right)}`;
+    const formatMoney = (value: Scalar | null | undefined) => {
+      if (value == null) return "—";
+      const [whole, fraction = ""] = String(value).split(".");
+      return formatAmountWithCurrency(`${whole}.${fraction.padEnd(2, "0")}`);
+    };
+    const forbidden = isCommissionForbidden("commissionRate");
+    const selling = term("selling");
+    const effective = term(
+      "effective",
+      undefined,
+      extras?.periodEffectiveCount == null && result.value
+        ? "effectiveUnavailableHint"
+        : "effectiveHint"
+    );
+    const orderCount = term("orders");
+    const units = term("units");
+    const net = term("net");
+    const commission = term(
+      "totalCommission",
+      undefined,
+      forbidden ? "commissionForbiddenHint" : "totalCommissionHint"
+    );
+    return [
+      {
+        tone: "purple" as const,
+        icon: User,
+        label: `${selling.label} / ${effective.label}`,
+        value: pair(summary?.sellingCount, extras?.periodEffectiveCount),
+        labelTerms: [selling, effective],
+        detailTerms: [
+          term(
+            "relationship",
+            extras?.relationshipCount == null
+              ? "—"
+              : t("analytics.creatorCards.peopleCount", {
+                  value: display("", extras.relationshipCount)
+                })
+          )
+        ]
+      },
+      {
+        tone: "blue" as const,
+        icon: Tickets,
+        label: `${orderCount.label} / ${units.label}`,
+        value: pair(data?.paidOrderCount, data?.units),
+        labelTerms: [orderCount, units],
+        detailTerms: [
+          { label: translate("spu"), value: display("", extras?.spuCount) },
+          term("averageOrder", formatMoney(data?.averageOrderAmount))
+        ]
+      },
+      {
+        tone: "green" as const,
+        icon: TrendCharts,
+        label: net.label,
+        value: formatMoney(data?.netSalesAmount),
+        labelTerms: [net],
+        detailTerms: [
+          { label: t("analytics.salesAmount"), value: formatMoney(data?.salesAmount) },
+          { label: translate("cohortRefund"), value: formatMoney(data?.cohortRefundAmount) }
+        ]
+      },
+      {
+        tone: "amber" as const,
+        icon: Wallet,
+        label: commission.label,
+        value: forbidden
+          ? t("analytics.commissionForbidden")
+          : formatMoney(extras?.totalCommission),
+        labelTerms: [commission],
+        unavailable: forbidden || extras?.totalCommission == null,
+        detailTerms: forbidden
+          ? undefined
+          : [
+              {
+                label: translate("commissionBeforeClawback"),
+                value: formatMoney(extras?.commissionBeforeClawback)
+              },
+              term("clawback", formatMoney(extras?.commissionClawback))
+            ]
+      }
+    ];
+  }
   const selling = shop ? summary?.sellingShopCount : summary?.sellingCount;
   const total = shop ? summary?.shopCount : summary?.activeCount;
   const first = {

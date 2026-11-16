@@ -630,11 +630,14 @@ class KolServiceTest {
   @Test
   void shouldPublishStatusEvent_whenStatusChanges() {
     actAs(1L, Role.STAFF, DataScope.ALL);
-    when(kols.selectById(11L)).thenReturn(kol(OTHER_BD));
+    var creator = kol(OTHER_BD);
+    creator.setTenantId(1L);
+    when(kols.selectById(11L)).thenReturn(creator);
     when(kols.update(isNull(), any())).thenReturn(1);
 
     service.updateStatus(11L, 0);
 
+    verify(kols).recordReportingStatus(eq(1L), eq(11L), eq(false), any());
     verify(events).publishEvent(new KolStatusChangedEvent(11L));
   }
 

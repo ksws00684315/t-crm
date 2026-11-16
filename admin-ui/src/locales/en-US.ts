@@ -7,6 +7,41 @@ const enUS: MessageSchema = {
   prepay,
   finance,
   analytics: {
+    creatorCards: {
+      selling: "Creators with sales",
+      sellingHint: "Distinct creators with paid orders during the selected period.",
+      effective: "Active creators",
+      effectiveHint: "Distinct creators who were enabled at any point during the selected period.",
+      effectiveUnavailableHint:
+        "Counts creators enabled during the period. A dash indicates incomplete status history.",
+      orders: "Orders",
+      ordersHint:
+        "Distinct paid orders across matching shops, based on payment time during the selected period.",
+      units: "Units sold",
+      unitsHint:
+        "Total units of all SKUs in matching paid orders during the selected payment period.",
+      net: "Net sales",
+      netHint:
+        "Sales paid during the selected period less successful refunds completed within 30 Beijing calendar days of payment, counting the payment day as day one.",
+      totalCommission: "Total creator commission",
+      totalCommissionHint:
+        "Commission on verified orders paid during the selected period. Estimated amounts apply to unsettled orders and actual amounts to settled orders. Withdrawals do not add commission again.",
+      commissionForbiddenHint:
+        "Total creator commission is based on the payment period. Viewing amounts requires commission access.",
+      relationship: "Assigned creators",
+      peopleCount: "{value}",
+      relationshipHint:
+        "Distinct creators currently assigned to a business owner, including disabled creators. A shop filter limits the count to those who have sold at that shop.",
+      averageOrder: "Average order value",
+      spu: "SPUs sold",
+      averageOrderHint:
+        "Sales divided by distinct paid orders under the same period and filters. Shows a dash if there are no paid orders.",
+      cohortRefund: "Cohort refunds",
+      commissionBeforeClawback: "Commission",
+      clawback: "Clawback",
+      clawbackHint:
+        "Confirmed deductions after commission release due to successful refunds on the same cohort of verified orders. Shown as a positive amount. A dash indicates unverified attribution."
+    },
     productCreatorCount: "Creators",
     productRefundHint:
       "Product refunds include successful refunds linked to an item. The order refund rate uses orders paid in the selected period.",

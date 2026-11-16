@@ -41,6 +41,21 @@ public class OrderStatsService implements OrderStatsApi {
   }
 
   @Override
+  public List<Long> paidCreatorIds(ScopeDTO scope) {
+    return mapper.paidCreatorIds(scope);
+  }
+
+  @Override
+  public long creatorSpuCount(ScopeDTO scope, Instant from, Instant until) {
+    return mapper.creatorSpuCount(scope, from, until);
+  }
+
+  @Override
+  public CreatorCommissionDTO creatorCommission(ScopeDTO scope, Instant from, Instant until) {
+    return mapper.creatorCommission(scope, from, until);
+  }
+
+  @Override
   public List<LocalDate> changedDays(long tenantId, Instant from, Instant until) {
     return daily.changedDays(tenantId, from, until);
   }

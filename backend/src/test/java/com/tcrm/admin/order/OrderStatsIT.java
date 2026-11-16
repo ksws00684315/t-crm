@@ -2,6 +2,7 @@ package com.tcrm.admin.order;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
+import com.tcrm.admin.kol.mapper.KolMapper;
 import com.tcrm.admin.order.api.OrderEvidenceApi.Kind;
 import com.tcrm.admin.order.api.OrderEvidenceApi.ProductBreakdown;
 import com.tcrm.admin.order.api.OrderEvidenceApi.Selection;
@@ -110,6 +111,7 @@ class OrderStatsIT {
     configuration.addMapper(OrderStatsMapper.class);
     configuration.addMapper(OrderDailyStatsMapper.class);
     configuration.addMapper(OrderEvidenceMapper.class);
+    configuration.addMapper(KolMapper.class);
     configuration.addMapper(StatsRollupMapper.class);
     var factory = new SqlSessionFactoryBuilder().build(configuration);
 
@@ -302,6 +304,61 @@ class OrderStatsIT {
           .satisfies(day -> assertThat(day.sales()).isEqualByComparingTo("100"));
     }
     measureNinetyDayQueries(jdbc, factory);
+    checkCreatorCards(jdbc, factory);
+  }
+
+  private static void checkCreatorCards(JdbcTemplate jdbc, SqlSessionFactory factory) {
+    jdbc.execute(
+        """
+        INSERT INTO crm_kol (id, tenant_id, kol_code, name, email, country, create_time, update_time)
+        VALUES (701, 4, 'KOL-AAA701', 'Fixture', 't144-701@example.test', 'US', '2026-11-01T00:00:00Z', now()),
+               (702, 4, 'KOL-AAA702', 'Fixture', 't144-702@example.test', 'US', '2026-11-01T00:00:00Z', now())
+        """);
+    jdbc.update("UPDATE crm_kol SET status = 0 WHERE id = 701");
+    jdbc.update(
+        """
+        INSERT INTO crm_kol_reporting_status (tenant_id, kol_id, enabled, changed_at, baseline)
+        VALUES (4, 702, TRUE, '2026-11-04T00:00:00Z', TRUE)
+        """);
+    jdbc.execute(
+        """
+        INSERT INTO crm_commission_item_state (id, tenant_id, order_id, order_item_id, kol_id,
+          source_key, settlement_state, verified, accrued_commission_cny, release_basis,
+          create_time, update_time)
+        VALUES (701, 4, 1, 1, 11, 't144-card-state', 'CONFIRMED', TRUE, 8, 'CONFIRMED', now(), now())
+        """);
+    jdbc.execute(
+        """
+        INSERT INTO crm_commission_item_revision (id, tenant_id, item_state_id, source_version,
+          basis_cny, successful_refund_cny, rate, accrued_cny, delta_cny, release_basis, create_time)
+        VALUES (701, 4, 701, 'initial', 100, 0, .10, 10, 0, 'CONFIRMED', '2026-11-03T00:00:00Z'),
+               (702, 4, 701, 'refund', 80, 20, .10, 8, -2, 'CONFIRMED', '2026-11-04T00:00:00Z')
+        """);
+    jdbc.execute(
+        """
+        INSERT INTO crm_commission_ledger (id, tenant_id, kol_id, entry_type, amount_cny, source_type,
+          source_id, source_key, occurred_at, balance_after_cny, create_time)
+        VALUES (701, 4, 11, 'COMMISSION_ADJUSTMENT', -2, 'COMMISSION', 701,
+          'COMMISSION_ITEM:701:refund', '2026-11-04T00:00:00Z', 8, now()),
+          (702, 4, 11, 'COMMISSION_ADJUSTMENT', -1, 'COMMISSION', 701,
+          'COMMISSION_ITEM:701:correction:K11', '2026-11-04T00:00:00Z', 7, now())
+        """);
+    try (var session = factory.openSession()) {
+      var kols = session.getMapper(KolMapper.class);
+      kols.recordReportingStatus(4L, 701L, false, UNTIL);
+      assertThat(kols.countEnabledDuring(4, java.util.List.of(701L), FROM, UNTIL)).isEqualTo(1L);
+      assertThat(kols.countEnabledDuring(4, java.util.List.of(701L), UNTIL, UNTIL.plusSeconds(60)))
+          .isZero();
+      assertThat(kols.countEnabledDuring(4, java.util.List.of(702L), FROM, UNTIL)).isNull();
+      var orders = session.getMapper(OrderStatsMapper.class);
+      var scoped = new ScopeDTO(4, 9L, 1L, null, null);
+      assertThat(orders.creatorSpuCount(scoped, FROM, UNTIL)).isEqualTo(1);
+      var commission = orders.creatorCommission(scoped, FROM, UNTIL);
+      assertThat(commission.total()).isEqualByComparingTo("8");
+      assertThat(commission.clawback()).isEqualByComparingTo("2");
+      assertThat(orders.creatorCommission(new ScopeDTO(4, 10L, null, null, null), FROM, UNTIL))
+          .isNull();
+    }
   }
 
   private static void measureNinetyDayQueries(JdbcTemplate jdbc, SqlSessionFactory factory) {
