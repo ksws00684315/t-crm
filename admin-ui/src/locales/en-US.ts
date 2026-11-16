@@ -11,6 +11,8 @@ const enUS: MessageSchema = {
     productRefundHint:
       "Product refunds include successful refunds linked to an item. The order refund rate uses orders paid in the selected period.",
     period: "Time period",
+    conditions: "Filters",
+    creatorSearch: "Enter creator ID or name",
     periodMode: {
       live: "Live",
       sevenDays: "7 days",

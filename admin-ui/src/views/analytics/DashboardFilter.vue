@@ -1,15 +1,15 @@
 <script setup lang="ts">
 import { computed, nextTick, ref } from "vue";
-import { ArrowLeft, ArrowRight } from "@element-plus/icons-vue";
+import { ArrowLeft, ArrowRight, Search } from "@element-plus/icons-vue";
 import { useI18n } from "vue-i18n";
 import ListSearch from "@/components/ListSearch.vue";
 import NameCode from "@/components/NameCode.vue";
 import { formatNameWithCode } from "@/utils/format";
-import type { Board, Filters, Options } from "@/api/analytics";
+import type { Filters, Options } from "@/api/analytics";
 import { adjacentPeriod, dates, monthRange, periodModes, periodRange } from "./board";
 import type { PeriodMode } from "./board";
 
-defineProps<{ board: Board; options?: Options; loading: boolean; optionsFailed: boolean }>();
+defineProps<{ options?: Options; loading: boolean; optionsFailed: boolean }>();
 const filters = defineModel<Filters>({ required: true });
 const emit = defineEmits<{ search: [live: boolean]; reset: []; refresh: [] }>();
 const { t } = useI18n();
@@ -146,109 +146,87 @@ function reset(): void {
         </div>
       </div>
       <div class="analytics-filter__fields">
-        <div class="analytics-filter__field">
-          <span>{{ t("analytics.shop") }}</span>
-          <el-select
-            v-model="filters.shopId"
-            clearable
-            filterable
-            :aria-label="t('analytics.shop')"
-            :placeholder="t('analytics.all')"
-          >
-            <el-option
-              v-for="option in options?.shops"
-              :key="option.id"
-              :value="option.id"
-              :label="formatNameWithCode(option.name, option.code)"
-            >
-              <NameCode v-if="option.code" :name="option.name" :code="option.code" />
-              <span v-else>{{ option.name }}</span>
-            </el-option>
-          </el-select>
-        </div>
-        <div class="analytics-filter__field">
-          <span>{{ t("analytics.channel") }}</span>
-          <el-select
-            v-model="filters.channel"
-            clearable
-            :aria-label="t('analytics.channel')"
-            :placeholder="t('analytics.all')"
-          >
-            <el-option value="WEIDIAN" :label="t('analytics.weidian')" />
-          </el-select>
-        </div>
-        <div
-          v-if="board === 'shop-performance' || board === 'best-sellers'"
-          class="analytics-filter__field"
+        <span class="analytics-filter__label">{{ t("analytics.conditions") }}</span>
+        <el-select
+          v-model="filters.shopId"
+          class="analytics-filter__shop"
+          clearable
+          filterable
+          :aria-label="t('analytics.shop')"
+          :placeholder="t('analytics.all')"
         >
-          <span>{{ t("analytics.creator") }}</span>
-          <el-select
-            v-model="filters.kolId"
-            clearable
-            filterable
-            :aria-label="t('analytics.creator')"
-            :placeholder="t('analytics.all')"
+          <template #prefix
+            ><span>{{ t("analytics.shop") }}</span></template
           >
-            <el-option
-              v-for="option in options?.creators"
-              :key="option.id"
-              :value="option.id"
-              :label="formatNameWithCode(option.name, option.code)"
-            >
-              <NameCode v-if="option.code" :name="option.name" :code="option.code" />
-              <span v-else>{{ option.name }}</span>
-            </el-option>
-          </el-select>
-        </div>
-        <div v-if="board === 'kol-ranking'" class="analytics-filter__field">
-          <span>{{ t("analytics.inviter") }}</span>
-          <el-select
-            v-model="filters.inviterId"
-            clearable
-            filterable
-            :aria-label="t('analytics.inviter')"
-            :placeholder="t('analytics.all')"
+          <el-option
+            v-for="option in options?.shops"
+            :key="option.id"
+            :value="option.id"
+            :label="formatNameWithCode(option.name, option.code)"
           >
-            <el-option
-              v-for="option in options?.inviters"
-              :key="option.id"
-              :value="option.id"
-              :label="option.name"
-            />
-          </el-select>
-        </div>
-        <div
-          v-if="board !== 'shop-performance'"
-          class="analytics-filter__field analytics-filter__field--keyword"
+            <NameCode v-if="option.code" :name="option.name" :code="option.code" />
+            <span v-else>{{ option.name }}</span>
+          </el-option>
+        </el-select>
+        <el-select
+          v-model="filters.channel"
+          class="analytics-filter__channel"
+          clearable
+          :aria-label="t('analytics.channel')"
+          :placeholder="t('analytics.all')"
         >
-          <span>{{ t("analytics.keyword") }}</span>
-          <el-input
-            v-model="filters.keyword"
-            clearable
-            :maxlength="100"
-            :aria-label="t('analytics.keyword')"
-            :placeholder="t(`analytics.${board}.keyword`)"
-          />
-        </div>
+          <template #prefix
+            ><span>{{ t("analytics.channel") }}</span></template
+          >
+          <el-option value="WEIDIAN" :label="t('analytics.weidian')" />
+        </el-select>
+        <el-input
+          v-model="filters.creatorKeyword"
+          class="analytics-filter__creator"
+          clearable
+          :maxlength="100"
+          :aria-label="t('analytics.creatorSearch')"
+          :placeholder="t('analytics.creatorSearch')"
+        >
+          <template #prefix>
+            <span>{{ t("analytics.creator") }}</span>
+            <el-icon class="analytics-filter__search-icon"><Search /></el-icon>
+          </template>
+        </el-input>
+        <span v-if="optionsFailed" class="analytics-filter__failure" role="status">{{
+          t("analytics.optionsFailed")
+        }}</span>
       </div>
-      <span v-if="optionsFailed" role="status">{{ t("analytics.optionsFailed") }}</span>
     </template>
   </ListSearch>
 </template>
 
 <style scoped>
-.analytics-filter__time {
-  flex: 0 0 100%;
-  min-width: 0;
+.analytics-filter :deep(.list-search__row) {
   display: grid;
+  grid-template-columns: minmax(0, 790px) max-content;
+}
+.analytics-filter__time,
+.analytics-filter__fields {
+  display: flex;
+  align-items: center;
   gap: var(--tcrm-space-2);
+  min-width: 0;
+}
+.analytics-filter__time {
+  grid-column: 1 / -1;
 }
 .analytics-filter__period {
   display: flex;
   min-width: 0;
   flex-wrap: wrap;
   align-items: center;
-  gap: var(--tcrm-space-2) var(--tcrm-space-4);
+  gap: var(--tcrm-space-2);
+}
+.analytics-filter__label {
+  flex: 0 0 5em;
+  white-space: nowrap;
+  color: var(--tcrm-color-text-secondary);
 }
 .analytics-filter__period :deep(.el-button) {
   padding-inline: var(--tcrm-space-3);
@@ -262,48 +240,48 @@ function reset(): void {
   background: var(--tcrm-color-option-selected-hover-bg);
 }
 .analytics-filter__period :deep(.el-date-editor) {
+  width: 144px;
   max-width: 100%;
 }
 .analytics-filter__period :deep(.el-date-editor--daterange) {
-  flex: 0 1 auto;
-  width: 320px;
-  min-width: 0;
+  width: 264px;
 }
 .analytics-filter__dates {
   color: var(--el-text-color-secondary);
   font-size: var(--tcrm-font-size-help);
 }
-.analytics-filter__fields {
-  display: flex;
-  flex: 1 1 610px;
-  flex-wrap: wrap;
-  gap: var(--tcrm-space-3) var(--tcrm-space-4);
-  min-width: 0;
+.analytics-filter__shop {
+  flex: 1 1 210px;
+  min-width: 112px;
 }
-.analytics-filter__field {
-  display: grid;
-  flex: 1 1 130px;
-  min-width: 0;
-  gap: var(--tcrm-space-1);
+.analytics-filter__channel {
+  flex: 0 1 164px;
+  min-width: 100px;
 }
-.analytics-filter__field--keyword {
-  flex-basis: 175px;
+.analytics-filter__creator {
+  flex: 1.5 1 320px;
+  min-width: 228px;
 }
-.analytics-filter__field > span,
-.analytics-filter__label {
-  color: var(--tcrm-color-text);
-  font-size: var(--tcrm-font-size-body);
-  line-height: var(--tcrm-line-height-body);
+.analytics-filter__search-icon {
+  margin-inline-start: var(--tcrm-space-1);
 }
-.analytics-filter__field :deep(.el-select),
-.analytics-filter__field :deep(.el-input) {
-  width: 100%;
+.analytics-filter__failure {
+  color: var(--el-text-color-secondary);
 }
 .analytics-filter :deep(.list-search__actions) {
-  flex: 0 0 auto;
   min-width: 0;
 }
-@media (max-width: 600px) {
+@media (max-width: 767px) {
+  .analytics-filter :deep(.list-search__row) {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .analytics-filter__time,
+  .analytics-filter__fields {
+    flex-wrap: wrap;
+  }
+  .analytics-filter__label {
+    flex-basis: 100%;
+  }
   .analytics-filter__period :deep(.el-button-group) {
     display: inline-flex;
     max-width: 100%;
@@ -312,14 +290,7 @@ function reset(): void {
   .analytics-filter__period :deep(.el-button) {
     padding-inline: var(--tcrm-space-2);
   }
-  .analytics-filter__fields {
-    flex-basis: 100%;
-    column-gap: var(--tcrm-space-3);
-  }
-  .analytics-filter__field {
-    flex-basis: 88px;
-  }
-  .analytics-filter__field--keyword {
+  .analytics-filter__creator {
     flex-basis: 100%;
   }
 }

@@ -4,7 +4,6 @@ import cn.dev33.satoken.annotation.SaCheckPermission;
 import cn.dev33.satoken.annotation.SaMode;
 import com.tcrm.admin.shared.R;
 import com.tcrm.admin.stats.service.StatsOverviewService;
-import com.tcrm.admin.stats.service.StatsOverviewService.FilterDTO;
 import com.tcrm.admin.stats.service.StatsOverviewService.OverviewDTO;
 import jakarta.validation.Valid;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -27,14 +26,6 @@ public class StatsController {
       value = {"dashboard:shop", "dashboard:team"},
       mode = SaMode.OR)
   public R<OverviewDTO> overview(@Valid @ModelAttribute StatsOverviewQuery query) {
-    return R.ok(
-        stats.overview(
-            new FilterDTO(
-                query.startDate(),
-                query.endDate(),
-                query.shopId(),
-                query.kolId(),
-                query.inviterId(),
-                query.channel())));
+    return R.ok(stats.overview(query.toFilter()));
   }
 }

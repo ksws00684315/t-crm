@@ -43,6 +43,17 @@ public interface OrderDailyStatsMapper {
           </choose>
         </if>
         <if test="scope.kolId != null">AND i.kol_id = #{scope.kolId}</if>
+        <if test="scope.matchedKolIds != null">
+          <choose>
+            <when test="scope.matchedKolIds.isEmpty()">AND FALSE</when>
+            <otherwise>
+              AND i.kol_id IN
+              <foreach collection="scope.matchedKolIds" item="matched" open="(" separator="," close=")">
+                #{matched}
+              </foreach>
+            </otherwise>
+          </choose>
+        </if>
       ), selected_lines AS NOT MATERIALIZED (
         SELECT l.* FROM lines l
         <if test="keyword != null">

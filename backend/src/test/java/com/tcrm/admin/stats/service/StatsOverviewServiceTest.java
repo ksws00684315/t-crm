@@ -8,6 +8,8 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
+import com.tcrm.admin.kol.api.KolApi;
+import com.tcrm.admin.kol.api.KolRefDTO;
 import com.tcrm.admin.order.api.OrderStatsApi;
 import com.tcrm.admin.order.api.OrderStatsApi.ScopeDTO;
 import com.tcrm.admin.order.api.OrderStatsApi.TotalsDTO;
@@ -19,6 +21,7 @@ import com.tcrm.admin.stats.service.StatsOverviewService.FilterDTO;
 import java.math.BigDecimal;
 import java.time.Instant;
 import java.time.LocalDate;
+import java.util.List;
 import org.junit.jupiter.api.Test;
 
 class StatsOverviewServiceTest {
@@ -29,7 +32,8 @@ class StatsOverviewServiceTest {
   private final OrderStatsApi orders = mock(OrderStatsApi.class);
   private final CurrentUserContext current = mock(CurrentUserContext.class);
   private final AccountDTO account = mock(AccountDTO.class);
-  private final StatsOverviewService service = new StatsOverviewService(orders, current);
+  private final KolApi creators = mock(KolApi.class);
+  private final StatsOverviewService service = new StatsOverviewService(orders, current, creators);
 
   @Test
   void scopesBothPeriodsAndKeepsRefundClocksSeparate() {
@@ -55,6 +59,39 @@ class StatsOverviewServiceTest {
     assertThat(result.unavailable()).hasSize(3);
     verify(orders).totals(scope, FROM, UNTIL);
     verify(orders).totals(scope, PRIOR, FROM);
+  }
+
+  @Test
+  void resolvesCreatorNameCodeAndIdWithinTheAccountOrderScope() {
+    when(current.user()).thenReturn(account);
+    when(account.tenantId()).thenReturn(40L);
+    when(account.id()).thenReturn(99L);
+    when(account.ownScope()).thenReturn(true);
+    when(creators.listAll())
+        .thenReturn(
+            List.of(
+                new KolRefDTO(8L, "KOL-001", "北岸达人", true, 99L),
+                new KolRefDTO(9L, "KOL-002", "纸飞机达人", true, 12L)));
+
+    for (String keyword : List.of("北岸", " kol-001 ", "8")) {
+      var result = service.resolve(new FilterDTO(DAY, DAY, 6L, null, null, null, keyword));
+      assertThat(result.scope().matchedKolIds()).containsExactly(8L);
+      assertThat(result.scope().tenantId()).isEqualTo(40L);
+      assertThat(result.scope().ownerId()).isEqualTo(99L);
+      assertThat(result.filters().creatorKeyword()).isEqualTo(keyword.strip());
+    }
+    assertThat(
+            service
+                .resolve(new FilterDTO(DAY, DAY, 6L, null, null, null, "missing"))
+                .scope()
+                .matchedKolIds())
+        .isEmpty();
+    assertThat(
+            service
+                .resolve(new FilterDTO(DAY, DAY, 6L, null, null, null, " "))
+                .scope()
+                .matchedKolIds())
+        .isNull();
   }
 
   @Test

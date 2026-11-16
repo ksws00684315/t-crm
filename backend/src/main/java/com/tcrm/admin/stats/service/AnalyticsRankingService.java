@@ -125,7 +125,9 @@ public class AnalyticsRankingService {
             original.shopId(),
             original.kolId(),
             null,
-            List.copyOf(shopNames.keySet()));
+            List.copyOf(shopNames.keySet()),
+            original.matchedKolIds(),
+            null);
     var current = orders.productFacts(scope, keyword, period.from(), period.until());
     var previous = orders.productFacts(scope, keyword, prior.from(), prior.until());
     var totals = current.stream().filter(p -> p.shopId() == null).findFirst().orElseThrow();
@@ -225,13 +227,18 @@ public class AnalyticsRankingService {
     now.forEach(r -> ids.add(r.entityId()));
     before.forEach(r -> ids.add(r.entityId()));
     var directory =
-        scope.ownerId() == null ? creators.listAll() : creators.listByBdUserId(scope.ownerId());
+        (scope.ownerId() == null ? creators.listAll() : creators.listByBdUserId(scope.ownerId()))
+            .stream()
+                .filter(
+                    k -> scope.matchedKolIds() == null || scope.matchedKolIds().contains(k.id()))
+                .toList();
     var kolIds = board == Board.CREATOR ? ids : List.<Long>of();
     var kols =
         creators.listByIdsIncludingDeleted(kolIds).stream()
             .collect(Collectors.toMap(k -> k.id(), Function.identity()));
     directory.forEach(k -> kols.put(k.id(), k));
-    var invited = board == Board.INVITER ? invitedCounts() : Map.<Long, Long>of();
+    var invited =
+        board == Board.INVITER ? invitedCounts(scope.matchedKolIds()) : Map.<Long, Long>of();
     var ownerIds = new java.util.HashSet<Long>();
     kols.values().stream().map(k -> k.bdUserId()).filter(Objects::nonNull).forEach(ownerIds::add);
     if (board == Board.INVITER) {
@@ -311,7 +318,11 @@ public class AnalyticsRankingService {
                                 || (kols.containsKey(e.getKey())
                                     && scope.inviterId().equals(kols.get(e.getKey()).bdUserId()))
                                 || ids.contains(e.getKey()))
-                        : scope.inviterId() == null || scope.inviterId().equals(e.getKey()))
+                        : (scope.inviterId() == null || scope.inviterId().equals(e.getKey()))
+                            && (scope.matchedKolIds() == null
+                                || ids.contains(e.getKey())
+                                || invited.containsKey(e.getKey())
+                                || effective.containsKey(e.getKey())))
             .filter(e -> matches(e.getValue(), keyword))
             .map(Map.Entry::getKey)
             .toList();
@@ -325,7 +336,7 @@ public class AnalyticsRankingService {
                 scope.kolId(),
                 scope.inviterId(),
                 scope.visibleShopIds(),
-                board == Board.CREATOR ? matched : null,
+                board == Board.CREATOR ? matched : scope.matchedKolIds(),
                 board == Board.INVITER ? matched : null)
             : scope;
     var total =
@@ -386,7 +397,7 @@ public class AnalyticsRankingService {
     return List.copyOf(fields);
   }
 
-  private Map<Long, Long> invitedCounts() {
+  private Map<Long, Long> invitedCounts(List<Long> matchedKolIds) {
     var firstOwner = new HashMap<Long, KolOwnershipDTO>();
     ownership
         .createdBetween(Instant.EPOCH, Instant.now())
@@ -395,6 +406,7 @@ public class AnalyticsRankingService {
                 firstOwner.merge(
                     entry.kolId(), entry, (a, b) -> a.startTime().isAfter(b.startTime()) ? b : a));
     return firstOwner.values().stream()
+        .filter(entry -> matchedKolIds == null || matchedKolIds.contains(entry.kolId()))
         .map(KolOwnershipDTO::bdUserId)
         .filter(Objects::nonNull)
         .collect(Collectors.groupingBy(Function.identity(), Collectors.counting()));

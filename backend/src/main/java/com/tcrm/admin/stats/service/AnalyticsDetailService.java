@@ -141,7 +141,9 @@ public class AnalyticsDetailService {
             original.shopId(),
             original.kolId(),
             original.inviterId(),
-            visible);
+            visible,
+            original.matchedKolIds(),
+            original.matchedInviterIds());
     var period = resolved.period();
     return new Selection(
         scope,
@@ -177,7 +179,9 @@ public class AnalyticsDetailService {
             original.shopId(),
             original.kolId(),
             inviterId,
-            visible);
+            visible,
+            original.matchedKolIds(),
+            original.matchedInviterIds());
     var period = resolved.period();
     var facts = orders.rankFacts(scope, RankDimension.KOL, period.from(), period.until());
     var metricsById =
@@ -186,6 +190,10 @@ public class AnalyticsDetailService {
         currentTeam
             ? creators.listByBdUserId(inviterId).stream()
                 .filter(k -> original.kolId() == null || Objects.equals(k.id(), original.kolId()))
+                .filter(
+                    k ->
+                        original.matchedKolIds() == null
+                            || original.matchedKolIds().contains(k.id()))
                 .toList()
             : creators.listByIdsIncludingDeleted(
                 facts.stream().map(RankFactsDTO::entityId).filter(id -> id != 0L).toList());

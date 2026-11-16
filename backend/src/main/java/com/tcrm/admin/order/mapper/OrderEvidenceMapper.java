@@ -28,6 +28,17 @@ public interface OrderEvidenceMapper {
         <if test="s.inviter != null">AND COALESCE(o.bd_user_id, 0) = #{s.inviter}</if>
         <if test="s.creator != null">AND COALESCE(o.kol_id, 0) = #{s.creator}</if>
         <if test="s.productCode == null and s.scope.kolId != null">AND o.kol_id = #{s.scope.kolId}</if>
+        <if test="s.productCode == null and s.scope.matchedKolIds != null">
+          <choose>
+            <when test="s.scope.matchedKolIds.isEmpty()">AND FALSE</when>
+            <otherwise>
+              AND o.kol_id IN
+              <foreach collection="s.scope.matchedKolIds" item="matched" open="(" separator="," close=")">
+                #{matched}
+              </foreach>
+            </otherwise>
+          </choose>
+        </if>
         <if test="s.productCode != null">AND o.attribution_status = 'ATTRIBUTED'</if>
         AND o.shop_id IN
         <foreach collection="s.scope.visibleShopIds" item="shop" open="(" separator="," close=")">
@@ -54,6 +65,17 @@ public interface OrderEvidenceMapper {
             </otherwise>
           </choose>
           <if test="s.scope.kolId != null">AND i.kol_id = #{s.scope.kolId}</if>
+          <if test="s.scope.matchedKolIds != null">
+            <choose>
+              <when test="s.scope.matchedKolIds.isEmpty()">AND FALSE</when>
+              <otherwise>
+                AND i.kol_id IN
+                <foreach collection="s.scope.matchedKolIds" item="matched" open="(" separator="," close=")">
+                  #{matched}
+                </foreach>
+              </otherwise>
+            </choose>
+          </if>
         </if>
       ),
       """;

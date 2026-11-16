@@ -61,13 +61,18 @@ public class ShopPerformanceService {
             filters.shopId(),
             filters.kolId(),
             filters.inviterId(),
-            visibleShops.stream().map(ShopAccessDTO::id).toList());
+            visibleShops.stream().map(ShopAccessDTO::id).toList(),
+            filters.matchedKolIds(),
+            filters.matchedInviterIds());
     var facts = new HashMap<Long, RankFactsDTO>();
     for (var row : orders.rankFacts(scope, RankDimension.SHOP, period.from(), period.until())) {
       facts.put(row.entityId(), row);
     }
     boolean includeShopsWithoutFacts =
-        resolved.dataScope() == DataScope.ALL && scope.kolId() == null && scope.inviterId() == null;
+        resolved.dataScope() == DataScope.ALL
+            && scope.kolId() == null
+            && scope.inviterId() == null
+            && scope.matchedKolIds() == null;
     var rows =
         visibleShops.stream()
             .filter(shop -> includeShopsWithoutFacts || facts.containsKey(shop.id()))

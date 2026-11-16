@@ -14,6 +14,8 @@ const zhCN = {
     productRefundHint:
       "商品退款金额统计可关联到商品行的成功退款，订单退款率以所选周期内支付的订单为分母。",
     period: "时间段",
+    conditions: "条件",
+    creatorSearch: "输入达人 ID 或达人名",
     periodMode: {
       live: "实时",
       sevenDays: "7天",

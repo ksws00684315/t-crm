@@ -365,15 +365,13 @@ function search(useLive = false): void {
     return;
   }
   live = useLive;
-  const { shopId, kolId, inviterId, channel, keyword, startDate, endDate } = draft.value;
+  const { shopId, channel, creatorKeyword, startDate, endDate } = draft.value;
   applied.value = {
     startDate,
     endDate,
     shopId: shopId || undefined,
-    kolId: kolId || undefined,
-    inviterId: inviterId || undefined,
     channel: channel || undefined,
-    keyword: keyword?.trim() || undefined
+    creatorKeyword: creatorKeyword?.trim() || undefined
   };
   page.value = 1;
   void load();
@@ -440,7 +438,6 @@ onUnmounted(stop);
   <div class="analytics-page">
     <DashboardFilter
       v-model="draft"
-      :board="board"
       :loading="loading"
       :options="options"
       :options-failed="optionsFailed"

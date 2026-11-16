@@ -23,6 +23,7 @@ export interface Filters {
   kolId?: string;
   inviterId?: string;
   keyword?: string;
+  creatorKeyword?: string;
 }
 export interface RankingQuery extends Filters {
   page: number;

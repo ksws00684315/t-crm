@@ -2,6 +2,7 @@ package com.tcrm.admin.stats.controller;
 
 import com.tcrm.admin.stats.service.StatsOverviewService.FilterDTO;
 import jakarta.validation.constraints.Positive;
+import jakarta.validation.constraints.Size;
 import java.time.LocalDate;
 import org.springframework.format.annotation.DateTimeFormat;
 
@@ -12,8 +13,9 @@ public record StatsOverviewQuery(
     @Positive Long shopId,
     @Positive Long kolId,
     @Positive Long inviterId,
-    String channel) {
+    String channel,
+    @Size(max = 100) String creatorKeyword) {
   FilterDTO toFilter() {
-    return new FilterDTO(startDate, endDate, shopId, kolId, inviterId, channel);
+    return new FilterDTO(startDate, endDate, shopId, kolId, inviterId, channel, creatorKeyword);
   }
 }

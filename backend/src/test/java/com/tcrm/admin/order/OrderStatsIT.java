@@ -282,6 +282,21 @@ class OrderStatsIT {
       var selection = new Selection(shopScope, null, null, "product:90", "B", FROM, UNTIL);
       var evidence = session.getMapper(OrderEvidenceMapper.class);
       assertThat(evidence.count(selection, Kind.ORDERS)).isEqualTo(2);
+      var creatorSearch =
+          new ScopeDTO(
+              4, null, 1L, null, null, java.util.List.of(1L), java.util.List.of(12L), null);
+      var filtered = new Selection(creatorSearch, null, null, "product:90", null, FROM, UNTIL);
+      assertThat(productMapper.productFacts(creatorSearch, null, FROM, UNTIL))
+          .filteredOn(row -> row.shopId() != null)
+          .singleElement()
+          .satisfies(row -> assertThat(row.sales()).isEqualByComparingTo("40"));
+      assertThat(evidence.count(filtered, Kind.ORDERS)).isEqualTo(1);
+      var noMatch =
+          new ScopeDTO(4, null, 1L, null, null, java.util.List.of(1L), java.util.List.of(), null);
+      assertThat(
+              evidence.count(
+                  new Selection(noMatch, null, null, null, null, FROM, UNTIL), Kind.ORDERS))
+          .isZero();
       assertThat(evidence.daily(selection))
           .singleElement()
           .satisfies(day -> assertThat(day.sales()).isEqualByComparingTo("100"));

@@ -1,5 +1,7 @@
 package com.tcrm.admin.stats.service;
 
+import com.tcrm.admin.kol.api.KolApi;
+import com.tcrm.admin.kol.api.KolRefDTO;
 import com.tcrm.admin.order.api.OrderStatsApi;
 import com.tcrm.admin.order.api.OrderStatsApi.ScopeDTO;
 import com.tcrm.admin.order.api.OrderStatsApi.TotalsDTO;
@@ -12,6 +14,8 @@ import java.math.RoundingMode;
 import java.time.Instant;
 import java.time.LocalDate;
 import java.util.List;
+import java.util.Locale;
+import java.util.Objects;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Isolation;
 import org.springframework.transaction.annotation.Transactional;
@@ -28,10 +32,12 @@ public class StatsOverviewService {
 
   private final OrderStatsApi orders;
   private final CurrentUserContext current;
+  private final KolApi creators;
 
-  public StatsOverviewService(OrderStatsApi orders, CurrentUserContext current) {
+  public StatsOverviewService(OrderStatsApi orders, CurrentUserContext current, KolApi creators) {
     this.orders = orders;
     this.current = current;
+    this.creators = creators;
   }
 
   @Transactional(readOnly = true, isolation = Isolation.REPEATABLE_READ)
@@ -58,18 +64,39 @@ public class StatsOverviewService {
     }
     var period =
         StatsPeriod.resolve(filter.startDate(), filter.endDate(), LocalDate.now(StatsPeriod.ZONE));
+    String creatorKeyword =
+        filter.creatorKeyword() == null || filter.creatorKeyword().isBlank()
+            ? null
+            : filter.creatorKeyword().strip();
+    var matchedCreators = creatorKeyword == null ? null : findCreators(creatorKeyword);
     var scope =
         new ScopeDTO(
             account.tenantId(),
             account.ownScope() ? account.id() : null,
             filter.shopId(),
             filter.kolId(),
-            filter.inviterId());
+            filter.inviterId(),
+            null,
+            matchedCreators,
+            null);
     return new ResolvedFilter(
         scope,
         period,
-        new AppliedFiltersDTO(filter.shopId(), filter.kolId(), filter.inviterId(), WEIDIAN),
+        new AppliedFiltersDTO(
+            filter.shopId(), filter.kolId(), filter.inviterId(), WEIDIAN, creatorKeyword),
         account.ownScope() ? DataScope.OWN : DataScope.ALL);
+  }
+
+  private List<Long> findCreators(String keyword) {
+    String needle = keyword.toLowerCase(Locale.ROOT);
+    return creators.listAll().stream()
+        .filter(
+            kol ->
+                kol.id().toString().equals(needle)
+                    || Objects.toString(kol.kolCode(), "").equalsIgnoreCase(needle)
+                    || Objects.toString(kol.name(), "").toLowerCase(Locale.ROOT).contains(needle))
+        .map(KolRefDTO::id)
+        .toList();
   }
 
   OverviewDTO overview(ResolvedFilter resolved) {
@@ -139,9 +166,25 @@ public class StatsOverviewService {
       Long shopId,
       Long kolId,
       Long inviterId,
-      String channel) {}
+      String channel,
+      String creatorKeyword) {
+    public FilterDTO(
+        LocalDate startDate,
+        LocalDate endDate,
+        Long shopId,
+        Long kolId,
+        Long inviterId,
+        String channel) {
+      this(startDate, endDate, shopId, kolId, inviterId, channel, null);
+    }
+  }
 
-  public record AppliedFiltersDTO(Long shopId, Long kolId, Long inviterId, String channel) {}
+  public record AppliedFiltersDTO(
+      Long shopId, Long kolId, Long inviterId, String channel, String creatorKeyword) {
+    public AppliedFiltersDTO(Long shopId, Long kolId, Long inviterId, String channel) {
+      this(shopId, kolId, inviterId, channel, null);
+    }
+  }
 
   record ResolvedFilter(
       ScopeDTO scope, StatsPeriod period, AppliedFiltersDTO filters, DataScope dataScope) {}

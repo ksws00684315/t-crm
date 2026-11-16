@@ -28,6 +28,9 @@ function label(id: string | undefined, options?: Option[]): string {
         >{{ t("analytics.creator") }}
         {{ label(result.meta.filters.kolId, options?.creators) }}</span
       >
+      <span v-if="result.meta.filters.creatorKeyword"
+        >{{ t("analytics.creator") }} {{ result.meta.filters.creatorKeyword }}</span
+      >
       <span v-if="result.meta.filters.inviterId"
         >{{ t("analytics.inviter") }}
         {{ label(result.meta.filters.inviterId, options?.inviters) }}</span
