@@ -207,8 +207,7 @@ onMounted(loadShops);
         ><template #cell-channel>{{ t("finance.weidian") }}</template>
         <template #cell-creator="{ row }">{{
           row.kolNames.length > 1 ? t("finance.multiple") : row.kolNames[0]
-        }}</template
-        ><template #cell-rate="{ row }">{{
+        }}</template><template #cell-rate="{ row }">{{
           row.rates.length > 1
             ? t("finance.multiple")
             : row.rates[0]
@@ -223,8 +222,7 @@ onMounted(loadShops);
             row[key] === null
               ? t(row.scopeLimited ? "finance.scopeLimited" : "finance.unverified")
               : formatPrice(row[key], "CNY")
-          }}</template
-        ><template #cell-weidianWithdrawable="{ row }">{{
+          }}</template><template #cell-weidianWithdrawable="{ row }">{{
           row.weidianWithdrawable === null ? "-" : formatPrice(row.weidianWithdrawable, "CNY")
         }}</template>
         <template #cell-accountStatus="{ row }"
@@ -272,8 +270,9 @@ onMounted(loadShops);
             :paged="false"
             plain
           >
-            <template #cell-product="{ row }">{{ row.product }}</template
-            ><template #cell-amountType>{{ t("finance.commissionType") }}</template
+            <template #cell-product="{ row }">{{ row.product }}</template><template
+              #cell-amountType
+              >{{ t("finance.commissionType") }}</template
             ><template #cell-direction="{ row }">{{
               t(`finance.${row.direction ?? "CREDIT"}`)
             }}</template

@@ -244,8 +244,9 @@ watch(
                     >
                   </el-image>
                   <div class="product-copy">
-                    <span class="product-name">{{ product.product }}</span
-                    ><small>{{ product.sku || "—" }}</small>
+                    <span class="product-name">{{ product.product }}</span><small>{{
+                      product.sku || "—"
+                    }}</small>
                   </div>
                 </div>
               </div>

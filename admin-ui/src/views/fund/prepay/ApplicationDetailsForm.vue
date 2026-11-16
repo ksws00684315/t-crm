@@ -258,8 +258,9 @@ defineExpose({ save });
           v-model="form.deductFromCommission"
           data-test="finance-prepay-deduct"
         >
-          <el-radio :value="true">{{ t("prepay.yes") }}</el-radio
-          ><el-radio :value="false">{{ t("prepay.no") }}</el-radio>
+          <el-radio :value="true">{{ t("prepay.yes") }}</el-radio><el-radio :value="false">{{
+            t("prepay.no")
+          }}</el-radio>
         </el-radio-group>
         <div v-else class="read-value">
           {{

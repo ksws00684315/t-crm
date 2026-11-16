@@ -237,8 +237,7 @@ async function save() {
           />
         </div>
         <div class="prepay-status">
-          <span>{{ t("prepay.number") }}</span
-          ><CopyText :value="application.prepayNo" />
+          <span>{{ t("prepay.number") }}</span><CopyText :value="application.prepayNo" />
         </div>
         <el-alert :title="t('prepay.completeInFinance')" :closable="false" type="info" />
       </template>
@@ -249,8 +248,7 @@ async function save() {
           :disabled="saving || preparing"
           data-test="prepay-abandon"
           @click="emit('update:modelValue', false)"
-          >{{ t("prepay.cancelAction") }}</el-button
-        ><el-button
+          >{{ t("prepay.cancelAction") }}</el-button><el-button
           v-if="!application"
           type="primary"
           :loading="saving || preparing"

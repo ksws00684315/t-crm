@@ -22,8 +22,9 @@ const { t } = useI18n();
         v-for="key in ['occupied', 'pendingDeduction', 'deducted', 'cumulativePaid'] as const"
         :key="key"
       >
-        <span>{{ t(`finance.${key}`) }}</span
-        ><strong>{{ formatPrice(metrics[key], "CNY") }}</strong>
+        <span>{{ t(`finance.${key}`) }}</span><strong>{{
+          formatPrice(metrics[key], "CNY")
+        }}</strong>
       </article>
     </template>
   </section>
