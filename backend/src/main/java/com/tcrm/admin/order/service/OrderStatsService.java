@@ -67,6 +67,17 @@ public class OrderStatsService implements OrderStatsApi {
   }
 
   @Override
+  public List<InviterCommissionDTO> inviterCommissions(
+      ScopeDTO scope, Instant from, Instant until) {
+    return mapper.inviterCommissions(scope, from, until);
+  }
+
+  @Override
+  public List<BestCreatorDTO> bestCreators(ScopeDTO scope, Instant from, Instant until) {
+    return mapper.bestCreators(scope, from, until);
+  }
+
+  @Override
   public List<LocalDate> changedDays(long tenantId, Instant from, Instant until) {
     return daily.changedDays(tenantId, from, until);
   }

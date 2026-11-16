@@ -38,7 +38,7 @@ export interface DataColumn {
   tooltip?: boolean;
   /** Hidden until the user shows it. Ignored once this table has saved column prefs. */
   defaultHidden?: boolean;
-  fixed?: "left";
+  fixed?: "left" | "right";
   /** Emphasizes the active sort column in rankings. */
   highlighted?: boolean;
 }
@@ -647,7 +647,9 @@ function canMove(index: number, delta: -1 | 1): boolean {
                   : 'right'
                 : column.key === columns[0]?.key
                   ? 'left'
-                  : column.fixed
+                  : narrowViewport && column.fixed === 'right'
+                    ? undefined
+                    : column.fixed
               : undefined
           "
           :align="

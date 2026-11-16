@@ -281,6 +281,12 @@ class OrderStatsIT {
                   Integer.class))
           .isEqualTo(dailyFacts.size());
     }
+    jdbc.update(
+        """
+        INSERT INTO crm_product (id, product_code, shop_id, tenant_id, weidian_item_id, name,
+          price, create_time, update_time)
+        VALUES (90, 'T144-PROD', 1, 4, '678900', 'Source Alpha', 100, now(), now())
+        """);
     jdbc.update("UPDATE crm_order_item SET product_id = 90 WHERE id IN (1, 2)");
     jdbc.update("UPDATE crm_order_item SET weidian_item_id = 'B', kol_id = 12 WHERE id = 2");
     jdbc.update("UPDATE crm_order SET shop_id = 2 WHERE id = 3");
@@ -298,6 +304,11 @@ class OrderStatsIT {
           .filteredOn(row -> row.shopId() != null)
           .hasSize(2)
           .allSatisfy(row -> assertThat(row.spu()).isEqualTo("product:90"));
+      for (String key : java.util.List.of("90", "678900", "ALPHA")) {
+        assertThat(productMapper.productFacts(visible, key, FROM, UNTIL))
+            .filteredOn(row -> row.shopId() != null)
+            .hasSize(2);
+      }
       assertThat(productMapper.productFacts(visible, "B", FROM, UNTIL))
           .filteredOn(row -> row.shopId() != null)
           .singleElement()
@@ -413,11 +424,66 @@ class OrderStatsIT {
           .isZero();
       assertThat(kols.countEnabledDuring(4, java.util.List.of(702L), FROM, UNTIL)).isNull();
       var orders = session.getMapper(OrderStatsMapper.class);
-      var scoped = new ScopeDTO(4, 9L, 1L, null, null);
+      var scoped = new ScopeDTO(4, 9L, 1L, null, null, java.util.List.of(1L));
       assertThat(orders.creatorSpuCount(scoped, FROM, UNTIL)).isEqualTo(1);
       var commission = orders.creatorCommission(scoped, FROM, UNTIL);
       assertThat(commission.total()).isEqualByComparingTo("8");
       assertThat(commission.clawback()).isEqualByComparingTo("2");
+      assertThat(orders.inviterCommissions(scoped, FROM, UNTIL))
+          .singleElement()
+          .satisfies(
+              value -> {
+                assertThat(value.inviterId()).isEqualTo(9L);
+                assertThat(value.estimated()).isEqualByComparingTo("8");
+                assertThat(value.actual()).isZero();
+              });
+      jdbc.update(
+          "UPDATE crm_commission_item_state SET released_commission_cny = 8 WHERE id = 701");
+      jdbc.update(
+          "UPDATE crm_order_item SET item_name = 'Other', weidian_item_id = 'B' WHERE id = 2");
+      jdbc.update("UPDATE crm_order_item SET item_name = 'Single selected item' WHERE id = 1");
+      var productScope = scoped.withProductKeyword("Single selected item");
+      session.clearCache();
+      var selected = orders.totals(productScope, FROM, UNTIL);
+      assertThat(selected.paidOrders()).isEqualTo(1L);
+      assertThat(selected.units()).isEqualTo(2L);
+      assertThat(selected.sales()).isEqualByComparingTo("60");
+      assertThat(selected.cohortRefunds()).isEqualByComparingTo("32");
+      assertThat(orders.rankFacts(productScope, RankDimension.INVITER, FROM, UNTIL))
+          .singleElement()
+          .satisfies(value -> assertThat(value.sales()).isEqualByComparingTo("60"));
+      assertThat(orders.bestCreators(productScope, FROM, UNTIL))
+          .singleElement()
+          .satisfies(
+              value -> {
+                assertThat(value.inviterId()).isEqualTo(9L);
+                assertThat(value.creatorId()).isEqualTo(11L);
+                assertThat(value.netSalesAmount()).isEqualByComparingTo("28");
+              });
+      assertThat(orders.inviterCommissions(productScope, FROM, UNTIL))
+          .singleElement()
+          .satisfies(
+              value -> {
+                assertThat(value.estimated()).isZero();
+                assertThat(value.actual()).isEqualByComparingTo("8");
+              });
+      assertThat(orders.inviterCommissions(scoped.withProductKeyword("Other"), FROM, UNTIL))
+          .isEmpty();
+      var evidence = session.getMapper(OrderEvidenceMapper.class);
+      var selection = new Selection(productScope, null, 9L, null, null, FROM, UNTIL);
+      assertThat(evidence.count(selection, Kind.ORDERS)).isEqualTo(1L);
+      assertThat(evidence.daily(selection))
+          .singleElement()
+          .satisfies(day -> assertThat(day.sales()).isEqualByComparingTo("60"));
+      jdbc.update(
+          """
+          INSERT INTO crm_commission_item_state (id, tenant_id, order_id, order_item_id, kol_id,
+            source_key, settlement_state, verified, accrued_commission_cny, release_basis,
+            create_time, update_time)
+          VALUES (702, 4, 1, 2, 11, 't144-unverified', 'UNKNOWN', FALSE, 0, 'UNVERIFIED', now(), now())
+          """);
+      session.clearCache();
+      assertThat(orders.inviterCommissions(productScope, FROM, UNTIL)).isEmpty();
       assertThat(orders.creatorCommission(new ScopeDTO(4, 10L, null, null, null), FROM, UNTIL))
           .isNull();
     }

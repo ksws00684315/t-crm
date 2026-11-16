@@ -18,10 +18,11 @@ public interface OrderDailyStatsMapper {
   @Select(
       """
       <script>
+      <bind name="productSearch" value="keyword"/>
       WITH lines AS NOT MATERIALIZED (
         SELECT o.id AS order_id, o.shop_id, o.pay_time, i.id AS line_id,
                COALESCE('product:' || i.product_id, 'unmapped:' || i.weidian_item_id) AS spu,
-               i.weidian_item_id AS link_id,
+               i.weidian_item_id, i.tenant_id,
                i.item_name, i.product_id, i.kol_id, i.quantity, i.pay_amount,
                GREATEST(o.update_time, i.update_time) AS updated_at
         FROM crm_order o JOIN crm_order_item i ON i.order_id = o.id
@@ -69,10 +70,12 @@ public interface OrderDailyStatsMapper {
         SELECT l.* FROM lines l
         <if test="keyword != null">
           WHERE (l.shop_id, l.spu) IN (
-            SELECT m.shop_id, m.spu FROM lines m
-            WHERE strpos(lower(m.item_name), lower(#{keyword})) &gt; 0
-               OR m.link_id = #{keyword}
-               OR m.spu = #{keyword}
+            SELECT i.shop_id, i.spu FROM lines i
+            WHERE
+      """
+          + OrderStatsMapper.PRODUCT_MATCH
+          + """
+               OR i.spu = #{keyword}
           )
         </if>
       ),

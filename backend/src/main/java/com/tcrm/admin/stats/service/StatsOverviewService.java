@@ -79,6 +79,10 @@ public class StatsOverviewService {
             : filter.inviterKeyword().strip();
     var matchedInviters =
         inviterKeyword == null ? null : inviters.findMemberIdsByKeyword(inviterKeyword);
+    String productKeyword =
+        filter.productKeyword() == null || filter.productKeyword().isBlank()
+            ? null
+            : filter.productKeyword().strip();
     var scope =
         new ScopeDTO(
             account.tenantId(),
@@ -88,7 +92,8 @@ public class StatsOverviewService {
             filter.inviterId(),
             null,
             matchedCreators,
-            matchedInviters);
+            matchedInviters,
+            productKeyword);
     return new ResolvedFilter(
         scope,
         period,
@@ -98,7 +103,8 @@ public class StatsOverviewService {
             filter.inviterId(),
             WEIDIAN,
             creatorKeyword,
-            inviterKeyword),
+            inviterKeyword,
+            productKeyword),
         account.ownScope() ? DataScope.OWN : DataScope.ALL);
   }
 
@@ -183,7 +189,29 @@ public class StatsOverviewService {
       Long inviterId,
       String channel,
       String creatorKeyword,
-      String inviterKeyword) {
+      String inviterKeyword,
+      String productKeyword) {
+    public FilterDTO(
+        LocalDate startDate,
+        LocalDate endDate,
+        Long shopId,
+        Long kolId,
+        Long inviterId,
+        String channel,
+        String creatorKeyword,
+        String inviterKeyword) {
+      this(
+          startDate,
+          endDate,
+          shopId,
+          kolId,
+          inviterId,
+          channel,
+          creatorKeyword,
+          inviterKeyword,
+          null);
+    }
+
     public FilterDTO(
         LocalDate startDate,
         LocalDate endDate,
@@ -212,9 +240,10 @@ public class StatsOverviewService {
       Long inviterId,
       String channel,
       String creatorKeyword,
-      String inviterKeyword) {
+      String inviterKeyword,
+      String productKeyword) {
     public AppliedFiltersDTO(Long shopId, Long kolId, Long inviterId, String channel) {
-      this(shopId, kolId, inviterId, channel, null, null);
+      this(shopId, kolId, inviterId, channel, null, null, null);
     }
   }
 

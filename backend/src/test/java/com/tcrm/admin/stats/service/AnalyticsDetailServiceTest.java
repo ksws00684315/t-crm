@@ -45,7 +45,7 @@ class AnalyticsDetailServiceTest {
   @Test
   void carriesProductCodeKeywordAndOwnerScopeToEvidencePage() {
     var filters = filters(1L);
-    var scope = new ScopeDTO(4, 9L, 1L, 11L, null);
+    var scope = new ScopeDTO(4, 9L, 1L, 11L, null).withProductKeyword("Sample");
     when(overview.canView("order:view")).thenReturn(true);
     when(overview.resolve(filters)).thenReturn(resolved(scope));
     when(shops.listShops()).thenReturn(List.of(new ShopAccessDTO(1L, "Shop", "remote", 1, "S1")));
@@ -54,7 +54,7 @@ class AnalyticsDetailServiceTest {
 
     assertThat(
             details
-                .detail(Board.PRODUCT, filters, null, "SPU", "Sample", Kind.REFUNDS, 2, 20)
+                .detail(Board.PRODUCT, filters, null, "SPU", null, Kind.REFUNDS, 2, 20)
                 .activity()
                 .page())
         .isEqualTo(2);

@@ -1,5 +1,4 @@
 <script setup lang="ts">
-import { InfoFilled } from "@element-plus/icons-vue";
 import { computed, type Component } from "vue";
 
 interface Term {
@@ -47,12 +46,15 @@ const note = computed(() => [props.detail, props.comparison].filter(Boolean).joi
         </template>
       </div>
       <div v-else class="metric-card__label">
-        <span class="metric-card__text" :title="label">{{ label }}</span>
-        <el-tooltip v-if="hint" :content="hint" :trigger="['hover', 'focus']">
-          <button type="button" class="metric-card__hint" :aria-label="hint">
-            <el-icon aria-hidden="true"><InfoFilled /></el-icon>
-          </button>
+        <el-tooltip
+          v-if="hint"
+          :content="hint"
+          :trigger="['hover', 'focus']"
+          popper-class="analytics-metric-definition"
+        >
+          <span tabindex="0" class="metric-card__text metric-card__term">{{ label }}</span>
         </el-tooltip>
+        <span v-else class="metric-card__text" :title="label">{{ label }}</span>
       </div>
       <div v-if="unavailable" class="metric-card__state">
         <el-tag type="info" effect="light">{{ value }}</el-tag>
@@ -178,17 +180,7 @@ const note = computed(() => [props.detail, props.comparison].filter(Boolean).joi
 }
 .metric-card--with-terms .metric-card__note {
   grid-column: 1 / -1;
-  margin-inline-start: clamp(0px, calc(100cqw - 240px), 60px);
-}
-.metric-card__hint {
-  display: inline-flex;
-  flex: none;
-  padding: 0;
-  border: 0;
-  background: transparent;
-  color: var(--tcrm-color-text-secondary);
-  cursor: help;
-  font-size: var(--tcrm-font-size-help);
+  margin-inline-start: var(--metric-note-indent, clamp(0px, calc(100cqw - 240px), 60px));
 }
 .metric-card__state {
   display: flex;

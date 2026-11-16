@@ -43,8 +43,8 @@ const enUS: MessageSchema = {
         "Confirmed deductions after commission release due to successful refunds on the same cohort of verified orders. Shown as a positive amount. A dash indicates unverified attribution."
     },
     productCreatorCount: "Creators",
-    productRefundHint:
-      "Product refunds include successful refunds linked to an item. The order refund rate uses orders paid in the selected period.",
+    product: "Product",
+    productSearch: "Product name or SPU ID",
     period: "Time period",
     conditions: "Filters",
     creatorSearch: "Enter creator ID or name",
@@ -153,6 +153,15 @@ const enUS: MessageSchema = {
       loading: "Loading trend",
       emptyTrend: "No sales or refunds in the selected period"
     },
+    evidenceDefinitions: {
+      orderNo: "The Weidian order ID. An order can contain multiple item rows.",
+      refundNo: "The Weidian refund record ID.",
+      eventPay: "Order payment date and time, in Beijing time.",
+      eventRefund: "Successful refund completion date and time, in Beijing time.",
+      itemAmount: "Amount paid for this order line.",
+      sku: "Variant code of the sold item.",
+      product: "Product name recorded on the order."
+    },
     "shop-performance": {
       detailTitle: "Shop performance details",
       selling: "Shops with sales",
@@ -221,6 +230,13 @@ const enUS: MessageSchema = {
       net: "Product net sales",
       keyword: "Product name / SPU",
       definitions: {
+        selling: "SPUs with sales in the selected period. Each shop counts its SPUs separately.",
+        cohortRefundAmount:
+          "Successful line-linked refunds for these paid items completed within 30 Beijing calendar days from payment.",
+        averageOrderAmount:
+          "Selected item sales divided by distinct paid orders containing those items.",
+        amountRefundRate:
+          "Successful refunds completed for matching items divided by sales for those items in the same period.",
         rank: "Rank by net sales under the applied filters. Sorting by another column preserves the business rank.",
         identity:
           "The name from the order and the linked source product image. A placeholder appears if the image is unavailable.",
@@ -303,6 +319,23 @@ const enUS: MessageSchema = {
       rankingCount: "{count} inviter | {count} inviters",
       netCommission: "Estimated team commission for the period",
       keyword: "Inviter name / code",
+      conversionTitle: "Invitation conversion",
+      conversionSubtitle: "From invitations to sales in the period",
+      bestCreator: "Top creator",
+      commissionAccess: "Your account cannot view commission",
+      rankingHint: "Open Details to see period contributions and the current team.",
+      terms: {
+        activeInviters: "Active inviters",
+        totalInviters: "Total inviters",
+        paidOrderCount: "Paid orders",
+        newInvitations: "New creators invited",
+        pendingCreators: "Pending review now",
+        estimatedPart: "Unsettled",
+        actualPart: "Settled",
+        effectiveTransition: "Active creator share",
+        salesTransition: "Selling creator share",
+        cohortRefundAmount: "Cohort refunds"
+      },
       definitions: {
         identity: "The inviter’s name and account.",
         status: "Whether the inviter’s account is enabled.",
@@ -311,9 +344,9 @@ const enUS: MessageSchema = {
         units:
           "Total units purchased across SKUs on orders attributed to this inviter and paid during the selected period.",
         salesAmount:
-          "Amount paid on orders attributed to the inviter, including shipping, grouped by payment date.",
+          "Amount paid on attributed orders by payment date, including shipping. With a product filter, only matching item payments are counted.",
         completedRefundAmount:
-          "Successful refunds attributed to the inviter, grouped by refund completion date.",
+          "Successful refunds by completion date. With a product filter, only refunds linked to matching items are counted.",
         netSalesAmount:
           "Sales minus successful refunds on those same orders completed within 30 Beijing calendar days.",
         amountRefundRate:
@@ -321,10 +354,32 @@ const enUS: MessageSchema = {
         averageOrderAmount:
           "Sales divided by the number of paid orders during the selected period.",
         prepayExpense: "Prepayments with completed payment. Dashboard integration is pending.",
-        totalEstimatedCommission:
-          "Total estimated commission on orders in the selected period. Dashboard integration is pending.",
         totalExpense:
-          "Commission and prepayments with completed payment. Dashboard integration is pending."
+          "Commission and prepayments with completed payment. Dashboard integration is pending.",
+        activeInviters: "Inviter accounts currently enabled and eligible for business development.",
+        totalInviters:
+          "Visible inviters, including inactive accounts with visible invitation or sales history.",
+        paidOrderCount:
+          "Paid orders in the selected period, by payment-time ownership and counted once. Product filters include orders containing a matching item.",
+        newInvitations:
+          "Creators first assigned to an inviter in the period. Transfers are excluded.",
+        pendingCreators: "Creators currently assigned to the visible inviters and awaiting review.",
+        estimatedPart:
+          "Estimated commission for verified orders paid in the period and currently unsettled.",
+        actualPart:
+          "Actual commission for verified orders paid in the period and currently settled. Withdrawals stay attributed to the original orders.",
+        effectiveTransition: "Current active creators divided by lifetime creators invited.",
+        salesTransition: "Creators with sales in the period divided by current active creators.",
+        cohortRefundAmount:
+          "Successful refunds on the same paid orders within 30 Beijing calendar days from payment.",
+        invitedCount:
+          "Lifetime creators whose first invitation is attributed to a visible inviter.",
+        effectiveCount: "Active creators currently assigned to visible inviters.",
+        kolCount: "Distinct creators with paid orders in the period, by payment-time ownership.",
+        bestCreator:
+          "Creator with the highest filtered net sales under each inviter, by payment-time ownership. Ties use ascending creator ID.",
+        totalEstimatedCommission:
+          "Verified orders paid in the selected period, counted once. Use estimates for unsettled orders and actuals for settled orders. Withdrawals stay attributed to the original order."
       }
     }
   },

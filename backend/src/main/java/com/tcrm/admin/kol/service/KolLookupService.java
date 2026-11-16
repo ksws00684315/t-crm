@@ -11,6 +11,7 @@ import com.tcrm.admin.kol.mapper.LinkTemplateMapper;
 import com.tcrm.admin.kol.model.KolDO;
 import com.tcrm.admin.kol.model.LinkTemplateDO;
 import com.tcrm.admin.kol.model.RelationStatus;
+import com.tcrm.admin.kol.model.ReviewStatus;
 import com.tcrm.admin.system.api.BdUserDTO;
 import java.math.BigDecimal;
 import java.time.Instant;
@@ -45,6 +46,16 @@ public class KolLookupService implements KolApi {
     return visibleIds.isEmpty()
         ? Long.valueOf(0)
         : kols.countEnabledDuring(tenantId, visibleIds, from, until);
+  }
+
+  @Override
+  public long countPendingReview(Collection<Long> ids) {
+    return ids.isEmpty()
+        ? 0
+        : kols.selectCount(
+            new LambdaQueryWrapper<KolDO>()
+                .in(KolDO::getId, ids)
+                .eq(KolDO::getReviewStatus, ReviewStatus.PENDING.name()));
   }
 
   @Override

@@ -38,7 +38,10 @@ function label(id: string | undefined, options?: Option[]): string {
         >{{ t("analytics.inviter") }}
         {{ label(result.meta.filters.inviterId, options?.inviters) }}</span
       >
-      <span v-if="result.keyword">{{ t("analytics.keyword") }} {{ result.keyword }}</span>
+      <span v-if="result.meta.filters.productKeyword"
+        >{{ t("analytics.product") }} {{ result.meta.filters.productKeyword }}</span
+      >
+      <span v-else-if="result.keyword">{{ t("analytics.keyword") }} {{ result.keyword }}</span>
     </div>
     <div class="query-summary__meta">
       <el-tag effect="light" type="primary">{{

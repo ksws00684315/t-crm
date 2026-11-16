@@ -15,7 +15,7 @@ import {
   ArrowRight,
   DataBoard,
   Goods,
-  InfoFilled,
+  UserFilled,
   User,
   Tickets,
   TrendCharts,
@@ -60,7 +60,7 @@ import QuerySummary from "./QuerySummary.vue";
 
 defineOptions({ name: "AnalyticsPage" });
 
-const { t, locale } = useI18n();
+const { t, te, locale } = useI18n();
 const AnalyticsDetail = defineAsyncComponent(() => import("./AnalyticsDetail.vue"));
 const me = useUserStore();
 const board = boards[String(useRoute().name)]!;
@@ -122,7 +122,8 @@ const columnWidths: Record<string, DataColumn["minWidth"]> = {
   cumulativeCommission: { "zh-CN": 108, "en-US": 210 },
   prepayExpense: { "zh-CN": 108, "en-US": 198 },
   totalEstimatedCommission: { "zh-CN": 126, "en-US": 240 },
-  totalExpense: { "zh-CN": 108, "en-US": 140 }
+  totalExpense: { "zh-CN": 108, "en-US": 140 },
+  bestCreator: { "zh-CN": 156, "en-US": 182 }
 };
 const shopColumnWidths: Record<string, number> = {
   identity: 162,
@@ -143,9 +144,14 @@ const columns = computed<DataColumn[]>(() =>
     label: label(key),
     amount: money.has(key),
     tooltip: false,
-    align: key === "identity" ? "left" : "center",
+    align: ["identity", "bestCreator"].includes(key) ? "left" : "center",
     interactive: key === "identity",
-    fixed: (product || creator) && key === "identity" ? "left" : undefined,
+    fixed:
+      key === "bestCreator"
+        ? "right"
+        : (product || creator) && key === "identity"
+          ? "left"
+          : undefined,
     highlighted: sortBy.value === key,
     minWidth:
       shop && locale.value === "zh-CN" && shopColumnWidths[key]
@@ -177,7 +183,7 @@ function openDetail(row: RankRow): void {
       ...meta.filters,
       shopId: shop || product ? row.shopId : meta.filters.shopId,
       productCode: product ? row.code : undefined,
-      keyword: product ? result.value?.keyword : undefined,
+      keyword: product && !meta.filters.productKeyword ? result.value?.keyword : undefined,
       entityId: creator || inviter ? row.id : undefined
     }
   };
@@ -250,7 +256,13 @@ function label(key: string): string {
 
   if (
     inviter &&
-    ["creatorCounts", "prepayExpense", "totalEstimatedCommission", "totalExpense"].includes(key)
+    [
+      "creatorCounts",
+      "prepayExpense",
+      "totalEstimatedCommission",
+      "totalExpense",
+      "bestCreator"
+    ].includes(key)
   ) {
     return t(`analytics.inviter-performance.${key}`);
   }
@@ -291,7 +303,7 @@ function cellDisplay(row: RankRow, key: string): string {
   if (isCommissionForbidden(key)) return t("analytics.commissionForbidden");
   const value = valueOf(row, key);
   const unavailable = result.value?.unavailable.some(field => field.field === key);
-  return value == null && unavailable && key !== "refundUnits"
+  return value == null && unavailable && !["refundUnits", "totalEstimatedCommission"].includes(key)
     ? t("analytics.pending")
     : display(key, value);
 }
@@ -439,52 +451,138 @@ const cards = computed(() => {
       }
     ];
   }
-  const selling = summary?.sellingCount;
-  const total = summary?.activeCount;
-  const first = {
-    tone: "neutral" as const,
-    icon: DataBoard,
-    label: t(`analytics.${board}.selling`),
-    value: display("", selling),
-    detail: product ? undefined : t(`analytics.${board}.active`, { value: display("", total) })
-  };
-  const orders = {
-    tone: "blue" as const,
-    icon: Tickets,
-    label: t("analytics.paidOrderCount"),
-    value: display("", data?.paidOrderCount),
-    detail: product ? undefined : t("analytics.unitsValue", { value: display("", data?.units) })
-  };
-  const net = {
-    tone: "green" as const,
-    icon: TrendCharts,
-    label: t(product ? "analytics.best-sellers.net" : "analytics.netSalesAmount"),
-    value: display("netSalesAmount", data?.netSalesAmount),
-    hint: t("analytics.netHint")
-  };
-  const last = product
-    ? {
-        tone: "amber" as const,
-        icon: Goods,
-        label: label("units"),
-        value: display("", data?.units)
-      }
-    : {
+  if (inviter) {
+    const extras = summary?.inviterCards;
+    const term = inviterTerm;
+    const active = term("activeInviters");
+    const total = term("totalInviters");
+    const orders = term("paidOrderCount");
+    const units = term("units");
+    const net = term("netSalesAmount");
+    const commission = term("totalEstimatedCommission");
+    const forbidden = isCommissionForbidden("totalEstimatedCommission");
+    return [
+      {
+        tone: "purple" as const,
+        icon: User,
+        label: `${active.label} / ${total.label}`,
+        value: `${display("", summary?.activeCount)} / ${display("", extras?.inviterCount)}`,
+        labelTerms: [active, total],
+        detailTerms: [term("newInvitations", display("", extras?.newInvitations))]
+      },
+      {
+        tone: "blue" as const,
+        icon: Tickets,
+        label: `${orders.label} / ${units.label}`,
+        value: `${display("", data?.paidOrderCount)} / ${display("", data?.units)}`,
+        labelTerms: [orders, units],
+        detailTerms: [
+          term("averageOrderAmount", display("averageOrderAmount", data?.averageOrderAmount))
+        ]
+      },
+      {
+        tone: "green" as const,
+        icon: TrendCharts,
+        label: net.label,
+        value: display("netSalesAmount", data?.netSalesAmount),
+        labelTerms: [net],
+        detailTerms: [
+          term("salesAmount", display("salesAmount", data?.salesAmount)),
+          term("cohortRefundAmount", display("cohortRefundAmount", data?.cohortRefundAmount))
+        ]
+      },
+      {
         tone: "amber" as const,
         icon: Wallet,
-        label: label("netCommission"),
-        detail: t("analytics.currentUnsettledPeriod"),
-        value: t("analytics.pending"),
-        unavailable: true
-      };
-  return product ? [first, orders, last, net] : [first, orders, net, last];
+        label: commission.label,
+        value: forbidden
+          ? t("analytics.commissionForbidden")
+          : display("totalEstimatedCommission", extras?.totalCommission),
+        labelTerms: [commission],
+        unavailable: forbidden,
+        detailTerms: forbidden
+          ? undefined
+          : [
+              term(
+                "estimatedPart",
+                display("totalEstimatedCommission", extras?.estimatedCommission)
+              ),
+              term("actualPart", display("totalEstimatedCommission", extras?.actualCommission))
+            ],
+        detail: forbidden ? t("analytics.inviter-performance.commissionAccess") : undefined
+      }
+    ];
+  }
+  const hint = (key: string) => t(`analytics.best-sellers.definitions.${key}`);
+  return [
+    {
+      tone: "neutral" as const,
+      icon: DataBoard,
+      label: t("analytics.best-sellers.selling"),
+      value: display("", summary?.sellingCount),
+      hint: hint("selling")
+    },
+    {
+      tone: "blue" as const,
+      icon: Tickets,
+      label: t("analytics.paidOrderCount"),
+      value: display("", data?.paidOrderCount),
+      hint: hint("paidOrderCount")
+    },
+    {
+      tone: "amber" as const,
+      icon: Goods,
+      label: label("units"),
+      value: display("", data?.units),
+      hint: hint("units")
+    },
+    {
+      tone: "green" as const,
+      icon: TrendCharts,
+      label: t("analytics.best-sellers.net"),
+      value: display("netSalesAmount", data?.netSalesAmount),
+      hint: hint("netSalesAmount")
+    }
+  ];
 });
 
-const conversion = computed(() => [
-  { key: "invitedCount", value: result.value?.summary.invitedCount },
-  { key: "effectiveCount", value: result.value?.summary.effectiveCount },
-  { key: "kolCount", value: result.value?.summary.sellingCreatorCount }
-]);
+function inviterTerm(key: string, value?: string) {
+  const labels = `analytics.inviter-performance.terms.${key}`;
+  return {
+    label: te(labels) ? t(labels) : label(key),
+    hint: t(`analytics.inviter-performance.definitions.${key}`),
+    value
+  };
+}
+
+const conversion = computed(() => {
+  const summary = result.value?.summary;
+  const cards = summary?.inviterCards;
+  return [
+    {
+      ...inviterTerm("invitedCount", display("", summary?.invitedCount)),
+      note: inviterTerm("newInvitations", display("", cards?.newInvitations)),
+      transition: inviterTerm(
+        "effectiveTransition",
+        ratio(summary?.effectiveCount, summary?.invitedCount)
+      )
+    },
+    {
+      ...inviterTerm("effectiveCount", display("", summary?.effectiveCount)),
+      note: inviterTerm("pendingCreators", display("", cards?.pendingCreators)),
+      transition: inviterTerm(
+        "salesTransition",
+        ratio(summary?.sellingCreatorCount, summary?.effectiveCount)
+      )
+    },
+    {
+      ...inviterTerm("kolCount", display("", summary?.sellingCreatorCount)),
+      note: inviterTerm("paidOrderCount", display("", metrics.value?.paidOrderCount)),
+      transition: undefined
+    }
+  ];
+});
+
 function ratio(part?: Scalar, whole?: Scalar): string {
   return part == null || whole == null || Number(whole) === 0
     ? "—"
@@ -543,13 +641,15 @@ function search(useLive = false): void {
     return;
   }
   live = useLive;
-  const { shopId, channel, creatorKeyword, inviterKeyword, startDate, endDate } = draft.value;
+  const { shopId, channel, creatorKeyword, inviterKeyword, productKeyword, startDate, endDate } =
+    draft.value;
   applied.value = {
     startDate,
     endDate,
     shopId: shopId || undefined,
     channel: channel || undefined,
     creatorKeyword: creatorKeyword?.trim() || undefined,
+    productKeyword: product || inviter ? productKeyword?.trim() || undefined : undefined,
     inviterKeyword: creator ? inviterKeyword?.trim() || undefined : undefined
   };
   page.value = 1;
@@ -618,6 +718,7 @@ onUnmounted(stop);
     <DashboardFilter
       v-model="draft"
       :show-inviter="creator"
+      :show-product="product || inviter"
       :loading="loading"
       :options="options"
       :options-failed="optionsFailed"
@@ -636,7 +737,10 @@ onUnmounted(stop);
 
     <div
       class="analytics-cards"
-      :class="{ 'analytics-cards--combined-note': creator || inviter }"
+      :class="{
+        'analytics-cards--combined-note': creator || inviter,
+        'analytics-cards--inviter': inviter
+      }"
       :aria-busy="loading"
     >
       <MetricCard v-for="card in cards" :key="card.label" v-bind="card" />
@@ -728,32 +832,64 @@ onUnmounted(stop);
           :icon="Warning"
           tone="amber"
           :value="percent(metrics?.amountRefundRate)"
+          :hint="t('analytics.kol-ranking.definitions.amountRefundRate')"
           :detail="`${display('completedRefundAmount', metrics?.completedRefundAmount)} / ${display('salesAmount', metrics?.salesAmount)}`"
         />
       </div>
     </section>
-    <section v-else-if="!product" class="analytics-topic">
-      <h2>{{ t("analytics.conversion") }}</h2>
-      <div class="topic-grid topic-grid--three">
-        <MetricCard
-          v-for="(entry, index) in conversion"
-          :key="entry.key"
-          :label="label(entry.key)"
-          :icon="[Tickets, DataBoard, TrendCharts][index]"
-          :tone="(['neutral', 'blue', 'green'] as const)[index]"
-          :value="display('', entry.value)"
-          :detail="
-            index === 2
-              ? t('analytics.activationRate', {
-                  value: ratio(entry.value, conversion[index - 1]?.value)
-                })
-              : undefined
-          "
-        />
+    <section
+      v-else-if="inviter"
+      class="conversion-chain"
+      :aria-label="t('analytics.inviter-performance.conversionTitle')"
+    >
+      <div class="conversion-chain__intro">
+        <el-icon aria-hidden="true"><UserFilled /></el-icon>
+        <div>
+          <h2>{{ t("analytics.inviter-performance.conversionTitle") }}</h2>
+          <p>{{ t("analytics.inviter-performance.conversionSubtitle") }}</p>
+        </div>
       </div>
+      <template v-for="(entry, index) in conversion" :key="entry.label">
+        <div
+          class="conversion-chain__step"
+          :class="{ 'conversion-chain__step--sales': index === 2 }"
+        >
+          <el-tooltip
+            :content="entry.hint"
+            :trigger="['hover', 'focus']"
+            popper-class="analytics-metric-definition"
+          >
+            <span tabindex="0" class="conversion-chain__term">{{ entry.label }}</span>
+          </el-tooltip>
+          <strong>{{ entry.value }}</strong>
+          <el-tooltip
+            :content="entry.note.hint"
+            :trigger="['hover', 'focus']"
+            popper-class="analytics-metric-definition"
+          >
+            <small tabindex="0" class="conversion-chain__term"
+              >{{ entry.note.label }} {{ entry.note.value }}</small
+            >
+          </el-tooltip>
+        </div>
+        <div v-if="entry.transition" class="conversion-chain__transition">
+          <el-icon aria-hidden="true"><ArrowRight /></el-icon>
+          <el-tooltip
+            :content="entry.transition.hint"
+            :trigger="['hover', 'focus']"
+            popper-class="analytics-metric-definition"
+          >
+            <span
+              tabindex="0"
+              class="conversion-chain__term"
+              :aria-label="`${entry.transition.label} ${entry.transition.value}`"
+              >{{ entry.transition.value }}</span
+            >
+          </el-tooltip>
+        </div>
+      </template>
     </section>
 
-    <p v-if="product" class="analytics-note">{{ t("analytics.productRefundHint") }}</p>
     <DataTable
       class="analytics-ranking"
       scroll-with-page
@@ -776,7 +912,12 @@ onUnmounted(stop);
       @update:size="changeSize"
     >
       <template #title>
-        <h2 class="analytics-ranking__title">{{ t(`analytics.${board}.ranking`) }}</h2>
+        <div>
+          <h2 class="analytics-ranking__title">{{ t(`analytics.${board}.ranking`) }}</h2>
+          <p v-if="inviter" class="analytics-ranking__hint">
+            {{ t("analytics.inviter-performance.rankingHint") }}
+          </p>
+        </div>
       </template>
       <template #toolbar>
         <el-tag v-if="result" effect="light" type="primary">
@@ -825,13 +966,6 @@ onUnmounted(stop);
                     : "↓"
                   : "↕"
               }}</span>
-              <el-icon
-                v-if="help && !shop"
-                class="analytics-column-heading__info"
-                aria-hidden="true"
-              >
-                <InfoFilled />
-              </el-icon>
             </component>
           </el-tooltip>
         </div>
@@ -916,13 +1050,35 @@ onUnmounted(stop);
               'analytics-number--loss':
                 (key === 'completedRefundAmount' && Number(valueOf(row, key)) > 0) ||
                 (key === 'netSalesAmount' && Number(valueOf(row, key)) < 0),
-              'analytics-number--unavailable': pendingColumns.has(key) || isCommissionForbidden(key)
+              'analytics-number--unavailable':
+                (pendingColumns.has(key) && valueOf(row, key) == null) || isCommissionForbidden(key)
             }"
             >{{ cellDisplay(row, key) }}</span
           >
         </div>
       </template>
 
+      <template #cell-bestCreator="{ row }">
+        <div v-if="row.bestCreator" class="analytics-identity">
+          <span class="analytics-identity__avatar" aria-hidden="true">{{
+            Array.from(row.bestCreator.name || row.bestCreator.id)[0]
+          }}</span>
+          <div class="analytics-identity__text">
+            <strong>{{ row.bestCreator.name || row.bestCreator.id }}</strong>
+            <el-tooltip
+              :content="inviterTerm('netSalesAmount').hint"
+              :trigger="['hover', 'focus']"
+              popper-class="analytics-metric-definition"
+            >
+              <small tabindex="0" class="conversion-chain__term"
+                >{{ label("netSalesAmount") }}
+                {{ display("netSalesAmount", row.bestCreator.netSalesAmount) }}</small
+              >
+            </el-tooltip>
+          </div>
+        </div>
+        <span v-else>—</span>
+      </template>
       <template #cell-creatorCounts="{ row }">
         {{ display("effectiveCount", valueOf(row, "effectiveCount")) }}
         <span class="coverage-values__separator" aria-hidden="true">/</span>
@@ -960,11 +1116,8 @@ onUnmounted(stop);
   grid-template-columns: repeat(4, minmax(0, 1fr));
   gap: var(--tcrm-space-4);
 }
-.analytics-note {
-  margin: 0;
-  color: var(--el-text-color-secondary);
-  font-size: var(--tcrm-font-size-body);
-  line-height: var(--tcrm-line-height-body);
+.analytics-cards--inviter {
+  --metric-note-indent: 0px;
 }
 .analytics-topic {
   min-width: 0;
@@ -985,8 +1138,94 @@ onUnmounted(stop);
 .topic-grid--two {
   grid-template-columns: repeat(2, minmax(0, 1fr));
 }
-.topic-grid--three {
-  grid-template-columns: repeat(3, minmax(0, 1fr));
+.conversion-chain {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1.2fr) auto minmax(0, 1.2fr) auto minmax(
+      0,
+      1.2fr
+    );
+  border: 1px solid var(--tcrm-color-border);
+  border-radius: var(--tcrm-radius-card);
+  overflow: hidden;
+}
+.conversion-chain__intro,
+.conversion-chain__step {
+  display: grid;
+  align-content: center;
+  gap: var(--tcrm-space-1);
+  padding: var(--tcrm-space-4) var(--analytics-card-padding);
+  min-width: 0;
+}
+.conversion-chain__intro {
+  display: flex;
+  align-items: center;
+  gap: var(--tcrm-space-3);
+  background: linear-gradient(110deg, #246bc6, #5548ce);
+  color: #fff;
+}
+.conversion-chain__intro .el-icon {
+  font-size: var(--tcrm-font-size-title);
+  flex-shrink: 0;
+}
+.conversion-chain__intro h2,
+.conversion-chain__intro p,
+.analytics-ranking__hint {
+  margin: 0;
+}
+.conversion-chain__intro h2 {
+  font-size: var(--tcrm-font-size-section);
+}
+.conversion-chain__intro p,
+.analytics-ranking__hint {
+  font-size: var(--tcrm-font-size-help);
+  line-height: var(--tcrm-line-height-body);
+}
+.conversion-chain__intro p {
+  margin-top: var(--tcrm-space-1);
+}
+.analytics-ranking__hint {
+  color: var(--tcrm-color-text-secondary);
+}
+.conversion-chain__step {
+  background: linear-gradient(110deg, var(--tcrm-color-muted), var(--tcrm-color-card));
+  color: var(--tcrm-color-text-secondary);
+}
+.conversion-chain__step strong {
+  color: var(--tcrm-color-text);
+  font-size: var(--tcrm-font-size-title);
+  font-variant-numeric: tabular-nums;
+}
+.conversion-chain__step--sales {
+  background: linear-gradient(110deg, var(--tcrm-color-success-bg), var(--tcrm-color-card));
+}
+.conversion-chain__step--sales strong {
+  color: var(--tcrm-color-success);
+}
+.conversion-chain__term {
+  cursor: help;
+}
+.conversion-chain__transition {
+  display: grid;
+  align-content: center;
+  justify-items: center;
+  gap: var(--tcrm-space-1);
+  padding: var(--tcrm-space-2);
+  background: var(--tcrm-color-option-selected-bg);
+  color: var(--tcrm-color-primary-text);
+  font-size: var(--tcrm-font-size-help);
+}
+@container (max-width: 720px) {
+  .conversion-chain {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .conversion-chain__transition {
+    grid-auto-flow: column;
+    justify-content: start;
+    padding-inline: var(--analytics-card-padding);
+  }
+  .conversion-chain__transition .el-icon {
+    transform: rotate(90deg);
+  }
 }
 .ledger-comparison {
   display: grid;
@@ -1210,10 +1449,6 @@ onUnmounted(stop);
   align-items: center;
   gap: var(--tcrm-space-1);
   white-space: nowrap;
-}
-.analytics-column-heading__info {
-  flex: none;
-  color: var(--tcrm-color-text-secondary);
 }
 :global(.analytics-metric-definition) {
   max-width: min(360px, calc(100vw - var(--tcrm-space-5)));

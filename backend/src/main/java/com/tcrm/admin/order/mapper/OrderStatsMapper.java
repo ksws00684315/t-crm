@@ -1,7 +1,9 @@
 package com.tcrm.admin.order.mapper;
 
 import com.baomidou.mybatisplus.annotation.InterceptorIgnore;
+import com.tcrm.admin.order.api.OrderStatsApi.BestCreatorDTO;
 import com.tcrm.admin.order.api.OrderStatsApi.CreatorCommissionDTO;
+import com.tcrm.admin.order.api.OrderStatsApi.InviterCommissionDTO;
 import com.tcrm.admin.order.api.OrderStatsApi.RankDimension;
 import com.tcrm.admin.order.api.OrderStatsApi.RankFactsDTO;
 import com.tcrm.admin.order.api.OrderStatsApi.ScopeDTO;
@@ -17,12 +19,74 @@ import org.apache.ibatis.annotations.Select;
  */
 @Mapper
 public interface OrderStatsMapper {
+  // Alias i is the order item; bind its keyword as productSearch.
+  String PRODUCT_MATCH =
+      """
+      (strpos(lower(i.item_name), lower(#{productSearch})) &gt; 0
+        OR i.weidian_item_id = #{productSearch}
+        OR i.product_id::text = #{productSearch}
+        OR ('product:' || i.product_id) = #{productSearch}
+        OR (i.product_id IS NULL AND ('unmapped:' || i.weidian_item_id) = #{productSearch})
+        OR EXISTS (
+          SELECT 1 FROM crm_product product WHERE product.id = i.product_id
+            AND product.tenant_id = i.tenant_id
+            AND (strpos(lower(product.name), lower(#{productSearch})) &gt; 0
+              OR product.weidian_item_id = #{productSearch}
+              OR lower(product.product_code) = lower(#{productSearch}))
+        ))
+      """;
+
+  String PRODUCT_ITEMS =
+      """
+      <if test="scope.productKeyword != null">
+        product_items AS NOT MATERIALIZED (
+          SELECT i.id, i.order_id, i.pay_amount
+          FROM crm_order_item i
+          WHERE i.tenant_id = #{scope.tenantId} AND NOT i.is_deleted AND
+      """
+          + PRODUCT_MATCH
+          + """
+        ),
+      </if>
+      """;
+
+  String MATCHED_ITEM =
+      """
+      <if test="scope.productKeyword != null">
+        AND EXISTS (SELECT 1 FROM product_items matched WHERE matched.id = i.id)
+      </if>
+      """;
+
+  String MATCHED_REFUND =
+      """
+      <if test="scope.productKeyword != null">
+        AND EXISTS (SELECT 1 FROM product_items matched WHERE matched.id = r.order_item_id
+          AND matched.order_id = r.order_id)
+      </if>
+      """;
+
   String SCOPED_ORDERS =
       """
       <script>
-      WITH scoped_orders AS NOT MATERIALIZED (
-        SELECT o.id, o.shop_id, o.kol_id, o.bd_user_id, o.pay_time, o.pay_amount, o.update_time
+      <bind name="productSearch" value="scope.productKeyword"/>
+      WITH
+      """
+          + PRODUCT_ITEMS
+          + """
+      scoped_orders AS NOT MATERIALIZED (
+        SELECT o.id, o.shop_id, o.kol_id, o.bd_user_id, o.pay_time,
+        <choose>
+          <when test="scope.productKeyword != null">matched.amount</when>
+          <otherwise>o.pay_amount</otherwise>
+        </choose>
+        AS pay_amount, o.update_time
         FROM crm_order o
+        <if test="scope.productKeyword != null">
+          JOIN LATERAL (
+            SELECT COALESCE(SUM(i.pay_amount), 0) AS amount
+            FROM product_items i WHERE i.order_id = o.id HAVING COUNT(*) &gt; 0
+          ) matched ON TRUE
+        </if>
         WHERE o.tenant_id = #{scope.tenantId} AND NOT o.is_deleted
           AND o.pay_time IS NOT NULL
         <if test="scope.ownerId != null">AND o.bd_user_id = #{scope.ownerId}</if>
@@ -143,6 +207,47 @@ public interface OrderStatsMapper {
   CreatorCommissionDTO creatorCommission(
       @Param("scope") ScopeDTO scope, @Param("from") Instant from, @Param("until") Instant until);
 
+  /**
+   * Current verified snapshots; released means posted to the wallet, independent of withdrawals.
+   */
+  @InterceptorIgnore(tenantLine = "true")
+  @Select(
+      SCOPED_ORDERS
+          + """
+      , states AS (
+        SELECT p.bd_user_id AS inviter_id, p.id AS order_id, s.accrued_commission_cny AS accrued,
+               COALESCE(s.released_commission_cny, 0) AS released,
+               (s.verified AND s.kol_id IS NOT DISTINCT FROM p.kol_id
+                 AND i.kol_id IS NOT DISTINCT FROM p.kol_id) AS verified,
+        <choose>
+          <when test="scope.productKeyword != null">
+            EXISTS (SELECT 1 FROM product_items matched WHERE matched.id = i.id)
+          </when>
+          <otherwise>TRUE</otherwise>
+        </choose> AS included
+        FROM scoped_orders p
+        JOIN crm_commission_item_state s ON s.order_id = p.id
+          AND s.tenant_id = #{scope.tenantId} AND NOT s.is_deleted
+        JOIN crm_order_item i ON i.id = s.order_item_id AND i.order_id = p.id
+          AND i.tenant_id = #{scope.tenantId} AND NOT i.is_deleted
+        WHERE p.bd_user_id IS NOT NULL AND p.kol_id IS NOT NULL
+          AND p.pay_time &gt;= #{from} AND p.pay_time &lt; #{until}
+      ), commission_orders AS (
+        SELECT inviter_id, order_id, SUM(accrued) FILTER (WHERE included) AS accrued,
+          SUM(released) FILTER (WHERE included) AS released,
+          BOOL_OR(accrued &gt; released) AS unsettled
+        FROM states GROUP BY inviter_id, order_id
+        HAVING BOOL_AND(verified) AND BOOL_OR(included)
+      )
+      SELECT inviter_id,
+        COALESCE(SUM(accrued) FILTER (WHERE unsettled), 0) AS estimated,
+        COALESCE(SUM(released) FILTER (WHERE NOT unsettled), 0) AS actual
+      FROM commission_orders GROUP BY inviter_id
+      </script>
+      """)
+  List<InviterCommissionDTO> inviterCommissions(
+      @Param("scope") ScopeDTO scope, @Param("from") Instant from, @Param("until") Instant until);
+
   String COHORT_REFUND_WINDOW =
       """
       AND r.finish_time &lt; (
@@ -150,6 +255,37 @@ public interface OrderStatsMapper {
         AT TIME ZONE 'Asia/Shanghai'
       )
       """;
+
+  @InterceptorIgnore(tenantLine = "true")
+  @Select(
+      SCOPED_ORDERS
+          + """
+      , period_orders AS (
+        SELECT p.id, p.bd_user_id, p.kol_id, p.pay_time, p.pay_amount
+        FROM scoped_orders p
+        WHERE p.bd_user_id IS NOT NULL AND p.kol_id IS NOT NULL
+          AND p.pay_time &gt;= #{from} AND p.pay_time &lt; #{until}
+      ), cohort AS (
+        SELECT p.id, SUM(r.amount) AS amount
+        FROM crm_refund r JOIN period_orders p ON r.order_id = p.id
+        WHERE r.tenant_id = #{scope.tenantId} AND NOT r.is_deleted AND r.refund_status = 'SUCCESS'
+      """
+          + COHORT_REFUND_WINDOW
+          + MATCHED_REFUND
+          + """
+        GROUP BY p.id
+      ), creators AS (
+        SELECT p.bd_user_id AS inviter_id, p.kol_id AS creator_id,
+          SUM(p.pay_amount - COALESCE(c.amount, 0)) AS net_sales_amount
+        FROM period_orders p LEFT JOIN cohort c ON c.id = p.id
+        GROUP BY p.bd_user_id, p.kol_id
+      )
+      SELECT DISTINCT ON (inviter_id) inviter_id, creator_id, net_sales_amount
+      FROM creators ORDER BY inviter_id, net_sales_amount DESC, creator_id
+      </script>
+      """)
+  List<BestCreatorDTO> bestCreators(
+      @Param("scope") ScopeDTO scope, @Param("from") Instant from, @Param("until") Instant until);
 
   @InterceptorIgnore(tenantLine = "true")
   @Select(
@@ -164,6 +300,9 @@ public interface OrderStatsMapper {
         SELECT COALESCE(SUM(i.quantity), 0) AS units, MAX(i.update_time) AS updated_at
         FROM crm_order_item i JOIN paid p ON p.id = i.order_id
         WHERE i.tenant_id = #{scope.tenantId} AND NOT i.is_deleted
+      """
+          + MATCHED_ITEM
+          + """
       ),
       cohort AS (
         SELECT COALESCE(SUM(r.amount), 0) AS amount, MAX(r.update_time) AS updated_at
@@ -172,6 +311,7 @@ public interface OrderStatsMapper {
           AND r.refund_status = 'SUCCESS'
       """
           + COHORT_REFUND_WINDOW
+          + MATCHED_REFUND
           + """
       ),
       completed AS (
@@ -181,6 +321,9 @@ public interface OrderStatsMapper {
         WHERE r.tenant_id = #{scope.tenantId} AND NOT r.is_deleted
           AND r.refund_status = 'SUCCESS'
           AND r.finish_time &gt;= #{from} AND r.finish_time &lt; #{until}
+      """
+          + MATCHED_REFUND
+          + """
       )
       SELECT sales.paid_orders, items.units, sales.amount AS sales,
              cohort.amount AS cohort_refunds, completed.amount AS completed_refunds,
@@ -239,6 +382,9 @@ public interface OrderStatsMapper {
                COUNT(DISTINCT i.kol_item_id) FILTER (WHERE i.kol_id = p.kol_id) AS link_count
         FROM crm_order_item i JOIN ranked_paid p ON p.id = i.order_id
         WHERE i.tenant_id = #{scope.tenantId} AND NOT i.is_deleted
+      """
+          + MATCHED_ITEM
+          + """
         GROUP BY p.entity_id
       ),
       cohort AS (
@@ -248,6 +394,7 @@ public interface OrderStatsMapper {
           AND r.refund_status = 'SUCCESS'
       """
           + COHORT_REFUND_WINDOW
+          + MATCHED_REFUND
           + """
         GROUP BY p.entity_id
       ),
@@ -258,6 +405,9 @@ public interface OrderStatsMapper {
         WHERE r.tenant_id = #{scope.tenantId} AND NOT r.is_deleted
           AND r.refund_status = 'SUCCESS'
           AND r.finish_time &gt;= #{from} AND r.finish_time &lt; #{until}
+      """
+          + MATCHED_REFUND
+          + """
         GROUP BY o.entity_id
       ),
       shops AS (

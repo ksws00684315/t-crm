@@ -86,7 +86,11 @@ public class AnalyticsRankingService {
     String key = sortBy == null ? NET : sortBy;
     var comparator = comparator(board, sorting, key);
     var scope = overview.resolve(filters);
-    var data = board == Board.PRODUCT ? products(scope, keyword) : people(board, scope, keyword);
+    String productKeyword = scope.scope().productKeyword();
+    var data =
+        board == Board.PRODUCT
+            ? products(scope, productKeyword == null ? keyword : productKeyword)
+            : people(board, scope, keyword);
     return new Result(
         data.meta(),
         data.summary(),
@@ -96,7 +100,7 @@ public class AnalyticsRankingService {
         data.unavailable(),
         key,
         sorting.descending() ? "desc" : "asc",
-        keyword);
+        productKeyword == null ? keyword : productKeyword);
   }
 
   @Transactional(readOnly = true)
@@ -239,8 +243,11 @@ public class AnalyticsRankingService {
         creators.listByIdsIncludingDeleted(kolIds).stream()
             .collect(Collectors.toMap(k -> k.id(), Function.identity()));
     directory.forEach(k -> kols.put(k.id(), k));
+    var firstInvitations =
+        board == Board.INVITER ? firstInvitations(scope) : List.<KolOwnershipDTO>of();
     var invited =
-        board == Board.INVITER ? invitedCounts(scope.matchedKolIds()) : Map.<Long, Long>of();
+        firstInvitations.stream()
+            .collect(Collectors.groupingBy(KolOwnershipDTO::bdUserId, Collectors.counting()));
     var ownerIds = new java.util.HashSet<Long>();
     kols.values().stream().map(k -> k.bdUserId()).filter(Objects::nonNull).forEach(ownerIds::add);
     if (board == Board.INVITER) {
@@ -273,6 +280,7 @@ public class AnalyticsRankingService {
     var effective = new HashMap<Long, Long>();
     directory.stream()
         .filter(k -> k.enabled() && k.bdUserId() != null)
+        .filter(k -> scope.kolId() == null || scope.kolId().equals(k.id()))
         .forEach(k -> effective.merge(k.bdUserId(), 1L, Long::sum));
     var identities = new HashMap<Long, Identity>();
     if (board == Board.CREATOR) {
@@ -341,7 +349,8 @@ public class AnalyticsRankingService {
                 scope.inviterId(),
                 scope.visibleShopIds(),
                 board == Board.CREATOR ? matched : scope.matchedKolIds(),
-                board == Board.INVITER ? matched : scope.matchedInviterIds())
+                board == Board.INVITER ? matched : scope.matchedInviterIds(),
+                scope.productKeyword())
             : scope;
     var total =
         overview.overview(
@@ -349,7 +358,9 @@ public class AnalyticsRankingService {
                 scoped, period, filter.filters(), filter.dataScope()));
     var rows =
         peopleRows(
-            board == Board.INVITER ? withInactivePeriods(now, matched) : now,
+            board == Board.INVITER && scope.productKeyword() == null
+                ? withInactivePeriods(now, matched)
+                : now,
             identities,
             matched,
             search);
@@ -382,6 +393,82 @@ public class AnalyticsRankingService {
         board == Board.CREATOR
             ? creatorCards(scoped, period, directory, matchedIds, commissionVisible)
             : null;
+    InviterCards inviterCards = null;
+    boolean canSeeInviterCommission = board == Board.INVITER && overview.canViewCommission();
+    if (board == Board.INVITER) {
+      var top =
+          orders.bestCreators(scoped, period.from(), period.until()).stream()
+              .collect(
+                  Collectors.toMap(OrderStatsApi.BestCreatorDTO::inviterId, Function.identity()));
+      var names =
+          creators
+              .listByIdsIncludingDeleted(
+                  top.values().stream()
+                      .map(OrderStatsApi.BestCreatorDTO::creatorId)
+                      .distinct()
+                      .toList())
+              .stream()
+              .collect(Collectors.toMap(KolRefDTO::id, Function.identity()));
+      var commissions =
+          canSeeInviterCommission
+              ? orders.inviterCommissions(scoped, period.from(), period.until()).stream()
+                  .collect(
+                      Collectors.toMap(
+                          OrderStatsApi.InviterCommissionDTO::inviterId, Function.identity()))
+              : Map.<Long, OrderStatsApi.InviterCommissionDTO>of();
+      rows =
+          rows.stream()
+              .map(
+                  row -> {
+                    var best = top.get(row.entityId());
+                    var creator = best == null ? null : names.get(best.creatorId());
+                    var commission = commissions.get(row.entityId());
+                    return row.withInviterMetrics(
+                        best == null
+                            ? null
+                            : new BestCreator(
+                                best.creatorId(),
+                                creator == null ? null : creator.name(),
+                                best.netSalesAmount()),
+                        commission == null
+                            ? null
+                            : commission.estimated().add(commission.actual()));
+                  })
+              .toList();
+      long newInvitations =
+          firstInvitations.stream()
+              .filter(invitation -> matchedIds.contains(invitation.bdUserId()))
+              .filter(
+                  invitation ->
+                      !invitation.startTime().isBefore(period.from())
+                          && invitation.startTime().isBefore(period.until()))
+              .count();
+      long pending =
+          creators.countPendingReview(
+              directory.stream()
+                  .filter(k -> k.bdUserId() != null && matchedIds.contains(k.bdUserId()))
+                  .filter(k -> scope.kolId() == null || scope.kolId().equals(k.id()))
+                  .map(KolRefDTO::id)
+                  .toList());
+      BigDecimal estimated =
+          commissions.values().stream()
+              .map(OrderStatsApi.InviterCommissionDTO::estimated)
+              .reduce(BigDecimal::add)
+              .orElse(null);
+      BigDecimal actual =
+          commissions.values().stream()
+              .map(OrderStatsApi.InviterCommissionDTO::actual)
+              .reduce(BigDecimal::add)
+              .orElse(null);
+      inviterCards =
+          new InviterCards(
+              matched.size(),
+              newInvitations,
+              pending,
+              estimated == null ? null : estimated.add(actual),
+              estimated,
+              actual);
+    }
     return new Data(
         total.meta(),
         new Summary(
@@ -391,17 +478,27 @@ public class AnalyticsRankingService {
             invitedCount,
             effectiveCount,
             sellingCreators,
-            creatorCards),
+            creatorCards,
+            inviterCards),
         new Summary(total.previous(), selling(previous), null, null, null, null),
         total.change(),
         rows,
         board == Board.CREATOR
             ? creatorUnavailable(commissionVisible)
-            : List.of(
-                new UnavailableDTO("netCommission", "WEIDIAN_SETTLEMENT_PENDING"),
-                new UnavailableDTO("prepayExpense", "INVITER_FINANCE_DASHBOARD_PENDING"),
-                new UnavailableDTO("totalEstimatedCommission", "INVITER_FINANCE_DASHBOARD_PENDING"),
-                new UnavailableDTO("totalExpense", "INVITER_FINANCE_DASHBOARD_PENDING")));
+            : inviterUnavailable(inviterCards, canSeeInviterCommission));
+  }
+
+  private static List<UnavailableDTO> inviterUnavailable(InviterCards cards, boolean authorized) {
+    var fields = new ArrayList<UnavailableDTO>();
+    fields.add(new UnavailableDTO("prepayExpense", "INVITER_FINANCE_DASHBOARD_PENDING"));
+    fields.add(new UnavailableDTO("totalExpense", "INVITER_FINANCE_DASHBOARD_PENDING"));
+    if (!authorized || cards.totalCommission() == null) {
+      fields.add(
+          new UnavailableDTO(
+              "totalEstimatedCommission",
+              authorized ? "NO_VERIFIED_COMMISSION" : "COMMISSION_FORBIDDEN"));
+    }
+    return List.copyOf(fields);
   }
 
   private CreatorCards creatorCards(
@@ -460,7 +557,7 @@ public class AnalyticsRankingService {
     return List.copyOf(fields);
   }
 
-  private Map<Long, Long> invitedCounts(List<Long> matchedKolIds) {
+  private List<KolOwnershipDTO> firstInvitations(ScopeDTO scope) {
     var firstOwner = new HashMap<Long, KolOwnershipDTO>();
     ownership
         .createdBetween(Instant.EPOCH, Instant.now())
@@ -469,10 +566,11 @@ public class AnalyticsRankingService {
                 firstOwner.merge(
                     entry.kolId(), entry, (a, b) -> a.startTime().isAfter(b.startTime()) ? b : a));
     return firstOwner.values().stream()
-        .filter(entry -> matchedKolIds == null || matchedKolIds.contains(entry.kolId()))
-        .map(KolOwnershipDTO::bdUserId)
-        .filter(Objects::nonNull)
-        .collect(Collectors.groupingBy(Function.identity(), Collectors.counting()));
+        .filter(entry -> scope.kolId() == null || scope.kolId().equals(entry.kolId()))
+        .filter(
+            entry -> scope.matchedKolIds() == null || scope.matchedKolIds().contains(entry.kolId()))
+        .filter(entry -> entry.bdUserId() != null)
+        .toList();
   }
 
   private static List<RankFactsDTO> withInactivePeriods(
@@ -574,7 +672,8 @@ public class AnalyticsRankingService {
     boolean valid =
         switch (key) {
           case "rank", "refundedOrderCount" -> board == Board.PRODUCT;
-          case "invitedCount", "effectiveCount" -> board == Board.INVITER;
+          case "invitedCount", "effectiveCount", "totalEstimatedCommission" ->
+              board == Board.INVITER;
           case "kolCount" -> board != Board.CREATOR;
           case "spuCount", "linkCount", "commissionRate" -> board == Board.CREATOR;
           case "averageOrderAmount", "amountRefundRate" -> board != Board.PRODUCT;
@@ -594,6 +693,7 @@ public class AnalyticsRankingService {
         switch (key) {
           case "rank" -> sorting.compare(Row::rank);
           case "invitedCount" -> sorting.compare(Row::invitedCount);
+          case "totalEstimatedCommission" -> sorting.compare(Row::totalEstimatedCommission);
           case "effectiveCount" -> sorting.compare(Row::effectiveCount);
           case "kolCount" -> sorting.compare(Row::kolCount);
           case "spuCount" -> sorting.compare(Row::spuCount);
@@ -644,7 +744,8 @@ public class AnalyticsRankingService {
       Long invitedCount,
       Long effectiveCount,
       Long sellingCreatorCount,
-      CreatorCards creatorCards) {
+      CreatorCards creatorCards,
+      InviterCards inviterCards) {
     public Summary(
         MetricsDTO metrics,
         long sellingCount,
@@ -659,9 +760,20 @@ public class AnalyticsRankingService {
           invitedCount,
           effectiveCount,
           sellingCreatorCount,
+          null,
           null);
     }
   }
+
+  public record InviterCards(
+      long inviterCount,
+      long newInvitations,
+      long pendingCreators,
+      BigDecimal totalCommission,
+      BigDecimal estimatedCommission,
+      BigDecimal actualCommission) {}
+
+  public record BestCreator(Long id, String name, BigDecimal netSalesAmount) {}
 
   public record CreatorCards(
       Long periodEffectiveCount,
@@ -693,7 +805,87 @@ public class AnalyticsRankingService {
       String primaryPlatform,
       Long linkCount,
       BigDecimal commissionRate,
-      String relationStatus) {
+      String relationStatus,
+      BestCreator bestCreator,
+      BigDecimal totalEstimatedCommission) {
+    public Row(
+        String id,
+        String name,
+        String code,
+        String related,
+        Boolean enabled,
+        List<String> social,
+        Long entityId,
+        Long shopId,
+        Integer rank,
+        Long invitedCount,
+        Long effectiveCount,
+        Long kolCount,
+        Long spuCount,
+        Instant lastPaidAt,
+        Instant lastRefundedAt,
+        MetricsDTO metrics,
+        String imageUrl,
+        String sourceItemId,
+        String primaryPlatform,
+        Long linkCount,
+        BigDecimal commissionRate,
+        String relationStatus) {
+      this(
+          id,
+          name,
+          code,
+          related,
+          enabled,
+          social,
+          entityId,
+          shopId,
+          rank,
+          invitedCount,
+          effectiveCount,
+          kolCount,
+          spuCount,
+          lastPaidAt,
+          lastRefundedAt,
+          metrics,
+          imageUrl,
+          sourceItemId,
+          primaryPlatform,
+          linkCount,
+          commissionRate,
+          relationStatus,
+          null,
+          null);
+    }
+
+    Row withInviterMetrics(BestCreator best, BigDecimal commission) {
+      return new Row(
+          id,
+          name,
+          code,
+          related,
+          enabled,
+          social,
+          entityId,
+          shopId,
+          rank,
+          invitedCount,
+          effectiveCount,
+          kolCount,
+          spuCount,
+          lastPaidAt,
+          lastRefundedAt,
+          metrics,
+          imageUrl,
+          sourceItemId,
+          primaryPlatform,
+          linkCount,
+          commissionRate,
+          relationStatus,
+          best,
+          commission);
+    }
+
     Row withRank(int nextRank) {
       return new Row(
           id,

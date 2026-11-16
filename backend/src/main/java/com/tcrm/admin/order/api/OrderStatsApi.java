@@ -36,6 +36,14 @@ public interface OrderStatsApi {
   /** Read-only CRM commission snapshots for the same paid-order cohort. */
   CreatorCommissionDTO creatorCommission(ScopeDTO scope, Instant from, Instant until);
 
+  List<InviterCommissionDTO> inviterCommissions(ScopeDTO scope, Instant from, Instant until);
+
+  List<BestCreatorDTO> bestCreators(ScopeDTO scope, Instant from, Instant until);
+
+  record InviterCommissionDTO(Long inviterId, BigDecimal estimated, BigDecimal actual) {}
+
+  record BestCreatorDTO(Long inviterId, Long creatorId, BigDecimal netSalesAmount) {}
+
   record CreatorCommissionDTO(BigDecimal total, BigDecimal clawback) {}
 
   enum RankDimension {
@@ -61,7 +69,42 @@ public interface OrderStatsApi {
       Long inviterId,
       List<Long> visibleShopIds,
       List<Long> matchedKolIds,
-      List<Long> matchedInviterIds) {
+      List<Long> matchedInviterIds,
+      String productKeyword) {
+    public ScopeDTO withProductKeyword(String keyword) {
+      return new ScopeDTO(
+          tenantId,
+          ownerId,
+          shopId,
+          kolId,
+          inviterId,
+          visibleShopIds,
+          matchedKolIds,
+          matchedInviterIds,
+          keyword);
+    }
+
+    public ScopeDTO(
+        long tenantId,
+        Long ownerId,
+        Long shopId,
+        Long kolId,
+        Long inviterId,
+        List<Long> visibleShopIds,
+        List<Long> matchedKolIds,
+        List<Long> matchedInviterIds) {
+      this(
+          tenantId,
+          ownerId,
+          shopId,
+          kolId,
+          inviterId,
+          visibleShopIds,
+          matchedKolIds,
+          matchedInviterIds,
+          null);
+    }
+
     public ScopeDTO(
         long tenantId,
         Long ownerId,

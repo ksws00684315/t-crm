@@ -13,7 +13,9 @@ import com.tcrm.admin.kol.api.KolOwnershipDTO;
 import com.tcrm.admin.kol.api.KolRefDTO;
 import com.tcrm.admin.order.api.OrderStatsApi;
 import com.tcrm.admin.order.api.OrderStatsApi.ProductFactsDTO;
+import com.tcrm.admin.order.api.OrderStatsApi.RankDimension;
 import com.tcrm.admin.order.api.OrderStatsApi.RankFactsDTO;
+import com.tcrm.admin.order.api.OrderStatsApi.ScopeDTO;
 import com.tcrm.admin.order.api.OrderStatsApi.TotalsDTO;
 import com.tcrm.admin.product.api.ProductAccessApi;
 import com.tcrm.admin.product.api.ProductAccessApi.ProductRefDTO;
@@ -183,6 +185,47 @@ class AnalyticsRankingServiceTest {
         .extracting(Row::id)
         .containsExactly("10");
     assertThat(service.options().inviters()).hasSize(2);
+  }
+
+  @Test
+  void filtersInviterProductSalesAndHonorsCommissionAccess() {
+    var bd = new BdUserDTO(9L, "bd1", "First", true);
+    var creator = new KolRefDTO(11L, "K1", "Alice", true, 9L);
+    var filter = new FilterDTO(DAY, DAY, null, null, null, null, null, null, " Source  ");
+    var scope = new ScopeDTO(40, null, null, null, null).withProductKeyword("Source");
+    var until = new StatsPeriod(DAY, DAY).until();
+    when(inviters.listUsable()).thenReturn(List.of(bd));
+    when(inviters.listByIds(any())).thenReturn(List.of(bd));
+    when(creators.listAll()).thenReturn(List.of(creator));
+    when(creators.listByIdsIncludingDeleted(List.of(11L))).thenReturn(List.of(creator));
+    when(orders.rankFacts(eq(scope), eq(RankDimension.INVITER), eq(FROM), eq(until)))
+        .thenReturn(List.of(person(9, 1)));
+    when(orders.bestCreators(scope, FROM, until))
+        .thenReturn(List.of(new OrderStatsApi.BestCreatorDTO(9L, 11L, BigDecimal.TEN)));
+    var unauthorized = service.query(Board.INVITER, filter, null, 1, 20, null, null);
+    assertThat(unauthorized.summary().inviterCards().totalCommission()).isNull();
+    org.mockito.Mockito.verify(orders, org.mockito.Mockito.never())
+        .inviterCommissions(any(), any(), any());
+    when(current.effectivePermissions(account)).thenReturn(List.of("commission:view"));
+    when(orders.inviterCommissions(scope, FROM, until))
+        .thenReturn(
+            List.of(
+                new OrderStatsApi.InviterCommissionDTO(
+                    9L, new BigDecimal("3"), new BigDecimal("5"))));
+    var result =
+        service.query(Board.INVITER, filter, null, 1, 20, "totalEstimatedCommission", "desc");
+    assertThat(result.meta().filters().productKeyword()).isEqualTo("Source");
+    assertThat(result.summary().inviterCards().totalCommission()).isEqualByComparingTo("8");
+    assertThat(result.unavailable())
+        .noneMatch(field -> field.field().equals("totalEstimatedCommission"));
+    assertThat(result.ranking().items())
+        .singleElement()
+        .satisfies(
+            row -> {
+              assertThat(row.bestCreator().name()).isEqualTo("Alice");
+              assertThat(row.bestCreator().netSalesAmount()).isEqualByComparingTo("10");
+              assertThat(row.totalEstimatedCommission()).isEqualByComparingTo("8");
+            });
   }
 
   @Test

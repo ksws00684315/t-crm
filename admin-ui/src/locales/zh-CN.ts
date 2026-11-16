@@ -43,8 +43,8 @@ const zhCN = {
         "同批已核实订单发放佣金后，因成功退款确认入账的扣回，按正数展示。退款中暂时冻结、计佣前已减的退款及非退款调整不计入。无法核实原因时显示横线。"
     },
     productCreatorCount: "达人数",
-    productRefundHint:
-      "商品退款金额统计可关联到商品行的成功退款，订单退款率以所选周期内支付的订单为分母。",
+    product: "商品",
+    productSearch: "输入商品名或 SPU ID",
     period: "时间段",
     conditions: "条件",
     creatorSearch: "输入达人 ID 或达人名",
@@ -151,6 +151,15 @@ const zhCN = {
       loading: "正在加载趋势",
       emptyTrend: "所选期间无销售或退款记录"
     },
+    evidenceDefinitions: {
+      orderNo: "微店订单的编号。同一订单可以包含多条商品行。",
+      refundNo: "微店退款记录编号。",
+      eventPay: "订单支付时间，按北京时间归期。",
+      eventRefund: "成功退款完结时间，按北京时间归期。",
+      itemAmount: "这条订单商品行的实付金额。",
+      sku: "成交订单商品的规格编码。",
+      product: "订单中的商品名称。"
+    },
     "shop-performance": {
       detailTitle: "店铺经营详情",
       selling: "有成交店铺数",
@@ -214,6 +223,11 @@ const zhCN = {
       net: "商品净销售额",
       keyword: "商品名称／SPU",
       definitions: {
+        selling: "所选期间有支付成交的商品 SPU 数，同一 SPU 在不同店铺分别统计。",
+        cohortRefundAmount:
+          "该批已支付商品行在支付日起 30 个北京时间自然日内完结且能关联到商品行的成功退款。",
+        averageOrderAmount: "所选期间匹配商品行的销售额除以包含该商品的支付订单数。",
+        amountRefundRate: "匹配商品在所选期间完结的成功退款金额除以同期商品销售额。",
         rank: "按同一筛选条件下的净销售额从高到低计算名次。切换表头排序时，原名次保留。",
         identity: "展示订单商品名称和已关联源商品的主图。主图缺失时显示占位图标。",
         channelCode: "展示订单渠道和源链接商品 ID。未关联源商品时，ID 显示横线。",
@@ -279,19 +293,57 @@ const zhCN = {
       rankingCount: "共 {count} 位邀请人",
       netCommission: "团队本期预估佣金",
       keyword: "邀请人搜索",
+      conversionTitle: "邀请转化链",
+      conversionSubtitle: "从累计邀请到本期成交",
+      bestCreator: "最佳达人",
+      commissionAccess: "当前账号无佣金查看权限",
+      rankingHint: "点击「详情」查看该邀请人的期间贡献与当前团队。",
+      terms: {
+        activeInviters: "有效邀请人",
+        totalInviters: "总邀请人",
+        paidOrderCount: "订单数",
+        newInvitations: "本期新增邀请达人",
+        pendingCreators: "当前待审核",
+        estimatedPart: "未结算",
+        actualPart: "已结算",
+        effectiveTransition: "当前有效达人占比",
+        salesTransition: "本期有销售达人占比",
+        cohortRefundAmount: "同批退款"
+      },
       definitions: {
         identity: "展示邀请人姓名和账号。",
         status: "展示邀请人账号的启停状态。",
         creatorCounts: "当前归属该邀请人且启用的达人数，以及由该邀请人首次邀请的历史累计达人数。",
         units: "累计所选期间内归属该邀请人的已支付订单下各 SKU 的购买数量。",
-        salesAmount: "按支付时间累计归属该邀请人的已支付订单实付金额，含运费。",
-        completedRefundAmount: "按退款完结时间累计归属该邀请人的成功退款金额。",
+        salesAmount:
+          "按支付时间累计归属该邀请人的实付金额，含运费。筛选商品时仅汇总匹配商品行的实付。",
+        completedRefundAmount:
+          "按退款完结时间累计归属该邀请人的成功退款。筛选商品时仅纳入关联匹配商品行的退款。",
         netSalesAmount: "销售额减去同批订单在 30 个北京时间自然日内完结的成功退款金额。",
         amountRefundRate: "所选期间内完结的成功退款金额除以同期销售额。",
         averageOrderAmount: "所选期间的销售额除以已支付订单数。",
         prepayExpense: "预付已打款的支出金额。看板数据待接入。",
-        totalEstimatedCommission: "所选期间订单的预估佣金合计。看板数据待接入。",
-        totalExpense: "已支付的佣金支出加预付支出。看板数据待接入。"
+        totalExpense: "已支付的佣金支出加预付支出。看板数据待接入。",
+        activeInviters: "当前账户和公司成员关系均启用、且具备商务资格的邀请人数。按当前状态统计。",
+        totalInviters: "当前可见的商务邀请人，包括仍可查到历史邀请或业绩的停用邀请人。",
+        paidOrderCount:
+          "所选期间内按支付时归属汇总已支付订单，同一订单只计一次。筛选商品时仅统计含匹配商品的订单。",
+        newInvitations: "所选期间内首次归属该商务邀请人的达人数。换绑不产生新的首次邀请。",
+        pendingCreators: "当前归属该邀请人的达人中，审核状态为待审核的人数。",
+        estimatedPart: "本期已核实、当前未结算订单的预估佣金。",
+        actualPart: "本期已核实、当前已结算订单的实际佣金。已提现仍计入原订单。",
+        effectiveTransition: "当前有效达人数除以累计邀请达人数。前后采用当前状态与历史累计口径。",
+        salesTransition:
+          "所选期间有销售的达人数除以当前有效达人数。前后采用支付时归属与当前状态口径。",
+        cohortRefundAmount:
+          "所选期间支付的同批订单中，支付日起 30 个北京时间自然日内完结的成功退款。",
+        invitedCount: "截至当前，首次邀请归属可见商务的历史累计达人数。",
+        effectiveCount: "截至当前，仍归属可见商务且状态有效的达人数。",
+        kolCount: "所选期间内按订单支付时归属统计有已支付订单的去重达人数。",
+        bestCreator:
+          "按订单支付时归属，在当前筛选下净销售额最高的有成交达人，金额相同时按达人 ID 升序。",
+        totalEstimatedCommission:
+          "所选支付期间内已核实订单的佣金合计。未结算取预估，已结算取实际，已提现仍计入原订单，每笔订单只统计一次。"
       }
     }
   },

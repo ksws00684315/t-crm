@@ -58,7 +58,9 @@ class ShopPerformanceExportTest {
             "TikTok",
             2L,
             new BigDecimal("0.15"),
-            "PROMOTING");
+            "PROMOTING",
+            new AnalyticsRankingService.BestCreator(901L, "Best example", new BigDecimal("80")),
+            new BigDecimal("8.25"));
     var result =
         new AnalyticsRankingService.Result(
             meta,
@@ -146,12 +148,16 @@ class ShopPerformanceExportTest {
                     "Average order amount (CNY)",
                     "Prepayments paid out (CNY)",
                     "Total estimated commission (CNY)",
-                    "Total paid out (CNY)");
+                    "Total paid out (CNY)",
+                    "Top creator",
+                    "Top creator net sales (CNY)");
             assertThat(data.getCell(0).getStringCellValue()).isEqualTo("'=item / CODE");
             assertThat(data.getCell(2).getStringCellValue()).isEqualTo("1 / 2");
-            for (int i = 9; i < 12; i++) {
-              assertThat(data.getCell(i).getStringCellValue()).isEmpty();
-            }
+            assertThat(data.getCell(9).getStringCellValue()).isEmpty();
+            assertThat(data.getCell(10).getStringCellValue()).isEqualTo("8.25");
+            assertThat(data.getCell(11).getStringCellValue()).isEmpty();
+            assertThat(data.getCell(12).getStringCellValue()).isEqualTo("Best example");
+            assertThat(data.getCell(13).getStringCellValue()).isEqualTo("80");
           }
         }
       }

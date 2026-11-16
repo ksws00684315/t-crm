@@ -143,14 +143,17 @@ public class AnalyticsDetailService {
             original.inviterId(),
             visible,
             original.matchedKolIds(),
-            original.matchedInviterIds());
+            original.matchedInviterIds(),
+            board == Board.PRODUCT ? null : original.productKeyword());
     var period = resolved.period();
     return new Selection(
         scope,
         board == Board.CREATOR ? entityId : null,
         board == Board.INVITER ? entityId : null,
         board == Board.PRODUCT ? productCode : null,
-        keyword,
+        board == Board.PRODUCT && original.productKeyword() != null
+            ? original.productKeyword()
+            : keyword,
         period.from(),
         period.until());
   }
@@ -181,7 +184,8 @@ public class AnalyticsDetailService {
             inviterId,
             visible,
             original.matchedKolIds(),
-            original.matchedInviterIds());
+            original.matchedInviterIds(),
+            original.productKeyword());
     var period = resolved.period();
     var facts = orders.rankFacts(scope, RankDimension.KOL, period.from(), period.until());
     var metricsById =
@@ -194,6 +198,7 @@ public class AnalyticsDetailService {
                     k ->
                         original.matchedKolIds() == null
                             || original.matchedKolIds().contains(k.id()))
+                .filter(k -> original.productKeyword() == null || metricsById.containsKey(k.id()))
                 .toList()
             : creators.listByIdsIncludingDeleted(
                 facts.stream().map(RankFactsDTO::entityId).filter(id -> id != 0L).toList());

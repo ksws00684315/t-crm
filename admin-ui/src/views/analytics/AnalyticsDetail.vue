@@ -28,7 +28,7 @@ import MetricCard from "./MetricCard.vue";
 
 const props = defineProps<{ board: Board; row: RankRow; name: string; filters: DetailQuery }>();
 const emit = defineEmits<{ close: [] }>();
-const { t, locale } = useI18n();
+const { t, te, locale } = useI18n();
 const user = useUserStore();
 const access = computed(() => accessOf(user.user));
 const tab = ref<"overview" | "creators" | "currentTeam" | ActivityKind | ProductBreakdown>(
@@ -49,7 +49,10 @@ const failed = ref(false);
 let request = 0;
 
 const shop = computed(() => props.board === "shop-performance");
-const shopHint = (key: string) => t(`analytics.shop-performance.definitions.${key}`);
+function termHint(key: string): string {
+  const path = `analytics.${props.board}.definitions.${key}`;
+  return te(path) ? t(path) : "";
+}
 const heading = computed(() => t(`analytics.${props.board}.detailTitle`));
 const identityCode = computed(() =>
   props.board === "best-sellers" ? props.row.sourceItemId : props.row.shopCode || props.row.code
@@ -91,13 +94,7 @@ const cards = computed(() =>
               }).format(Number(value))
             : formatAmountWithCurrency(String(value));
     }
-    const hint = shop.value
-      ? shopHint(key)
-      : key === "netSalesAmount"
-        ? t("analytics.netHint")
-        : key === "completedRefundAmount"
-          ? t("analytics.refundPeriodHint")
-          : undefined;
+    const hint = termHint(key);
     return [{ key, value: formatted, hint }];
   })
 );
@@ -125,20 +122,6 @@ const columns = computed<DataColumn[]>(() => [
     minWidth: 168
   }
 ]);
-
-const shopHeaders = computed(() =>
-  shop.value
-    ? columns.value.flatMap(column => {
-        const hint =
-          column.key === "units"
-            ? shopHint("units")
-            : column.key === "amount"
-              ? shopHint(tab.value === "REFUNDS" ? "completedRefundAmount" : "itemAmount")
-              : undefined;
-        return hint ? [{ ...column, hint }] : [];
-      })
-    : []
-);
 
 const creatorColumns = computed<DataColumn[]>(() => [
   { key: "name", label: t("analytics.kol-ranking.identity"), minWidth: 180, align: "left" },
@@ -169,6 +152,38 @@ const groupColumns = computed<DataColumn[]>(() => [
     minWidth: 145
   }))
 ]);
+
+const tableColumns = computed(() =>
+  isBreakdown.value
+    ? groupColumns.value
+    : isCreatorList.value
+      ? creatorColumns.value
+      : columns.value
+);
+const detailHeaders = computed(() =>
+  tableColumns.value.flatMap(column => {
+    const refund = tab.value === "REFUNDS";
+    const key = column.key;
+    const evidenceKey =
+      key === "amount"
+        ? refund
+          ? null
+          : "itemAmount"
+        : key === "eventTime"
+          ? refund
+            ? "eventRefund"
+            : "eventPay"
+          : ["orderNo", "refundNo", "sku", "product"].includes(key)
+            ? key
+            : null;
+    const hint = evidenceKey
+      ? t(`analytics.evidenceDefinitions.${evidenceKey}`)
+      : termHint(
+          key === "amount" ? "completedRefundAmount" : key === "net" ? "netSalesAmount" : key
+        );
+    return hint ? [{ ...column, hint }] : [];
+  })
+);
 
 const chart = computed(() => {
   if (!daily.value.length) return null;
@@ -348,15 +363,26 @@ function changeSize(next: number): void {
             :key="card.key"
             :label="t(`analytics.${card.key}`)"
             :value="card.value"
-            :hint="shop ? undefined : card.hint"
-            :label-terms="
-              shop ? [{ label: t(`analytics.${card.key}`), hint: card.hint }] : undefined
-            "
+            :hint="card.hint"
           />
         </div>
         <section class="analytics-detail__trend">
           <h3>{{ t("analytics.drilldown.daily") }}</h3>
-          <p>{{ t("analytics.drilldown.clocks") }}</p>
+          <p>
+            <template
+              v-for="(key, index) in ['salesAmount', 'completedRefundAmount'] as const"
+              :key="key"
+            >
+              <span v-if="index" aria-hidden="true"> · </span>
+              <el-tooltip
+                :content="termHint(key)"
+                :trigger="['hover', 'focus']"
+                popper-class="analytics-metric-definition"
+              >
+                <span tabindex="0" class="analytics-detail__term">{{ t(`analytics.${key}`) }}</span>
+              </el-tooltip>
+            </template>
+          </p>
           <ChartPanel
             :option="chart"
             :label="t('analytics.drilldown.daily')"
@@ -371,7 +397,7 @@ function changeSize(next: number): void {
         :key="tab"
         :table-id="tableId"
         :rows="isBreakdown ? productGroups : isCreatorList ? creatorRows : rows"
-        :columns="isBreakdown ? groupColumns : isCreatorList ? creatorColumns : columns"
+        :columns="tableColumns"
         :row-key="isBreakdown ? 'code' : 'id'"
         :loading="loading"
         :failed="failed"
@@ -385,7 +411,7 @@ function changeSize(next: number): void {
         @update:page="changePage"
         @update:size="changeSize"
       >
-        <template v-for="column in shopHeaders" :key="column.key" #[`header-${column.key}`]>
+        <template v-for="column in detailHeaders" :key="column.key" #[`header-${column.key}`]>
           <el-tooltip
             :content="column.hint"
             :trigger="['hover', 'focus']"

@@ -24,6 +24,7 @@ export interface Filters {
   inviterId?: string;
   keyword?: string;
   creatorKeyword?: string;
+  productKeyword?: string;
   inviterKeyword?: string;
 }
 export interface RankingQuery extends Filters {
@@ -53,6 +54,14 @@ export interface Summary {
   invitedCount?: Scalar;
   effectiveCount?: Scalar;
   sellingCreatorCount?: Scalar;
+  inviterCards?: {
+    inviterCount: Scalar;
+    newInvitations: Scalar;
+    pendingCreators: Scalar;
+    totalCommission: Scalar | null;
+    estimatedCommission: Scalar | null;
+    actualCommission: Scalar | null;
+  };
   creatorCards?: {
     periodEffectiveCount: Scalar | null;
     relationshipCount: Scalar;
@@ -87,6 +96,7 @@ export interface RankRow {
   linkCount?: Scalar;
   commissionRate?: Scalar;
   imageUrl?: string;
+  bestCreator?: { id: string; name: string | null; netSalesAmount: Scalar };
   metrics?: Metrics;
   [key: string]: unknown;
 }

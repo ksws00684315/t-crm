@@ -65,7 +65,8 @@ export const columnsByBoard: Record<Board, string[]> = {
     "averageOrderAmount",
     "prepayExpense",
     "totalEstimatedCommission",
-    "totalExpense"
+    "totalExpense",
+    "bestCreator"
   ]
 };
 export const coverageKeys = ["spuCount", "skuCount"];
@@ -76,6 +77,7 @@ export const sortable = new Set([
   "rank",
   "linkCount",
   "commissionRate",
+  "totalEstimatedCommission",
   "invitedCount",
   "effectiveCount",
   "refundedOrderCount",

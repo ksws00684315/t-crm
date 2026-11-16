@@ -18,6 +18,7 @@ public interface OrderEvidenceMapper {
   String SCOPED =
       """
       <script>
+      <bind name="productSearch" value="s.scope.productKeyword"/>
       WITH scoped_orders AS NOT MATERIALIZED (
         SELECT o.id, o.weidian_order_id, o.pay_time, o.pay_amount
         FROM crm_order o
@@ -88,6 +89,12 @@ public interface OrderEvidenceMapper {
             </choose>
           </if>
         </if>
+        <if test="s.scope.productKeyword != null">
+          AND
+      """
+          + OrderStatsMapper.PRODUCT_MATCH
+          + """
+        </if>
       ),
       """;
 
@@ -107,7 +114,7 @@ public interface OrderEvidenceMapper {
              r.amount, r.finish_time AS event_time
       FROM scoped_orders o JOIN crm_refund r ON r.order_id = o.id
       <choose>
-        <when test="s.productCode != null">JOIN</when>
+        <when test="s.productCode != null or s.scope.productKeyword != null">JOIN</when>
         <otherwise>LEFT JOIN</otherwise>
       </choose>
         scoped_items i ON i.id = r.order_item_id AND i.order_id = o.id
@@ -158,7 +165,7 @@ public interface OrderEvidenceMapper {
           + """
       activity AS (
         <choose>
-          <when test="s.productCode != null">
+          <when test="s.productCode != null or s.scope.productKeyword != null">
             SELECT o.pay_time AS event_time, i.pay_amount AS sales, 0::numeric AS refunds
             FROM scoped_orders o JOIN scoped_items i ON i.order_id = o.id
             WHERE o.pay_time &gt;= #{s.from} AND o.pay_time &lt; #{s.until}

@@ -14,6 +14,7 @@ defineProps<{
   loading: boolean;
   optionsFailed: boolean;
   showInviter?: boolean;
+  showProduct?: boolean;
 }>();
 const filters = defineModel<Filters>({ required: true });
 const emit = defineEmits<{ search: [live: boolean]; reset: []; refresh: [] }>();
@@ -70,7 +71,7 @@ function reset(): void {
 <template>
   <ListSearch
     class="analytics-filter"
-    :class="{ 'analytics-filter--with-inviter': showInviter }"
+    :class="{ 'analytics-filter--four-fields': showInviter || showProduct }"
     @search="emit('search', mode === 'live')"
     @reset="reset"
   >
@@ -217,6 +218,20 @@ function reset(): void {
             <el-icon class="analytics-filter__search-icon"><Search /></el-icon>
           </template>
         </el-input>
+        <el-input
+          v-if="showProduct"
+          v-model="filters.productKeyword"
+          class="analytics-filter__product"
+          clearable
+          :maxlength="100"
+          :aria-label="t('analytics.productSearch')"
+          :placeholder="t('analytics.productSearch')"
+        >
+          <template #prefix>
+            <span class="analytics-filter__caption">{{ t("analytics.product") }}</span>
+            <el-icon class="analytics-filter__search-icon"><Search /></el-icon>
+          </template>
+        </el-input>
         <span v-if="optionsFailed" class="analytics-filter__failure" role="status">{{
           t("analytics.optionsFailed")
         }}</span>
@@ -231,7 +246,7 @@ function reset(): void {
   grid-template-columns: minmax(0, 790px) max-content;
   row-gap: var(--tcrm-space-4);
 }
-.analytics-filter--with-inviter :deep(.list-search__row) {
+.analytics-filter--four-fields :deep(.list-search__row) {
   grid-template-columns: minmax(0, 1030px) max-content;
 }
 .analytics-filter__time {
@@ -241,7 +256,7 @@ function reset(): void {
   gap: var(--tcrm-space-2);
   min-width: 0;
 }
-.analytics-filter--with-inviter .analytics-filter__time {
+.analytics-filter--four-fields .analytics-filter__time {
   contain: inline-size;
 }
 .analytics-filter__fields {
@@ -251,7 +266,7 @@ function reset(): void {
   gap: var(--tcrm-space-2);
   min-width: 0;
 }
-.analytics-filter--with-inviter .analytics-filter__fields {
+.analytics-filter--four-fields .analytics-filter__fields {
   grid-template-columns: 5em repeat(4, minmax(0, 1fr));
 }
 .analytics-filter__period {
@@ -297,7 +312,8 @@ function reset(): void {
 .analytics-filter__shop,
 .analytics-filter__channel,
 .analytics-filter__creator,
-.analytics-filter__inviter {
+.analytics-filter__inviter,
+.analytics-filter__product {
   min-width: 0;
   width: 100%;
 }
@@ -313,14 +329,14 @@ function reset(): void {
 }
 @media (max-width: 767px) {
   .analytics-filter :deep(.list-search__row),
-  .analytics-filter--with-inviter :deep(.list-search__row) {
+  .analytics-filter--four-fields :deep(.list-search__row) {
     grid-template-columns: minmax(0, 1fr);
   }
   .analytics-filter__time {
     flex-wrap: wrap;
   }
   .analytics-filter__fields,
-  .analytics-filter--with-inviter .analytics-filter__fields {
+  .analytics-filter--four-fields .analytics-filter__fields {
     grid-template-columns: minmax(0, 1fr);
   }
   .analytics-filter__label {

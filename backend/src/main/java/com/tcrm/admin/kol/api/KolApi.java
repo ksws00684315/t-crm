@@ -37,6 +37,9 @@ public interface KolApi {
   /** Counts visible KOLs enabled at any time in the period; null if history is incomplete. */
   Long countEnabledDuring(long tenantId, Collection<Long> visibleIds, Instant from, Instant until);
 
+  /** Current pending review count for the visible creator ids. */
+  long countPendingReview(Collection<Long> ids);
+
   /** Social accounts and display relation status for the scoped dashboard identities. */
   Map<Long, AnalyticsProfileDTO> analyticsProfiles(
       Collection<Long> ids, Map<Long, BdUserDTO> owners);
