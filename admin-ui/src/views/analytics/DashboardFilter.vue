@@ -155,9 +155,9 @@ function reset(): void {
           :aria-label="t('analytics.shop')"
           :placeholder="t('analytics.all')"
         >
-          <template #prefix
-            ><span>{{ t("analytics.shop") }}</span></template
-          >
+          <template #prefix>
+            <span class="analytics-filter__caption">{{ t("analytics.shop") }}</span>
+          </template>
           <el-option
             v-for="option in options?.shops"
             :key="option.id"
@@ -175,9 +175,9 @@ function reset(): void {
           :aria-label="t('analytics.channel')"
           :placeholder="t('analytics.all')"
         >
-          <template #prefix
-            ><span>{{ t("analytics.channel") }}</span></template
-          >
+          <template #prefix>
+            <span class="analytics-filter__caption">{{ t("analytics.channel") }}</span>
+          </template>
           <el-option value="WEIDIAN" :label="t('analytics.weidian')" />
         </el-select>
         <el-input
@@ -189,7 +189,7 @@ function reset(): void {
           :placeholder="t('analytics.creatorSearch')"
         >
           <template #prefix>
-            <span>{{ t("analytics.creator") }}</span>
+            <span class="analytics-filter__caption">{{ t("analytics.creator") }}</span>
             <el-icon class="analytics-filter__search-icon"><Search /></el-icon>
           </template>
         </el-input>
@@ -231,10 +231,16 @@ function reset(): void {
 .analytics-filter__label {
   flex: 0 0 5em;
   white-space: nowrap;
-  color: var(--tcrm-color-text-secondary);
+}
+.analytics-filter__label,
+.analytics-filter__caption {
+  color: var(--tcrm-color-text);
 }
 .analytics-filter__period :deep(.el-button) {
   padding-inline: var(--tcrm-space-3);
+}
+#app .analytics-filter__period :deep(.el-button) {
+  font-weight: 400;
 }
 .analytics-filter__period :deep(.period-selected) {
   color: var(--tcrm-color-primary-text);
