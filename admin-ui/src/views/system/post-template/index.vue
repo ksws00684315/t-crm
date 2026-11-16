@@ -296,13 +296,16 @@ function asModule(row: object): PermissionModule {
           <section v-for="module in permissionModules" :key="module.group" class="permission-card">
             <header class="permission-card__head">
               <div class="permission-module">
-                <strong>{{ module.label }}</strong
-                ><span class="permission-count" :data-test="`module-count-${module.group}`">{{
-                  t("postTemplate.selectedCount", {
-                    selected: module.picked,
-                    total: module.codes.length
-                  })
-                }}</span>
+                <strong>{{ module.label }}</strong><span
+                  class="permission-count"
+                  :data-test="`module-count-${module.group}`"
+                  >{{
+                    t("postTemplate.selectedCount", {
+                      selected: module.picked,
+                      total: module.codes.length
+                    })
+                  }}</span
+                >
               </div>
               <el-checkbox
                 :model-value="module.allChecked"
