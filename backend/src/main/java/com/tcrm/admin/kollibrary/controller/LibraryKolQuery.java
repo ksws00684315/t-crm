@@ -15,7 +15,9 @@ public record LibraryKolQuery(
     @Size(max = 8) String countryCode,
     @Size(max = 48) String category,
     @Size(max = 16) String outreachStatus,
-    @Size(max = 64) String followUpOwner) {
+    @Size(max = 64) String followUpOwner,
+    LibraryKolFilter.SortField sortBy,
+    LibraryKolFilter.SortOrder sortOrder) {
   public LibraryKolQuery {
     page = page == null ? 1 : page;
     size = size == null ? 20 : size;
@@ -23,6 +25,15 @@ public record LibraryKolQuery(
 
   LibraryKolFilter toFilter() {
     return new LibraryKolFilter(
-        keyword, platform, countryCode, category, outreachStatus, followUpOwner, page, size);
+        keyword,
+        platform,
+        countryCode,
+        category,
+        outreachStatus,
+        followUpOwner,
+        page,
+        size,
+        sortBy,
+        sortOrder);
   }
 }

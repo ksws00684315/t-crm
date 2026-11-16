@@ -695,6 +695,7 @@ const zhCN = {
     editTitle: "编辑档案",
     editProfile: "编辑档案",
     editTabTitle: "编辑档案：{name}",
+    detailTabTitle: "详细信息：{name}",
     workbook: {
       download: "下载模板",
       upload: "上传表格",
@@ -709,8 +710,16 @@ const zhCN = {
       invalidCell: "「{column}」填写有误，请核对模板中的格式和示例",
       viewList: "查看达人列表"
     },
+    overview: {
+      account: "达人账号基础信息",
+      quality: "质量和分级",
+      audience: "粉丝画像",
+      status: "当前状态",
+      engagementRate: "互动率"
+    },
     updateFollowUp: "更新跟进",
     view: "查看",
+    viewDetails: "查看明细",
     backToList: "返回达人列表",
     notFound: "该达人不存在或已被删除",
     saved: "档案已保存",
@@ -826,6 +835,7 @@ const zhCN = {
       sampleCost: "样品成本",
       slotFee: "坑位费",
       commissionRate: "佣金比例（%）",
+      commissionRateColumn: "佣金比例",
       estimatedCommission: "预估佣金",
       totalCost: "总投入成本",
       actualRoi: "实际ROI",

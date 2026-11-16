@@ -180,6 +180,50 @@ class KolLibraryIT {
   }
 
   @Test
+  void shouldSortFilteredCreatorsBeforePaging() throws Exception {
+    String token = library.token();
+    var first = profile("sort_first", "Sort team");
+    first.put("followers", 900);
+    first.put("grade", "C");
+    create(token, first).andExpect(status().isOk());
+    var second = profile("sort_second", "Sort team");
+    second.put("followers", 12000);
+    second.put("grade", "S");
+    create(token, second).andExpect(status().isOk());
+    var third = profile("sort_third", "Sort team");
+    third.put("followers", 10000);
+    third.put("grade", "A");
+    create(token, third).andExpect(status().isOk());
+    createOk(token, "sort_unrated", "Sort team");
+    jdbc.update(
+        "UPDATE crm_library_kol SET followers = NULL, grade = NULL WHERE kol_username = ?",
+        "sort_unrated");
+    createOk(token, "sort_excluded", "Different team");
+
+    assertSortedPage(token, "FOLLOWERS", "ASC", 1, "sort_first", "sort_third");
+    assertSortedPage(token, "FOLLOWERS", "DESC", 2, "sort_first", "sort_unrated");
+    assertSortedPage(token, "GRADE", "ASC", 2, "sort_second", "sort_unrated");
+    assertSortedPage(token, "GRADE", "DESC", 1, "sort_second", "sort_third");
+  }
+
+  private void assertSortedPage(
+      String token, String field, String direction, int page, String first, String second)
+      throws Exception {
+    mvc.perform(
+            get(LIB)
+                .header(TOKEN, token)
+                .param("followUpOwner", "Sort team")
+                .param("page", Integer.toString(page))
+                .param("size", "2")
+                .param("sortBy", field)
+                .param("sortOrder", direction))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.data.total").value(4))
+        .andExpect(jsonPath("$.data.items[0].kolUsername").value(first))
+        .andExpect(jsonPath("$.data.items[1].kolUsername").value(second));
+  }
+
+  @Test
   void shouldDownloadTemplateAndOnlyImportNewCreators() throws Exception {
     String token = library.token();
     String id = createOk(token, "old_creator", "Amy BD");

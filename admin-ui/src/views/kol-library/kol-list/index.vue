@@ -35,14 +35,14 @@ const { t, locale } = useI18n();
 const router = useRouter();
 const me = useUserStore();
 const tabs = useTabsStore();
-/** Widths are tuned for the 14px Chinese labels; English needs more room and scrolls instead. */
-const px = (zh: number, en: number): number => (locale.value === "zh-CN" ? zh : en);
 const abilities = computed(() => libraryAbilities(me.user));
 
 const loading = ref(false);
 const loadFailed = ref(false);
 const rows = ref<LibraryKolVO[]>([]);
 const total = ref(0);
+const sort = ref<Pick<LibraryKolQuery, "sortBy" | "sortOrder">>({});
+let loadSequence = 0;
 const query = reactive<{
   page: number;
   size: number;
@@ -74,26 +74,29 @@ function followers(value: number | string | null): string {
  * a quantity and stays centered with tabular figures (norm 13 appendix A).
  */
 const columns = computed<DataColumn[]>(() => [
-  { key: "kol", align: "left" as const, label: t("library.column.kol"), minWidth: px(180, 240) },
-  { key: "platform", label: t("library.column.platform"), width: px(100, 110) },
-  { key: "followers", label: t("library.column.followers"), amount: true, width: px(110, 120) },
-  { key: "countryCode", label: t("library.column.country"), width: px(100, 150) },
+  { key: "kol", align: "left", label: t("library.column.kol") },
+  { key: "platform", label: t("library.column.platform") },
+  {
+    key: "followers",
+    label: t("library.column.followers"),
+    amount: true,
+    sortable: true
+  },
+  { key: "countryCode", label: t("library.column.country") },
   {
     key: "categories",
-    align: "left" as const,
-    label: t("library.column.categories"),
-    minWidth: px(150, 260)
+    align: "left",
+    label: t("library.column.categories")
   },
-  { key: "outreachStatus", label: t("library.column.outreachStatus"), width: px(130, 170) },
+  { key: "outreachStatus", label: t("library.column.outreachStatus") },
   {
     key: "followUpOwner",
-    align: "left" as const,
+    align: "left",
     label: t("library.column.followUpOwner"),
-    prop: "followUpOwner",
-    minWidth: px(120, 150)
+    prop: "followUpOwner"
   },
-  { key: "grade", label: t("library.column.grade"), width: px(100, 130) },
-  { key: "actions", label: t("common.actions"), width: px(112, 112) }
+  { key: "grade", label: t("library.column.grade"), sortable: true },
+  { key: "actions", label: t("common.actions") }
 ]);
 
 const applied = ref({
@@ -162,17 +165,25 @@ function appliedQuery(): LibraryKolQuery {
 }
 
 async function load(): Promise<void> {
+  const request = ++loadSequence;
   loading.value = true;
   loadFailed.value = false;
   try {
-    const page = await listLibraryKols({ page: query.page, size: query.size, ...appliedQuery() });
+    const page = await listLibraryKols({
+      page: query.page,
+      size: query.size,
+      ...appliedQuery(),
+      ...sort.value
+    });
+    if (request !== loadSequence) return;
     rows.value = page.items;
     total.value = Number(page.total);
   } catch (error) {
+    if (request !== loadSequence) return;
     loadFailed.value = true;
     notifyError(error);
   } finally {
-    loading.value = false;
+    if (request === loadSequence) loading.value = false;
   }
 }
 
@@ -218,6 +229,17 @@ function onPage(page: number): void {
   void load();
 }
 
+function onSort({ prop, order }: { prop: string; order: "ascending" | "descending" | null }): void {
+  if (prop !== "followers" && prop !== "grade") return;
+  sort.value = order
+    ? {
+        sortBy: prop === "followers" ? "FOLLOWERS" : "GRADE",
+        sortOrder: order === "ascending" ? "ASC" : "DESC"
+      }
+    : {};
+  onPage(1);
+}
+
 function onSize(size: number): void {
   query.size = size;
 }
@@ -229,7 +251,7 @@ async function openDetail(row: LibraryKolVO): Promise<void> {
   if (!tabs.tabs.some(tab => tab.path === path)) {
     tabs.open({
       path,
-      titleKey: row.displayName,
+      titleKey: t("library.detailTabTitle", { name: row.displayName }),
       literalTitle: true,
       affix: false,
       componentName: "LibraryKolDetailPage"
@@ -242,33 +264,11 @@ function openCreate(): void {
   void router.push("/kol-library/kols/new");
 }
 
-/** Edit opens the same form as Add, filled with the creator (requirement 1.2.5 ②, 2026-11-11). */
-async function openEdit(row: LibraryKolVO): Promise<void> {
-  const path = `/kol-library/kols/${row.id}/edit`;
-  if (!tabs.tabs.some(tab => tab.path === path)) {
-    tabs.open({
-      path,
-      titleKey: t("library.editTabTitle", { name: row.displayName }),
-      literalTitle: true,
-      affix: false,
-      componentName: "LibraryKolFormPage"
-    });
-  }
-  await router.push(path);
-}
-
 function rowActions(row: LibraryKolVO): RowAction[] {
   return [
     {
-      key: "edit",
-      label: t("common.edit"),
-      testId: `library-edit-${row.id}`,
-      hidden: !abilities.value.canEdit,
-      onClick: () => void openEdit(row)
-    },
-    {
       key: "view",
-      label: t("library.view"),
+      label: t("library.viewDetails"),
       testId: `library-view-${row.id}`,
       onClick: () => void openDetail(row)
     }
@@ -280,7 +280,14 @@ onMounted(load);
 
 <template>
   <div class="list-page">
-    <ListSearch :chips="chips" has-more @search="search" @reset="reset" @remove="removeChip">
+    <ListSearch
+      :chips="chips"
+      has-more
+      inline-actions
+      @search="search"
+      @reset="reset"
+      @remove="removeChip"
+    >
       <template #primary>
         <el-form-item :label="t('library.filter.keyword')">
           <el-input
@@ -367,13 +374,8 @@ onMounted(load);
           />
         </el-form-item>
       </template>
-      <template #actions>
-        <el-button
-          v-if="abilities.canEdit"
-          type="primary"
-          data-test="library-create"
-          @click="openCreate"
-        >
+      <template v-if="abilities.canEdit" #actions>
+        <el-button type="primary" data-test="library-create" @click="openCreate">
           {{ t("library.create") }}
         </el-button>
       </template>
@@ -381,6 +383,8 @@ onMounted(load);
 
     <DataTable
       table-id="library-kols"
+      class="library-kol-table"
+      :equal-column-width="locale === 'zh-CN' ? 120 : 150"
       fill-available-height
       :rows="rows"
       :columns="columns"
@@ -392,6 +396,7 @@ onMounted(load);
       :filter-count="chips.length"
       @update:page="onPage"
       @update:size="onSize"
+      @sort-change="onSort"
       @refresh="load"
       @retry="load"
       @clear-filters="reset"
@@ -438,6 +443,17 @@ onMounted(load);
 </template>
 
 <style scoped>
+/* Element Plus updates its hover-row class after a delay. Use pointer hover for the whole
+   row so a stale class cannot leave a second row shaded. */
+.library-kol-table :deep(.el-table) {
+  --el-table-row-hover-bg-color: var(--tcrm-color-card);
+}
+.library-kol-table :deep(.el-table__body td.el-table__cell) {
+  transition: none;
+}
+.library-kol-table :deep(.el-table__body tr:hover > td.el-table__cell) {
+  background-color: var(--tcrm-color-muted);
+}
 /* The nickname on the first line, the copyable @username under it. */
 .kol-cell {
   display: flex;

@@ -5,6 +5,7 @@ import { useI18n } from "vue-i18n";
 import { useRoute, useRouter } from "vue-router";
 import {
   deleteLibraryContent,
+  deleteLibraryKol,
   getLibraryKol,
   listLibraryContents,
   type LibraryContentVO,
@@ -16,7 +17,7 @@ import RowActions, { type RowAction } from "@/components/RowActions.vue";
 import { useTabsStore } from "@/stores/tabs";
 import { useUserStore } from "@/stores/user";
 import { formatAmountWithCurrency } from "@/utils/format";
-import { libraryOptionLabel, sampleTagType } from "@/utils/kol-library";
+import { libraryOptionLabel, outreachTagType, sampleTagType } from "@/utils/kol-library";
 import { notifyError } from "@/utils/notify";
 import { libraryAbilities } from "@/utils/permission";
 import LibraryContentDialog from "./LibraryContentDialog.vue";
@@ -44,9 +45,26 @@ const activeTab = ref<"profile" | "contents">("profile");
 const contentDialogVisible = ref(false);
 const editingContent = ref<LibraryContentVO | null>(null);
 const followUpVisible = ref(false);
+const deleting = ref(false);
 
 /** The path of this creator's detail tab, used by keep-alive and by the other pages. */
 const selfPath = computed(() => `/kol-library/kols/${id.value}`);
+
+const initials = computed(() => {
+  const name = (detail.value?.displayName || detail.value?.kolUsername || "").trim();
+  const words = name.split(/\s+/);
+  const letters =
+    words.length > 1
+      ? words.slice(0, 2).map(word => Array.from(word)[0])
+      : Array.from(name).slice(0, 2);
+  return letters.join("").toUpperCase();
+});
+
+const countFormat = new Intl.NumberFormat("en-US");
+
+function formatCount(value: string | null): string {
+  return value && /^\d+$/.test(value) ? countFormat.format(BigInt(value)) : show(value);
+}
 
 function asContent(row: object): LibraryContentVO {
   return row as LibraryContentVO;
@@ -85,9 +103,12 @@ function money(value: string | null | undefined): string {
 /** One read-only field of the profile; a link opens in a new window, a wide one takes the row. */
 interface ProfileField {
   label: string;
-  value: string;
+  value?: string;
   link?: string | null;
+  tags?: string[];
+  tagType?: ReturnType<typeof outreachTagType>;
   wide?: boolean;
+  note?: boolean;
 }
 
 interface ProfileGroup {
@@ -96,7 +117,6 @@ interface ProfileGroup {
   fields: ProfileField[];
 }
 
-/** The profile groups of requirement 1.2.5 ③; short fields read in two columns (norm 13 §3.4). */
 const profileGroups = computed<ProfileGroup[]>(() => {
   const row = detail.value;
   if (!row) return [];
@@ -107,7 +127,7 @@ const profileGroups = computed<ProfileGroup[]>(() => {
       fields: [
         { label: t("library.field.kolUsername"), value: `@${row.kolUsername}` },
         { label: t("library.field.displayName"), value: row.displayName },
-        { label: t("library.field.followers"), value: show(row.followers) },
+        { label: t("library.field.followers"), value: formatCount(row.followers) },
         { label: t("library.field.platform"), value: option("platform", row.platform) },
         { label: t("library.field.country"), value: option("country", row.countryCode) },
         {
@@ -117,19 +137,32 @@ const profileGroups = computed<ProfileGroup[]>(() => {
         },
         {
           label: t("library.field.categories"),
-          value: row.categories
-            .map(item => libraryOptionLabel("category", item))
-            .join(t("library.separator"))
+          tags: row.categories.map(item => libraryOptionLabel("category", item)),
+          tagType: "primary"
         },
-        { label: t("library.field.avgViews"), value: show(row.avgViews) },
-        { label: t("library.field.engagementRate"), value: show(row.engagementRate) }
+        { label: t("library.field.avgViews"), value: formatCount(row.avgViews) },
+        {
+          label: t("library.overview.engagementRate"),
+          value: row.engagementRate ? `${row.engagementRate}%` : "—"
+        },
+        { label: t("library.field.contact"), value: show(row.contact) },
+        {
+          label: t("library.field.tags"),
+          tags: row.tags,
+          tagType: "info",
+          wide: true
+        },
+        { label: t("library.field.remark"), value: show(row.remark), note: true }
       ]
     },
     {
       key: "audience",
       title: t("library.group.audience"),
       fields: [
-        { label: t("library.field.audienceCountry"), value: show(row.audienceCountry) },
+        {
+          label: t("library.field.audienceCountry"),
+          value: option("country", row.audienceCountry)
+        },
         {
           label: t("library.field.audienceAgeRange"),
           value: option("audienceAge", row.audienceAgeRange)
@@ -141,49 +174,24 @@ const profileGroups = computed<ProfileGroup[]>(() => {
       ]
     },
     {
-      key: "contact",
-      title: t("library.group.contact"),
-      fields: [{ label: t("library.field.contact"), value: show(row.contact) }]
-    },
-    {
-      key: "quality",
-      title: t("library.group.quality"),
-      fields: [
-        { label: t("library.field.contentQuality"), value: option("level", row.contentQuality) },
-        { label: t("library.field.salesPotential"), value: option("level", row.salesPotential) },
-        {
-          label: t("library.field.cooperationAttitude"),
-          value: option("level", row.cooperationAttitude)
-        },
-        { label: t("library.field.grade"), value: option("grade", row.grade) }
-      ]
-    },
-    {
-      key: "tags",
-      title: t("library.group.tags"),
-      fields: [
-        {
-          label: t("library.field.tags"),
-          value: row.tags.length ? row.tags.join(t("library.separator")) : "—",
-          wide: row.tags.length > 3
-        },
-        { label: t("library.field.remark"), value: show(row.remark), wide: true }
-      ]
-    },
-    {
       key: "followUp",
       title: t("library.group.followUp"),
       fields: [
         {
           label: t("library.field.outreachStatus"),
-          value: option("outreachStatus", row.outreachStatus)
+          tags: [option("outreachStatus", row.outreachStatus)],
+          tagType: outreachTagType(row.outreachStatus)
         },
         { label: t("library.field.followUpOwner"), value: row.followUpOwner },
         { label: t("library.field.lastContactDate"), value: show(row.lastContactDate) },
-        { label: t("library.field.sampleStatus"), value: option("sampleStatus", row.sampleStatus) },
+        {
+          label: t("library.field.sampleStatus"),
+          tags: [option("sampleStatus", row.sampleStatus)],
+          tagType: sampleTagType(row.sampleStatus)
+        },
         { label: t("library.field.trackingNo"), value: show(row.trackingNo) },
         { label: t("library.field.sampleDate"), value: show(row.sampleDate) },
-        { label: t("library.field.followUpRemark"), value: show(row.followUpRemark), wide: true }
+        { label: t("library.field.followUpRemark"), value: show(row.followUpRemark), note: true }
       ]
     }
   ];
@@ -206,7 +214,12 @@ const contentColumns = computed<DataColumn[]>(() => [
   { key: "sampleType", label: t("library.content.sampleType"), width: 90 },
   { key: "sampleCost", label: t("library.content.sampleCost"), amount: true, width: 110 },
   { key: "slotFee", label: t("library.content.slotFee"), amount: true, width: 110 },
-  { key: "commissionRate", label: t("library.content.commissionRate"), amount: true, width: 100 },
+  {
+    key: "commissionRate",
+    label: t("library.content.commissionRateColumn"),
+    amount: true,
+    width: 100
+  },
   {
     key: "estimatedCommission",
     label: t("library.content.estimatedCommission"),
@@ -215,13 +228,6 @@ const contentColumns = computed<DataColumn[]>(() => [
   },
   { key: "totalCost", label: t("library.content.totalCost"), amount: true, width: 120 },
   { key: "actualRoi", label: t("library.content.actualRoi"), amount: true, width: 100 },
-  {
-    key: "nextAction",
-    align: "left" as const,
-    label: t("library.content.nextAction"),
-    minWidth: 160,
-    tooltip: true
-  },
   { key: "actions", label: t("common.actions"), width: 96 }
 ]);
 
@@ -258,7 +264,7 @@ async function load(): Promise<void> {
     if (tab && loaded.displayName) {
       tabs.open({
         ...tab,
-        titleKey: loaded.displayName,
+        titleKey: t("library.detailTabTitle", { name: loaded.displayName }),
         literalTitle: true
       });
     }
@@ -356,6 +362,41 @@ function backToList(): void {
   void router.push("/kol-library/kols");
 }
 
+async function removeKol(): Promise<void> {
+  const creator = detail.value;
+  if (!creator || creator.id !== id.value || !abilities.value.canDelete || deleting.value) return;
+  deleting.value = true;
+  const creatorPath = selfPath.value;
+  const isCreatorTab = (path: string) => path === creatorPath || path === `${creatorPath}/edit`;
+  const name = creator.displayName.trim() || creator.kolUsername;
+  try {
+    const confirmed = await ElMessageBox.confirm(
+      t("library.confirmDelete", { name }),
+      t("library.deleteTitle"),
+      {
+        type: "warning",
+        confirmButtonText: t("common.delete"),
+        cancelButtonText: t("common.cancel")
+      }
+    ).then(
+      () => true,
+      () => false
+    );
+    if (!confirmed) return;
+    await deleteLibraryKol(creator.id);
+    ElMessage.success(t("library.deleted"));
+    for (const tab of tabs.tabs.filter(tab => isCreatorTab(tab.path))) {
+      tabs.close(tab.path);
+    }
+    tabs.refresh("/kol-library/kols");
+    if (isCreatorTab(route.path)) backToList();
+  } catch (error) {
+    notifyError(error);
+  } finally {
+    deleting.value = false;
+  }
+}
+
 watch(id, () => {
   activeTab.value = "profile";
   void loadAll();
@@ -387,79 +428,174 @@ onMounted(() => {
     </el-empty>
 
     <template v-else>
-      <!-- Header card: who the creator is and what the relationship is (requirement 1.2.5 ③). -->
       <el-card v-loading="loading" shadow="never" class="detail-page__header-card">
-        <div class="header-card">
-          <div class="header-card__main">
-            <div class="header-card__title">
-              <h1 class="header-card__name" data-test="detail-name">
-                {{ detail?.displayName ?? "" }}
-              </h1>
-              <CopyText v-if="detail" :value="`@${detail.kolUsername}`" />
+        <template v-if="detail">
+          <div class="header-card__heading">
+            <div class="header-card__identity">
+              <el-avatar :size="56" class="header-card__avatar" aria-hidden="true">
+                {{ initials }}
+              </el-avatar>
+              <div>
+                <h1 class="header-card__name" data-test="detail-name">{{ detail.displayName }}</h1>
+                <CopyText :value="`@${detail.kolUsername}`" />
+              </div>
             </div>
-            <div v-if="detail" class="header-card__meta">
-              <el-tag size="small" type="info">{{ option("platform", detail.platform) }}</el-tag>
-              <el-tag size="small" type="info">{{ option("country", detail.countryCode) }}</el-tag>
-              <el-tag
-                v-for="category in detail.categories"
-                :key="category"
-                size="small"
-                data-test="detail-category"
+            <div v-if="abilities.canEdit || abilities.canDelete" class="header-card__actions">
+              <el-button
+                v-if="abilities.canEdit"
+                data-test="detail-follow-up"
+                @click="openFollowUp"
               >
-                {{ libraryOptionLabel("category", category) }}
-              </el-tag>
+                {{ t("library.updateFollowUp") }}
+              </el-button>
+              <el-button
+                v-if="abilities.canEdit"
+                type="primary"
+                plain
+                data-test="detail-edit"
+                @click="openEdit"
+              >
+                {{ t("library.editProfile") }}
+              </el-button>
+              <el-button
+                v-if="abilities.canDelete"
+                type="danger"
+                plain
+                :loading="deleting"
+                data-test="detail-delete"
+                @click="removeKol"
+              >
+                {{ t("library.deleteTitle") }}
+              </el-button>
             </div>
-            <dl v-if="detail" class="header-card__facts">
-              <div>
-                <dt>{{ t("library.field.grade") }}</dt>
-                <dd>{{ option("grade", detail.grade) }}</dd>
-              </div>
-              <div>
-                <dt>{{ t("library.field.outreachStatus") }}</dt>
-                <dd>{{ option("outreachStatus", detail.outreachStatus) }}</dd>
-              </div>
-              <div>
-                <dt>{{ t("library.field.followUpOwner") }}</dt>
-                <dd>{{ detail.followUpOwner }}</dd>
-              </div>
-              <div>
-                <dt>{{ t("library.field.sampleStatus") }}</dt>
-                <dd>
-                  <el-tag size="small" :type="sampleTagType(detail.sampleStatus)">
-                    {{ option("sampleStatus", detail.sampleStatus) }}
-                  </el-tag>
-                </dd>
-              </div>
-            </dl>
           </div>
-          <div v-if="detail" class="header-card__actions">
-            <el-button v-if="abilities.canEdit" data-test="detail-edit" @click="openEdit">
-              {{ t("library.editProfile") }}
-            </el-button>
-            <el-button v-if="abilities.canEdit" data-test="detail-follow-up" @click="openFollowUp">
-              {{ t("library.updateFollowUp") }}
-            </el-button>
+          <div class="header-card__meta">
+            <el-tag size="small" type="info">{{ option("platform", detail.platform) }}</el-tag>
+            <el-tag size="small" type="info">{{ option("country", detail.countryCode) }}</el-tag>
+            <el-tag
+              v-for="category in detail.categories"
+              :key="category"
+              size="small"
+              data-test="detail-category"
+            >
+              {{ libraryOptionLabel("category", category) }}
+            </el-tag>
           </div>
-        </div>
+          <div class="header-card__summary">
+            <section class="header-card__panel">
+              <h2>{{ t("library.overview.account") }}</h2>
+              <dl class="header-card__rows">
+                <div>
+                  <dt>{{ t("library.field.followers") }}</dt>
+                  <dd class="header-card__followers">{{ formatCount(detail.followers) }}</dd>
+                </div>
+                <div>
+                  <dt>{{ t("library.field.avgViews") }}</dt>
+                  <dd>{{ formatCount(detail.avgViews) }}</dd>
+                </div>
+                <div>
+                  <dt>{{ t("library.overview.engagementRate") }}</dt>
+                  <dd>{{ detail.engagementRate ? `${detail.engagementRate}%` : "—" }}</dd>
+                </div>
+              </dl>
+            </section>
+            <section class="header-card__panel">
+              <h2>{{ t("library.overview.quality") }}</h2>
+              <dl class="header-card__quality" data-test="detail-quality">
+                <div>
+                  <dt>{{ t("library.field.contentQuality") }}</dt>
+                  <dd>{{ option("level", detail.contentQuality) }}</dd>
+                </div>
+                <div>
+                  <dt>{{ t("library.field.salesPotential") }}</dt>
+                  <dd>{{ option("level", detail.salesPotential) }}</dd>
+                </div>
+                <div>
+                  <dt>{{ t("library.field.cooperationAttitude") }}</dt>
+                  <dd>{{ option("level", detail.cooperationAttitude) }}</dd>
+                </div>
+                <div>
+                  <dt>{{ t("library.field.grade") }}</dt>
+                  <dd>
+                    <el-tag v-if="detail.grade" size="small">{{
+                      option("grade", detail.grade)
+                    }}</el-tag>
+                    <span v-else>—</span>
+                  </dd>
+                </div>
+              </dl>
+            </section>
+            <section class="header-card__panel">
+              <h2>{{ t("library.overview.audience") }}</h2>
+              <dl class="header-card__rows">
+                <div>
+                  <dt>{{ t("library.field.audienceCountry") }}</dt>
+                  <dd>{{ option("country", detail.audienceCountry) }}</dd>
+                </div>
+                <div>
+                  <dt>{{ t("library.field.audienceAgeRange") }}</dt>
+                  <dd>{{ option("audienceAge", detail.audienceAgeRange) }}</dd>
+                </div>
+                <div>
+                  <dt>{{ t("library.field.audienceGender") }}</dt>
+                  <dd>{{ option("audienceGender", detail.audienceGender) }}</dd>
+                </div>
+              </dl>
+            </section>
+            <section class="header-card__panel">
+              <h2>{{ t("library.overview.status") }}</h2>
+              <dl class="header-card__rows">
+                <div>
+                  <dt>{{ t("library.field.outreachStatus") }}</dt>
+                  <dd>
+                    <el-tag size="small" :type="outreachTagType(detail.outreachStatus)">
+                      {{ option("outreachStatus", detail.outreachStatus) }}
+                    </el-tag>
+                  </dd>
+                </div>
+                <div>
+                  <dt>{{ t("library.field.followUpOwner") }}</dt>
+                  <dd>{{ show(detail.followUpOwner) }}</dd>
+                </div>
+                <div>
+                  <dt>{{ t("library.field.sampleStatus") }}</dt>
+                  <dd>
+                    <el-tag size="small" :type="sampleTagType(detail.sampleStatus)">
+                      {{ option("sampleStatus", detail.sampleStatus) }}
+                    </el-tag>
+                  </dd>
+                </div>
+              </dl>
+            </section>
+          </div>
+        </template>
       </el-card>
 
       <el-tabs v-model="activeTab" class="detail-page__tabs">
         <el-tab-pane :label="t('library.tab.profile')" name="profile">
-          <div class="profile-groups">
-            <el-card
+          <el-card
+            v-if="profileGroups.length"
+            shadow="never"
+            class="profile-groups"
+            :body-style="{ padding: 0 }"
+          >
+            <section
               v-for="group in profileGroups"
               :key="group.key"
-              shadow="never"
               class="profile-group"
+              :class="`profile-group--${group.key}`"
               :data-test="`group-${group.key}`"
             >
-              <template #header>{{ group.title }}</template>
+              <h2 class="profile-group__title">{{ group.title }}</h2>
               <dl class="profile-group__fields">
                 <div
                   v-for="field in group.fields"
                   :key="field.label"
                   class="profile-field"
-                  :class="{ 'profile-field--wide': field.wide }"
+                  :class="{
+                    'profile-field--wide': field.wide || field.note,
+                    'profile-field--note': field.note
+                  }"
                 >
                   <dt>{{ field.label }}</dt>
                   <dd>
@@ -471,12 +607,27 @@ onMounted(() => {
                       data-test="profile-link"
                       >{{ field.value }}</a
                     >
-                    <span v-else>{{ field.value }}</span>
+                    <div v-else-if="field.tags?.length" class="profile-field__tags">
+                      <el-tag
+                        v-for="tag in field.tags"
+                        :key="tag"
+                        size="small"
+                        :type="field.tagType"
+                      >
+                        {{ tag }}
+                      </el-tag>
+                    </div>
+                    <span
+                      v-else
+                      :class="{ 'profile-field__empty': !field.value || field.value === '—' }"
+                    >
+                      {{ field.value ?? "—" }}
+                    </span>
                   </dd>
                 </div>
               </dl>
-            </el-card>
-          </div>
+            </section>
+          </el-card>
         </el-tab-pane>
 
         <el-tab-pane :label="t('library.tab.contents')" name="contents">
@@ -547,9 +698,6 @@ onMounted(() => {
             <template #cell-actualRoi="{ row }">
               {{ asContent(row).actualRoi ?? "—" }}
             </template>
-            <template #cell-nextAction="{ row }">
-              {{ asContent(row).nextAction || "—" }}
-            </template>
             <template #actions="{ row }">
               <RowActions :actions="contentActions(asContent(row))" />
             </template>
@@ -584,68 +732,220 @@ onMounted(() => {
 .detail-page > * + * {
   margin-top: var(--tcrm-space-4);
 }
-.header-card {
+.detail-page__header-card {
+  container-type: inline-size;
+}
+.header-card__heading {
   display: flex;
   flex-wrap: wrap;
-  align-items: flex-start;
+  align-items: center;
   justify-content: space-between;
   gap: var(--tcrm-space-4);
 }
-.header-card__main {
+.header-card__identity {
   display: flex;
-  flex-direction: column;
-  gap: var(--tcrm-space-2);
+  align-items: center;
+  flex: 1 1 220px;
+  gap: var(--tcrm-space-3);
   min-width: 0;
 }
-.header-card__title {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: baseline;
-  gap: var(--tcrm-space-2);
+.header-card__identity > div {
+  min-width: 0;
+}
+.header-card__avatar {
+  flex-shrink: 0;
+  background: var(--tcrm-color-option-selected-bg);
+  color: var(--tcrm-color-primary-text);
+  font-size: var(--tcrm-font-size-section);
+  font-weight: 700;
 }
 .header-card__name {
-  margin: 0;
+  margin: 0 0 var(--tcrm-space-1);
+  overflow-wrap: anywhere;
 }
 .header-card__meta {
   display: flex;
   flex-wrap: wrap;
-  gap: var(--tcrm-space-1);
+  gap: var(--tcrm-space-2);
+  margin-top: var(--tcrm-space-3);
 }
-.header-card__facts {
+.header-card__summary {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
-  gap: var(--tcrm-space-2) var(--tcrm-space-4);
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: var(--tcrm-space-3);
+  margin-top: var(--tcrm-space-4);
+}
+.header-card__panel {
+  min-width: 0;
+  padding: var(--tcrm-space-4);
+  border-radius: var(--tcrm-radius-card);
+  background: var(--tcrm-color-page);
+}
+.header-card__panel h2 {
+  margin: 0 0 var(--tcrm-space-2);
+  font-size: var(--tcrm-font-size-body);
+  font-weight: 650;
+}
+.header-card__panel dl {
   margin: 0;
 }
-.header-card__facts dt,
+.header-card__rows > div {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--tcrm-space-2);
+  padding-block: var(--tcrm-space-2);
+}
+.header-card__rows > div + div {
+  border-top: 1px solid var(--tcrm-color-border);
+}
+.header-card__rows dd {
+  min-width: 0;
+  text-align: end;
+}
+.header-card__rows :deep(.el-tag) {
+  height: auto;
+  min-height: 24px;
+  max-width: 100%;
+  white-space: normal;
+}
+.header-card__followers {
+  font-size: var(--tcrm-font-size-brand);
+  line-height: 1;
+}
+.header-card__quality {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: var(--tcrm-space-2) var(--tcrm-space-3);
+  padding-top: var(--tcrm-space-2);
+}
+@container (max-width: 900px) {
+  .header-card__summary {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+@container (max-width: 530px) {
+  .header-card__summary {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+.header-card__panel dt,
 .profile-field dt {
   color: var(--tcrm-color-text-secondary);
   font-size: var(--tcrm-font-size-body);
 }
-.header-card__facts dd,
+.header-card__panel dd,
 .profile-field dd {
   margin: 0;
   word-break: break-word;
+}
+.header-card__panel dd {
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+}
+.header-card__panel .header-card__quality dd {
+  margin-top: var(--tcrm-space-1);
 }
 .header-card__actions {
   display: flex;
   flex-wrap: wrap;
   gap: var(--tcrm-space-2);
 }
-.profile-groups {
-  display: flex;
-  flex-direction: column;
-  gap: var(--tcrm-space-4);
+.header-card__actions :deep(.el-button + .el-button) {
+  margin-left: 0;
 }
-/* Short fields read in two columns (norm 13 §3.4); long values take the whole row. */
+.profile-groups {
+  container-type: inline-size;
+}
+.profile-group {
+  padding: var(--tcrm-space-4) var(--tcrm-space-5);
+}
+.profile-group + .profile-group {
+  border-top: 1px solid var(--tcrm-color-border);
+}
+.profile-group__title {
+  margin: 0 0 var(--tcrm-space-2);
+  padding-inline-start: var(--tcrm-space-2);
+  border-inline-start: 3px solid var(--tcrm-color-primary);
+  font-size: var(--tcrm-font-size-section);
+  font-weight: 600;
+}
 .profile-group__fields {
   display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: var(--tcrm-space-3) var(--tcrm-space-6);
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  column-gap: var(--tcrm-space-6);
   margin: 0;
+}
+.profile-group--basic .profile-group__fields {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+.profile-field {
+  display: grid;
+  grid-template-columns: minmax(0, min(38%, 160px)) minmax(0, 1fr);
+  align-items: baseline;
+  gap: var(--tcrm-space-2);
+  padding-block: var(--tcrm-space-2);
+  border-bottom: 1px solid var(--tcrm-color-border);
+}
+.profile-group--audience .profile-field {
+  border-bottom: 0;
 }
 .profile-field--wide {
   grid-column: 1 / -1;
+  grid-template-columns: minmax(88px, min(18%, 160px)) minmax(0, 1fr);
+}
+.profile-field--note {
+  margin-top: var(--tcrm-space-2);
+  padding: var(--tcrm-space-2) var(--tcrm-space-3);
+  border: 0;
+  border-radius: var(--tcrm-radius-control);
+  background: var(--tcrm-color-page);
+}
+.profile-field--note dd {
+  white-space: pre-wrap;
+}
+.profile-field dd {
+  min-width: 0;
+  overflow-wrap: anywhere;
+  font-variant-numeric: tabular-nums;
+}
+.profile-field__empty {
+  color: var(--tcrm-color-text-secondary);
+}
+.profile-field__tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--tcrm-space-1);
+}
+.profile-field__tags :deep(.el-tag) {
+  max-width: 100%;
+  height: auto;
+  min-height: 24px;
+  white-space: normal;
+}
+@container (max-width: 740px) {
+  .profile-group__fields {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    column-gap: var(--tcrm-space-4);
+  }
+  .profile-field {
+    grid-template-columns: minmax(0, 45%) minmax(0, 1fr);
+  }
+  .profile-field--wide {
+    grid-template-columns: minmax(88px, 22%) minmax(0, 1fr);
+  }
+}
+@container (max-width: 470px) {
+  .profile-group {
+    padding-inline: var(--tcrm-space-3);
+  }
+  .profile-group__fields,
+  .profile-group--basic .profile-group__fields {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .profile-field--wide {
+    grid-template-columns: minmax(0, 45%) minmax(0, 1fr);
+  }
 }
 .metrics {
   display: grid;
@@ -672,10 +972,11 @@ onMounted(() => {
 }
 .contents-toolbar {
   display: flex;
-  flex: 1;
+  flex-wrap: wrap;
   align-items: center;
   justify-content: space-between;
   gap: var(--tcrm-space-3);
+  margin-bottom: var(--tcrm-space-3);
 }
 .content-link {
   display: flex;

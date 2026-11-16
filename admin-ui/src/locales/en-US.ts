@@ -722,6 +722,7 @@ const enUS: MessageSchema = {
     editTitle: "Edit profile",
     editProfile: "Edit profile",
     editTabTitle: "Edit profile: {name}",
+    detailTabTitle: "Details: {name}",
     workbook: {
       download: "Download template",
       upload: "Upload workbook",
@@ -736,8 +737,16 @@ const enUS: MessageSchema = {
       invalidCell: "Check the format for {column} against the template example.",
       viewList: "View creator list"
     },
+    overview: {
+      account: "Creator account",
+      quality: "Quality and grade",
+      audience: "Audience profile",
+      status: "Current status",
+      engagementRate: "Engagement rate"
+    },
     updateFollowUp: "Update follow-up",
     view: "View",
+    viewDetails: "View details",
     backToList: "Back to creators",
     notFound: "This creator does not exist or has been deleted",
     saved: "Profile saved",
@@ -853,6 +862,7 @@ const enUS: MessageSchema = {
       sampleCost: "Sample cost",
       slotFee: "Slot fee",
       commissionRate: "Commission rate (%)",
+      commissionRateColumn: "Commission rate",
       estimatedCommission: "Estimated commission",
       totalCost: "Total cost",
       actualRoi: "Actual ROI",
