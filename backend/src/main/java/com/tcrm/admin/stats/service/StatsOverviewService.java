@@ -9,6 +9,7 @@ import com.tcrm.admin.security.api.CurrentUserContext;
 import com.tcrm.admin.security.api.DataScope;
 import com.tcrm.admin.shared.BusinessException;
 import com.tcrm.admin.shared.ErrorCode;
+import com.tcrm.admin.system.api.BdUserApi;
 import java.math.BigDecimal;
 import java.math.RoundingMode;
 import java.time.Instant;
@@ -33,11 +34,14 @@ public class StatsOverviewService {
   private final OrderStatsApi orders;
   private final CurrentUserContext current;
   private final KolApi creators;
+  private final BdUserApi inviters;
 
-  public StatsOverviewService(OrderStatsApi orders, CurrentUserContext current, KolApi creators) {
+  public StatsOverviewService(
+      OrderStatsApi orders, CurrentUserContext current, KolApi creators, BdUserApi inviters) {
     this.orders = orders;
     this.current = current;
     this.creators = creators;
+    this.inviters = inviters;
   }
 
   @Transactional(readOnly = true, isolation = Isolation.REPEATABLE_READ)
@@ -69,6 +73,12 @@ public class StatsOverviewService {
             ? null
             : filter.creatorKeyword().strip();
     var matchedCreators = creatorKeyword == null ? null : findCreators(creatorKeyword);
+    String inviterKeyword =
+        filter.inviterKeyword() == null || filter.inviterKeyword().isBlank()
+            ? null
+            : filter.inviterKeyword().strip();
+    var matchedInviters =
+        inviterKeyword == null ? null : inviters.findMemberIdsByKeyword(inviterKeyword);
     var scope =
         new ScopeDTO(
             account.tenantId(),
@@ -78,12 +88,17 @@ public class StatsOverviewService {
             filter.inviterId(),
             null,
             matchedCreators,
-            null);
+            matchedInviters);
     return new ResolvedFilter(
         scope,
         period,
         new AppliedFiltersDTO(
-            filter.shopId(), filter.kolId(), filter.inviterId(), WEIDIAN, creatorKeyword),
+            filter.shopId(),
+            filter.kolId(),
+            filter.inviterId(),
+            WEIDIAN,
+            creatorKeyword,
+            inviterKeyword),
         account.ownScope() ? DataScope.OWN : DataScope.ALL);
   }
 
@@ -167,7 +182,8 @@ public class StatsOverviewService {
       Long kolId,
       Long inviterId,
       String channel,
-      String creatorKeyword) {
+      String creatorKeyword,
+      String inviterKeyword) {
     public FilterDTO(
         LocalDate startDate,
         LocalDate endDate,
@@ -175,14 +191,30 @@ public class StatsOverviewService {
         Long kolId,
         Long inviterId,
         String channel) {
-      this(startDate, endDate, shopId, kolId, inviterId, channel, null);
+      this(startDate, endDate, shopId, kolId, inviterId, channel, null, null);
+    }
+
+    public FilterDTO(
+        LocalDate startDate,
+        LocalDate endDate,
+        Long shopId,
+        Long kolId,
+        Long inviterId,
+        String channel,
+        String creatorKeyword) {
+      this(startDate, endDate, shopId, kolId, inviterId, channel, creatorKeyword, null);
     }
   }
 
   public record AppliedFiltersDTO(
-      Long shopId, Long kolId, Long inviterId, String channel, String creatorKeyword) {
+      Long shopId,
+      Long kolId,
+      Long inviterId,
+      String channel,
+      String creatorKeyword,
+      String inviterKeyword) {
     public AppliedFiltersDTO(Long shopId, Long kolId, Long inviterId, String channel) {
-      this(shopId, kolId, inviterId, channel, null);
+      this(shopId, kolId, inviterId, channel, null, null);
     }
   }
 

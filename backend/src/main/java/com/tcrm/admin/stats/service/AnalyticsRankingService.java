@@ -129,7 +129,7 @@ public class AnalyticsRankingService {
             null,
             List.copyOf(shopNames.keySet()),
             original.matchedKolIds(),
-            null);
+            original.matchedInviterIds());
     var current = orders.productFacts(scope, keyword, period.from(), period.until());
     var previous = orders.productFacts(scope, keyword, prior.from(), prior.until());
     var totals = current.stream().filter(p -> p.shopId() == null).findFirst().orElseThrow();
@@ -321,6 +321,8 @@ public class AnalyticsRankingService {
                                     && scope.inviterId().equals(kols.get(e.getKey()).bdUserId()))
                                 || ids.contains(e.getKey()))
                         : (scope.inviterId() == null || scope.inviterId().equals(e.getKey()))
+                            && (scope.matchedInviterIds() == null
+                                || scope.matchedInviterIds().contains(e.getKey()))
                             && (scope.matchedKolIds() == null
                                 || ids.contains(e.getKey())
                                 || invited.containsKey(e.getKey())
@@ -339,7 +341,7 @@ public class AnalyticsRankingService {
                 scope.inviterId(),
                 scope.visibleShopIds(),
                 board == Board.CREATOR ? matched : scope.matchedKolIds(),
-                board == Board.INVITER ? matched : null)
+                board == Board.INVITER ? matched : scope.matchedInviterIds())
             : scope;
     var total =
         overview.overview(
@@ -355,7 +357,14 @@ public class AnalyticsRankingService {
     var matchedIds = new java.util.HashSet<>(matched);
     long active =
         board == Board.CREATOR
-            ? directory.stream().filter(k -> k.enabled() && matchedIds.contains(k.id())).count()
+            ? directory.stream()
+                .filter(k -> k.enabled() && matchedIds.contains(k.id()))
+                .filter(
+                    k ->
+                        scope.matchedInviterIds() == null
+                            || (k.bdUserId() != null
+                                && scope.matchedInviterIds().contains(k.bdUserId())))
+                .count()
             : bd.values().stream().filter(b -> b.usable() && matchedIds.contains(b.id())).count();
     Long invitedCount =
         board == Board.INVITER
@@ -407,6 +416,11 @@ public class AnalyticsRankingService {
         directory.stream()
             .filter(k -> matched.contains(k.id()))
             .filter(k -> scope.inviterId() == null || scope.inviterId().equals(k.bdUserId()))
+            .filter(
+                k ->
+                    scope.matchedInviterIds() == null
+                        || (k.bdUserId() != null
+                            && scope.matchedInviterIds().contains(k.bdUserId())))
             .filter(k -> shopCreators == null || shopCreators.contains(k.id()))
             .toList();
     var now = Instant.now();

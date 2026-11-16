@@ -48,6 +48,7 @@ const enUS: MessageSchema = {
     period: "Time period",
     conditions: "Filters",
     creatorSearch: "Enter creator ID or name",
+    inviterSearch: "Enter ID or username",
     periodMode: {
       live: "Live",
       sevenDays: "7 days",

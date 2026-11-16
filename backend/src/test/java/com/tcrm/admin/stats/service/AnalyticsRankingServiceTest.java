@@ -50,7 +50,7 @@ class AnalyticsRankingServiceTest {
   private final CurrentUserContext current = mock(CurrentUserContext.class);
   private final AnalyticsRankingService service =
       new AnalyticsRankingService(
-          new StatsOverviewService(orders, current, creators),
+          new StatsOverviewService(orders, current, creators, inviters),
           orders,
           shops,
           catalog,

@@ -21,7 +21,7 @@ class AnalyticsRankControllerTest {
     var service = mock(AnalyticsRankingService.class);
     var export = mock(ShopPerformanceExport.class);
     var controller = new AnalyticsRankController(service, export);
-    var filter = new StatsOverviewQuery(null, null, null, null, null, null, null);
+    var filter = new StatsOverviewQuery(null, null, null, null, null, null, null, null);
     var ranking = new RankingQuery(2, 50, "units", "asc");
     var options = new Options(List.of(), List.of(), List.of());
     when(service.options()).thenReturn(options);

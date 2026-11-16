@@ -14,8 +14,10 @@ public record StatsOverviewQuery(
     @Positive Long kolId,
     @Positive Long inviterId,
     String channel,
-    @Size(max = 100) String creatorKeyword) {
+    @Size(max = 100) String creatorKeyword,
+    @Size(max = 100) String inviterKeyword) {
   FilterDTO toFilter() {
-    return new FilterDTO(startDate, endDate, shopId, kolId, inviterId, channel, creatorKeyword);
+    return new FilterDTO(
+        startDate, endDate, shopId, kolId, inviterId, channel, creatorKeyword, inviterKeyword);
   }
 }

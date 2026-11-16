@@ -19,7 +19,7 @@ class ShopPerformanceControllerTest {
     var service = mock(ShopPerformanceService.class);
     var export = mock(ShopPerformanceExport.class);
     var controller = new ShopPerformanceController(service, export);
-    var filter = new StatsOverviewQuery(null, null, null, null, null, null, null);
+    var filter = new StatsOverviewQuery(null, null, null, null, null, null, null, null);
     var ranking = new RankingQuery(2, 50, "units", "asc");
     var result =
         new ShopPerformanceDTO(

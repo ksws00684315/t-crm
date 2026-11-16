@@ -14,7 +14,7 @@ class StatsControllerTest {
     var service = mock(StatsOverviewService.class);
     var controller = new StatsController(service);
     var date = LocalDate.of(2026, 11, 3);
-    controller.overview(new StatsOverviewQuery(date, date, 1L, 2L, 3L, "WEIDIAN", null));
+    controller.overview(new StatsOverviewQuery(date, date, 1L, 2L, 3L, "WEIDIAN", null, null));
     verify(service).overview(new FilterDTO(date, date, 1L, 2L, 3L, "WEIDIAN"));
   }
 }

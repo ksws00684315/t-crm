@@ -25,6 +25,17 @@ public interface OrderEvidenceMapper {
         <if test="s.scope.shopId != null">AND o.shop_id = #{s.scope.shopId}</if>
         <if test="s.scope.ownerId != null">AND o.bd_user_id = #{s.scope.ownerId}</if>
         <if test="s.scope.inviterId != null">AND o.bd_user_id = #{s.scope.inviterId}</if>
+        <if test="s.scope.matchedInviterIds != null">
+          <choose>
+            <when test="s.scope.matchedInviterIds.isEmpty()">AND FALSE</when>
+            <otherwise>
+              AND o.bd_user_id IN
+              <foreach collection="s.scope.matchedInviterIds" item="inviter" open="(" separator="," close=")">
+                #{inviter}
+              </foreach>
+            </otherwise>
+          </choose>
+        </if>
         <if test="s.inviter != null">AND COALESCE(o.bd_user_id, 0) = #{s.inviter}</if>
         <if test="s.creator != null">AND COALESCE(o.kol_id, 0) = #{s.creator}</if>
         <if test="s.productCode == null and s.scope.kolId != null">AND o.kol_id = #{s.scope.kolId}</if>

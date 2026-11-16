@@ -18,6 +18,7 @@ import com.tcrm.admin.security.api.CurrentUserContext;
 import com.tcrm.admin.security.api.DataScope;
 import com.tcrm.admin.shared.BusinessException;
 import com.tcrm.admin.stats.service.StatsOverviewService.FilterDTO;
+import com.tcrm.admin.system.api.BdUserApi;
 import java.math.BigDecimal;
 import java.time.Instant;
 import java.time.LocalDate;
@@ -33,7 +34,9 @@ class StatsOverviewServiceTest {
   private final CurrentUserContext current = mock(CurrentUserContext.class);
   private final AccountDTO account = mock(AccountDTO.class);
   private final KolApi creators = mock(KolApi.class);
-  private final StatsOverviewService service = new StatsOverviewService(orders, current, creators);
+  private final BdUserApi inviters = mock(BdUserApi.class);
+  private final StatsOverviewService service =
+      new StatsOverviewService(orders, current, creators, inviters);
 
   @Test
   void scopesBothPeriodsAndKeepsRefundClocksSeparate() {
@@ -92,6 +95,27 @@ class StatsOverviewServiceTest {
                 .scope()
                 .matchedKolIds())
         .isNull();
+  }
+
+  @Test
+  void keepsInviterKeywordIntersectedWithCreatorAndAccountScopes() {
+    when(current.user()).thenReturn(account);
+    when(account.tenantId()).thenReturn(40L);
+    when(account.id()).thenReturn(99L);
+    when(account.ownScope()).thenReturn(true);
+    when(creators.listAll()).thenReturn(List.of(new KolRefDTO(8L, "K1", "Alice", true, 99L)));
+    when(inviters.findMemberIdsByKeyword("bd")).thenReturn(List.of(99L, 100L));
+
+    var result = service.resolve(new FilterDTO(DAY, DAY, 6L, null, null, null, "Alice", " bd "));
+    assertThat(result.scope())
+        .isEqualTo(new ScopeDTO(40, 99L, 6L, null, null, null, List.of(8L), List.of(99L, 100L)));
+    assertThat(result.filters().inviterKeyword()).isEqualTo("bd");
+    assertThat(
+            service
+                .resolve(new FilterDTO(DAY, DAY, null, null, null, null, null, "unmatched"))
+                .scope()
+                .matchedInviterIds())
+        .isEmpty();
   }
 
   @Test

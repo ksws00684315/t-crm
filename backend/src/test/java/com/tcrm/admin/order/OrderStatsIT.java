@@ -14,6 +14,7 @@ import com.tcrm.admin.order.mapper.OrderStatsMapper;
 import com.tcrm.admin.order.service.OrderStatsService;
 import com.tcrm.admin.stats.mapper.StatsRollupMapper;
 import com.tcrm.admin.stats.service.StatsRollupService;
+import com.tcrm.admin.system.mapper.SysUserTenantMapper;
 import java.time.Instant;
 import java.time.LocalDate;
 import java.util.Map;
@@ -112,6 +113,7 @@ class OrderStatsIT {
     configuration.addMapper(OrderDailyStatsMapper.class);
     configuration.addMapper(OrderEvidenceMapper.class);
     configuration.addMapper(KolMapper.class);
+    configuration.addMapper(SysUserTenantMapper.class);
     configuration.addMapper(StatsRollupMapper.class);
     var factory = new SqlSessionFactoryBuilder().build(configuration);
 
@@ -305,6 +307,36 @@ class OrderStatsIT {
     }
     measureNinetyDayQueries(jdbc, factory);
     checkCreatorCards(jdbc, factory);
+    checkInviterSearch(jdbc, factory);
+  }
+
+  private static void checkInviterSearch(JdbcTemplate jdbc, SqlSessionFactory factory) {
+    jdbc.execute(
+        """
+        INSERT INTO sys_user (id, username, password_hash, nickname, role, status, create_time, update_time)
+        VALUES (9501,'t144_north_bd','!','North','MEMBER',1,now(),now()),
+               (9502,'t144_south_bd','!','South','MEMBER',1,now(),now())
+        """);
+    jdbc.execute(
+        """
+        INSERT INTO sys_user_tenant (id, user_id, tenant_id, role, data_scope, status, create_time, update_time)
+        VALUES (9501,9501,4,'STAFF','OWN',0,now(),now()), (9502,9502,5,'STAFF','OWN',1,now(),now())
+        """);
+    try (var session = factory.openSession()) {
+      var members = session.getMapper(SysUserTenantMapper.class);
+      assertThat(members.findMemberIdsByKeyword(4L, "9501")).containsExactly(9501L);
+      assertThat(members.findMemberIdsByKeyword(4L, "NORTH")).containsExactly(9501L);
+      assertThat(members.findMemberIdsByKeyword(4L, "south")).isEmpty();
+      var scope =
+          new ScopeDTO(4, null, 1L, null, null, java.util.List.of(1L), null, java.util.List.of(9L));
+      var stats = session.getMapper(OrderStatsMapper.class);
+      assertThat(stats.totals(scope, FROM, UNTIL).sales()).isEqualByComparingTo("100");
+      var evidence = session.getMapper(OrderEvidenceMapper.class);
+      assertThat(
+              evidence.count(
+                  new Selection(scope, null, null, null, null, FROM, UNTIL), Kind.ORDERS))
+          .isEqualTo(2);
+    }
   }
 
   private static void checkCreatorCards(JdbcTemplate jdbc, SqlSessionFactory factory) {

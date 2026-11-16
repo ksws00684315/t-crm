@@ -72,7 +72,8 @@ public class ShopPerformanceService {
         resolved.dataScope() == DataScope.ALL
             && scope.kolId() == null
             && scope.inviterId() == null
-            && scope.matchedKolIds() == null;
+            && scope.matchedKolIds() == null
+            && scope.matchedInviterIds() == null;
     var rows =
         visibleShops.stream()
             .filter(shop -> includeShopsWithoutFacts || facts.containsKey(shop.id()))

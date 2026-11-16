@@ -31,6 +31,9 @@ public interface BdUserApi {
    */
   BdUserDTO getByUsername(String username);
 
+  /** Live company members with an exact ID or a case-insensitive username match. */
+  List<Long> findMemberIdsByKeyword(String keyword);
+
   /**
    * Returns the existing administrators among {@code ids}, usable or not, for display; unknown IDs
    * are skipped. An empty collection returns an empty list without querying.

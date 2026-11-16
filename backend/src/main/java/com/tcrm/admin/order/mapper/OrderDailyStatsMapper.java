@@ -30,6 +30,17 @@ public interface OrderDailyStatsMapper {
           AND o.attribution_status = 'ATTRIBUTED' AND i.kol_id IS NOT NULL
           AND i.weidian_item_id != ''
         <if test="scope.ownerId != null">AND o.bd_user_id = #{scope.ownerId}</if>
+        <if test="scope.matchedInviterIds != null">
+          <choose>
+            <when test="scope.matchedInviterIds.isEmpty()">AND FALSE</when>
+            <otherwise>
+              AND o.bd_user_id IN
+              <foreach collection="scope.matchedInviterIds" item="inviter" open="(" separator="," close=")">
+                #{inviter}
+              </foreach>
+            </otherwise>
+          </choose>
+        </if>
         <if test="scope.shopId != null">AND o.shop_id = #{scope.shopId}</if>
         <if test="scope.visibleShopIds != null">
           <choose>

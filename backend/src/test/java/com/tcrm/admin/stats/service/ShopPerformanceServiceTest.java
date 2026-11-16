@@ -37,7 +37,11 @@ class ShopPerformanceServiceTest {
   private final CurrentUserContext current = mock(CurrentUserContext.class);
   private final ShopPerformanceService service =
       new ShopPerformanceService(
-          new StatsOverviewService(orders, current, mock(com.tcrm.admin.kol.api.KolApi.class)),
+          new StatsOverviewService(
+              orders,
+              current,
+              mock(com.tcrm.admin.kol.api.KolApi.class),
+              mock(com.tcrm.admin.system.api.BdUserApi.class)),
           orders,
           shops);
 

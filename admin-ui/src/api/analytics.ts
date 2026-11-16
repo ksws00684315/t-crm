@@ -24,6 +24,7 @@ export interface Filters {
   inviterId?: string;
   keyword?: string;
   creatorKeyword?: string;
+  inviterKeyword?: string;
 }
 export interface RankingQuery extends Filters {
   page: number;

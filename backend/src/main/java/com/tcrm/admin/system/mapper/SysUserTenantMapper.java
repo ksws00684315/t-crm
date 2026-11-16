@@ -67,6 +67,18 @@ public interface SysUserTenantMapper extends BaseMapper<SysUserTenantDO> {
   List<MemberRow> listMembers(
       @Param("tenantId") Long tenantId, @Param("userIds") Collection<Long> userIds);
 
+  @Select(
+      """
+      SELECT m.user_id FROM sys_user_tenant m
+      JOIN sys_user u ON u.id = m.user_id AND NOT u.is_deleted
+      WHERE m.tenant_id = #{tenantId} AND NOT m.is_deleted
+        AND (CAST(m.user_id AS text) = #{keyword}
+             OR strpos(lower(u.username), lower(#{keyword})) > 0)
+      ORDER BY m.user_id
+      """)
+  List<Long> findMemberIdsByKeyword(
+      @Param("tenantId") long tenantId, @Param("keyword") String keyword);
+
   /** Live members of this company with this role, oldest first. */
   @Select(
       MEMBER_COLUMNS

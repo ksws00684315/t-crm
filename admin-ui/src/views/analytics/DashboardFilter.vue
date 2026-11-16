@@ -9,7 +9,12 @@ import type { Filters, Options } from "@/api/analytics";
 import { adjacentPeriod, dates, monthRange, periodModes, periodRange } from "./board";
 import type { PeriodMode } from "./board";
 
-defineProps<{ options?: Options; loading: boolean; optionsFailed: boolean }>();
+defineProps<{
+  options?: Options;
+  loading: boolean;
+  optionsFailed: boolean;
+  showInviter?: boolean;
+}>();
 const filters = defineModel<Filters>({ required: true });
 const emit = defineEmits<{ search: [live: boolean]; reset: []; refresh: [] }>();
 const { t } = useI18n();
@@ -63,7 +68,12 @@ function reset(): void {
 </script>
 
 <template>
-  <ListSearch class="analytics-filter" @search="emit('search', mode === 'live')" @reset="reset">
+  <ListSearch
+    class="analytics-filter"
+    :class="{ 'analytics-filter--with-inviter': showInviter }"
+    @search="emit('search', mode === 'live')"
+    @reset="reset"
+  >
     <template #actions>
       <el-button :loading="loading" @click="emit('refresh')">{{
         t("analytics.refresh")
@@ -193,6 +203,20 @@ function reset(): void {
             <el-icon class="analytics-filter__search-icon"><Search /></el-icon>
           </template>
         </el-input>
+        <el-input
+          v-if="showInviter"
+          v-model="filters.inviterKeyword"
+          class="analytics-filter__inviter"
+          clearable
+          :maxlength="100"
+          :aria-label="t('analytics.inviter')"
+          :placeholder="t('analytics.inviterSearch')"
+        >
+          <template #prefix>
+            <span class="analytics-filter__caption">{{ t("analytics.inviter") }}</span>
+            <el-icon class="analytics-filter__search-icon"><Search /></el-icon>
+          </template>
+        </el-input>
         <span v-if="optionsFailed" class="analytics-filter__failure" role="status">{{
           t("analytics.optionsFailed")
         }}</span>
@@ -207,6 +231,9 @@ function reset(): void {
   grid-template-columns: minmax(0, 790px) max-content;
   row-gap: var(--tcrm-space-4);
 }
+.analytics-filter--with-inviter :deep(.list-search__row) {
+  grid-template-columns: minmax(0, 1030px) max-content;
+}
 .analytics-filter__time {
   display: flex;
   grid-column: 1 / -1;
@@ -214,12 +241,18 @@ function reset(): void {
   gap: var(--tcrm-space-2);
   min-width: 0;
 }
+.analytics-filter--with-inviter .analytics-filter__time {
+  contain: inline-size;
+}
 .analytics-filter__fields {
   display: grid;
   grid-template-columns: 5em repeat(3, minmax(0, 1fr));
   align-items: center;
   gap: var(--tcrm-space-2);
   min-width: 0;
+}
+.analytics-filter--with-inviter .analytics-filter__fields {
+  grid-template-columns: 5em repeat(4, minmax(0, 1fr));
 }
 .analytics-filter__period {
   display: flex;
@@ -263,7 +296,8 @@ function reset(): void {
 }
 .analytics-filter__shop,
 .analytics-filter__channel,
-.analytics-filter__creator {
+.analytics-filter__creator,
+.analytics-filter__inviter {
   min-width: 0;
   width: 100%;
 }
@@ -278,13 +312,15 @@ function reset(): void {
   min-width: 0;
 }
 @media (max-width: 767px) {
-  .analytics-filter :deep(.list-search__row) {
+  .analytics-filter :deep(.list-search__row),
+  .analytics-filter--with-inviter :deep(.list-search__row) {
     grid-template-columns: minmax(0, 1fr);
   }
   .analytics-filter__time {
     flex-wrap: wrap;
   }
-  .analytics-filter__fields {
+  .analytics-filter__fields,
+  .analytics-filter--with-inviter .analytics-filter__fields {
     grid-template-columns: minmax(0, 1fr);
   }
   .analytics-filter__label {

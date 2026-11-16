@@ -48,6 +48,7 @@ const zhCN = {
     period: "时间段",
     conditions: "条件",
     creatorSearch: "输入达人 ID 或达人名",
+    inviterSearch: "输入 ID 或用户名",
     periodMode: {
       live: "实时",
       sevenDays: "7天",

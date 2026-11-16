@@ -38,7 +38,9 @@ public class ShopPerformanceExport {
                 label("creator"),
                 filters.creatorKeyword() != null ? filters.creatorKeyword() : text(filters.kolId()),
                 label("inviter"),
-                text(filters.inviterId()),
+                filters.inviterKeyword() != null
+                    ? filters.inviterKeyword()
+                    : text(filters.inviterId()),
                 label("channel"),
                 filters.channel()),
             List.of(
@@ -106,7 +108,9 @@ public class ShopPerformanceExport {
                 label("creator"),
                 filters.creatorKeyword() != null ? filters.creatorKeyword() : text(filters.kolId()),
                 label("inviter"),
-                text(filters.inviterId()),
+                filters.inviterKeyword() != null
+                    ? filters.inviterKeyword()
+                    : text(filters.inviterId()),
                 label("channel"),
                 filters.channel(),
                 label("keyword"),
