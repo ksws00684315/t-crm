@@ -23,10 +23,10 @@ reason = "Original grants EPL-2.0 OR LGPL-2.1; select EPL-2.0. Official original
 
 [[PackageOverrides]]
 name = "com.github.jsqlparser:jsqlparser"
-version = "5.2"
+version = "5.4"
 ecosystem = "Maven"
 license.override = ["Apache-2.0"]
-reason = "Upstream offers Apache-2.0 OR LGPL-2.1; select Apache-2.0. JAR has no license text; use exact upstream tag. Official original: https://github.com/JSQLParser/JSqlParser/blob/jsqlparser-5.2/LICENSE_APACHEV2"
+reason = "Upstream offers Apache-2.0 OR LGPL-2.1; select Apache-2.0. JAR has no license text; use exact upstream tag. Official original: https://github.com/JSQLParser/JSqlParser/blob/jsqlparser-5.4/LICENSE_APACHEV2"
 
 [[PackageOverrides]]
 name = "jakarta.activation:jakarta.activation-api"
