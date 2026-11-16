@@ -278,7 +278,7 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 The following npm packages may be included in this product:
 
  - @types/lodash-es@4.17.12
- - @types/lodash@4.17.25
+ - @types/lodash@4.17.27
  - @types/web-bluetooth@0.0.21
 
 These packages each contain the following license:
@@ -401,7 +401,7 @@ SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 
 The following npm package may be included in this product:
 
- - axios@1.20.0
+ - axios@1.21.1
 
 This package contains the following license:
 
@@ -615,7 +615,7 @@ Copyright (c) 2012 Felix Geisendörfer (felix@debuggable.com) and contributors
 
 The following npm package may be included in this product:
 
- - @babel/parser@7.29.9
+ - @babel/parser@7.29.14
 
 This package contains the following license:
 
@@ -756,7 +756,7 @@ PERFORMANCE OF THIS SOFTWARE.
 
 The following npm package may be included in this product:
 
- - @ctrl/tinycolor@4.2.1
+ - @ctrl/tinycolor@4.3.0
 
 This package contains the following license:
 
@@ -772,7 +772,7 @@ THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLI
 
 The following npm package may be included in this product:
 
- - follow-redirects@1.16.2
+ - follow-redirects@1.16.3
 
 This package contains the following license:
 
@@ -961,9 +961,9 @@ MIT
 
 The following npm packages may be included in this product:
 
- - @babel/helper-string-parser@7.29.7
+ - @babel/helper-string-parser@7.29.14
  - @babel/helper-validator-identifier@7.29.7
- - @babel/types@7.29.8
+ - @babel/types@7.29.14
 
 These packages each contain the following license:
 
@@ -1206,7 +1206,7 @@ SOFTWARE.
 
 The following npm package may be included in this product:
 
- - element-plus@2.14.7
+ - element-plus@2.14.8
 
 This package contains the following license:
 
@@ -1449,7 +1449,7 @@ SOFTWARE.
 
 The following npm package may be included in this product:
 
- - vue-component-type-helpers@3.3.12
+ - vue-component-type-helpers@3.3.14
 
 This package contains the following license:
 
@@ -1731,16 +1731,16 @@ SOFTWARE.
 
 The following npm packages may be included in this product:
 
- - @vue/compiler-core@3.5.44
- - @vue/compiler-dom@3.5.44
- - @vue/compiler-sfc@3.5.44
- - @vue/compiler-ssr@3.5.44
- - @vue/reactivity@3.5.44
- - @vue/runtime-core@3.5.44
- - @vue/runtime-dom@3.5.44
- - @vue/server-renderer@3.5.44
- - @vue/shared@3.5.44
- - vue@3.5.44
+ - @vue/compiler-core@3.5.45
+ - @vue/compiler-dom@3.5.45
+ - @vue/compiler-sfc@3.5.45
+ - @vue/compiler-ssr@3.5.45
+ - @vue/reactivity@3.5.45
+ - @vue/runtime-core@3.5.45
+ - @vue/runtime-dom@3.5.45
+ - @vue/server-renderer@3.5.45
+ - @vue/shared@3.5.45
+ - vue@3.5.45
 
 These packages each contain the following license:
 
@@ -1830,10 +1830,10 @@ SOFTWARE.
 
 The following npm packages may be included in this product:
 
- - @intlify/core-base@11.4.16
- - @intlify/message-compiler@11.4.16
- - @intlify/shared@11.4.16
- - vue-i18n@11.4.16
+ - @intlify/core-base@11.4.19
+ - @intlify/message-compiler@11.4.19
+ - @intlify/shared@11.4.19
+ - vue-i18n@11.4.19
 
 These packages each contain the following license:
 
@@ -1922,7 +1922,7 @@ SOFTWARE.
 
 The following npm package may be included in this product:
 
- - @intlify/devtools-types@11.4.16
+ - @intlify/devtools-types@11.4.19
 
 This package contains the following license:
 
@@ -1981,7 +1981,7 @@ SOFTWARE.
 
 The following npm package may be included in this product:
 
- - postcss@8.5.31
+ - postcss@8.5.32
 
 This package contains the following license:
 
