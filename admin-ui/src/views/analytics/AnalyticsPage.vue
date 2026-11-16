@@ -124,6 +124,19 @@ const columnWidths: Record<string, DataColumn["minWidth"]> = {
   totalEstimatedCommission: { "zh-CN": 126, "en-US": 240 },
   totalExpense: { "zh-CN": 108, "en-US": 140 }
 };
+const shopColumnWidths: Record<string, number> = {
+  identity: 162,
+  channelStatus: 112,
+  paidOrderCount: 108,
+  units: 74,
+  coverage: 96,
+  kolCount: 86,
+  salesAmount: 103,
+  completedRefundAmount: 108,
+  netSalesAmount: 110,
+  amountRefundRate: 108,
+  averageOrderAmount: 108
+};
 const columns = computed<DataColumn[]>(() =>
   [...columnsByBoard[board], "actions"].map(key => ({
     key,
@@ -134,17 +147,16 @@ const columns = computed<DataColumn[]>(() =>
     interactive: key === "identity",
     fixed: (product || creator) && key === "identity" ? "left" : undefined,
     highlighted: sortBy.value === key,
-    minWidth: columnWidths[key] ?? { "zh-CN": 108, "en-US": 136 }
+    minWidth:
+      shop && locale.value === "zh-CN" && shopColumnWidths[key]
+        ? shopColumnWidths[key]
+        : (columnWidths[key] ?? { "zh-CN": 108, "en-US": 136 })
   }))
 );
 const customHeaders = computed(() =>
   columnsByBoard[board]
-    .filter(key => !shop || sortable.has(key))
-    .map(key => ({
-      key,
-      help:
-        !shop || key === "completedRefundAmount" ? t(`analytics.${board}.definitions.${key}`) : ""
-    }))
+    .filter(key => !shop || !["identity", "channelStatus"].includes(key))
+    .map(key => ({ key, help: t(`analytics.${board}.definitions.${key}`) }))
 );
 const cellKeys = columnsByBoard[board].filter(
   key => key !== "rank" && (sortable.has(key) || pendingColumns.has(key))
@@ -181,7 +193,34 @@ function identity(row: RankRow): string {
   return (shop ? row.shopName : row.name) || (row.id === "0" ? t("analytics.unassigned") : "—");
 }
 
+function shopTerm(key: string, value?: string) {
+  return {
+    label: t(`analytics.shop-performance.${key}`),
+    hint: t(`analytics.shop-performance.definitions.${key}`),
+    value
+  };
+}
+
+const settlementState = computed(() => {
+  const scoped = result.value?.unavailable.some(field => field.reason === "SHOP_SETTLEMENT_SCOPE");
+  return t(`analytics.shop-performance.${scoped ? "settlementScoped" : "settlementEmpty"}`);
+});
+
+const shopSalesTerms = computed(() => [
+  shopTerm("salesAmount", display("salesAmount", metrics.value?.salesAmount)),
+  shopTerm("cohortRefundAmount", display("cohortRefundAmount", metrics.value?.cohortRefundAmount))
+]);
+
+const settlementTerms = computed(() => {
+  const settlement = result.value?.summary.settlement;
+  return [
+    shopTerm("increase", display("settlement", settlement?.increase)),
+    shopTerm("decrease", display("settlement", settlement?.decrease))
+  ];
+});
+
 function label(key: string): string {
+  if (shop && ["coverage", "kolCount"].includes(key)) return shopTerm(key).label;
   if (key === "identity" || key === "netCommission") {
     return t(`analytics.${board}.${key}`);
   }
@@ -353,8 +392,55 @@ const cards = computed(() => {
       }
     ];
   }
-  const selling = shop ? summary?.sellingShopCount : summary?.sellingCount;
-  const total = shop ? summary?.shopCount : summary?.activeCount;
+  if (shop) {
+    const selling = shopTerm("selling");
+    const total = shopTerm("total");
+    const orders = shopTerm("paidOrderCount");
+    const net = shopTerm("netSalesAmount");
+    const settlement = shopTerm("settlement");
+    return [
+      {
+        tone: "purple" as const,
+        icon: DataBoard,
+        label: `${selling.label} / ${total.label}`,
+        value: `${display("", summary?.sellingShopCount)} / ${display("", summary?.shopCount)}`,
+        labelTerms: [selling, total],
+        detail: t("analytics.shop-performance.totalIncludesDisabled")
+      },
+      {
+        tone: "blue" as const,
+        icon: Tickets,
+        label: orders.label,
+        value: display("", data?.paidOrderCount),
+        labelTerms: [orders],
+        detailTerms: [
+          shopTerm("units", display("", data?.units)),
+          shopTerm("spuCount", display("", summary?.spuCount))
+        ]
+      },
+      {
+        tone: "green" as const,
+        icon: TrendCharts,
+        label: net.label,
+        value: display("netSalesAmount", data?.netSalesAmount),
+        labelTerms: [net],
+        detailTerms: shopSalesTerms.value
+      },
+      {
+        tone: "amber" as const,
+        icon: Wallet,
+        label: settlement.label,
+        value: summary?.settlement
+          ? display("settlement", summary.settlement.net)
+          : settlementState.value,
+        unavailable: !summary?.settlement && !!result.value,
+        labelTerms: [settlement],
+        detailTerms: summary?.settlement ? settlementTerms.value : undefined
+      }
+    ];
+  }
+  const selling = summary?.sellingCount;
+  const total = summary?.activeCount;
   const first = {
     tone: "neutral" as const,
     icon: DataBoard,
@@ -367,8 +453,7 @@ const cards = computed(() => {
     icon: Tickets,
     label: t("analytics.paidOrderCount"),
     value: display("", data?.paidOrderCount),
-    detail:
-      shop || product ? undefined : t("analytics.unitsValue", { value: display("", data?.units) })
+    detail: product ? undefined : t("analytics.unitsValue", { value: display("", data?.units) })
   };
   const net = {
     tone: "green" as const,
@@ -387,11 +472,10 @@ const cards = computed(() => {
     : {
         tone: "amber" as const,
         icon: Wallet,
-        label: label(shop ? "settlement" : "netCommission"),
-        detail: shop ? undefined : t("analytics.currentUnsettledPeriod"),
+        label: label("netCommission"),
+        detail: t("analytics.currentUnsettledPeriod"),
         value: t("analytics.pending"),
-        unavailable: true,
-        hint: shop ? t("analytics.settlementHint") : undefined
+        unavailable: true
       };
   return product ? [first, orders, last, net] : [first, orders, net, last];
 });
@@ -563,19 +647,32 @@ onUnmounted(stop);
         <div class="ledger-comparison__panel ledger-comparison__transaction">
           <h3>{{ t("analytics.transactionLedger") }}</h3>
           <div class="ledger-comparison__hero">
-            <strong
-              :aria-label="`${label('netSalesAmount')} ${display('netSalesAmount', metrics?.netSalesAmount)}`"
+            <el-tooltip
+              :content="shopTerm('netSalesAmount').hint"
+              :trigger="['hover', 'focus']"
+              popper-class="analytics-metric-definition"
             >
-              {{ display("netSalesAmount", metrics?.netSalesAmount) }}
-            </strong>
+              <strong
+                tabindex="0"
+                class="ledger-comparison__term"
+                :aria-label="`${label('netSalesAmount')} ${display('netSalesAmount', metrics?.netSalesAmount)}`"
+                >{{ display("netSalesAmount", metrics?.netSalesAmount) }}</strong
+              >
+            </el-tooltip>
           </div>
           <p class="ledger-comparison__detail">
-            {{
-              t("analytics.ledgerTransactionDetail", {
-                sales: display("salesAmount", metrics?.salesAmount),
-                refunds: display("cohortRefundAmount", metrics?.cohortRefundAmount)
-              })
-            }}
+            <template v-for="(term, index) in shopSalesTerms" :key="term.label">
+              <span v-if="index" aria-hidden="true"> − </span>
+              <el-tooltip
+                :content="term.hint"
+                :trigger="['hover', 'focus']"
+                popper-class="analytics-metric-definition"
+              >
+                <span tabindex="0" class="ledger-comparison__term"
+                  >{{ term.label }} {{ term.value }}</span
+                >
+              </el-tooltip>
+            </template>
           </p>
         </div>
         <div class="ledger-comparison__bridge">
@@ -585,9 +682,37 @@ onUnmounted(stop);
         <div class="ledger-comparison__panel ledger-comparison__settlement">
           <h3>{{ t("analytics.settlementLedger") }}</h3>
           <div class="ledger-comparison__hero">
-            <el-tag type="info" effect="light">{{ t("analytics.pending") }}</el-tag>
+            <el-tooltip
+              :content="shopTerm('settlement').hint"
+              :trigger="['hover', 'focus']"
+              popper-class="analytics-metric-definition"
+            >
+              <span tabindex="0" class="ledger-comparison__term">
+                <strong v-if="result?.summary.settlement">{{
+                  display("settlement", result.summary.settlement.net)
+                }}</strong>
+                <el-tag v-else-if="result" type="info" effect="light">{{ settlementState }}</el-tag>
+                <strong v-else>—</strong>
+              </span>
+            </el-tooltip>
           </div>
-          <p class="ledger-comparison__detail">{{ t("analytics.settlementFormula") }}</p>
+          <p v-if="result?.summary.settlement" class="ledger-comparison__detail">
+            <template v-for="(term, index) in settlementTerms" :key="term.label">
+              <span v-if="index" aria-hidden="true"> − </span>
+              <el-tooltip
+                :content="term.hint"
+                :trigger="['hover', 'focus']"
+                popper-class="analytics-metric-definition"
+              >
+                <span tabindex="0" class="ledger-comparison__term"
+                  >{{ term.label }} {{ term.value }}</span
+                >
+              </el-tooltip>
+            </template>
+          </p>
+          <p v-else class="ledger-comparison__detail">
+            {{ t("analytics.shop-performance.settlementFormula") }}
+          </p>
         </div>
         <div class="ledger-comparison__panel ledger-comparison__note">
           <h3>{{ t("analytics.ledgerDifference") }}</h3>
@@ -700,7 +825,11 @@ onUnmounted(stop);
                     : "↓"
                   : "↕"
               }}</span>
-              <el-icon v-if="help" class="analytics-column-heading__info" aria-hidden="true">
+              <el-icon
+                v-if="help && !shop"
+                class="analytics-column-heading__info"
+                aria-hidden="true"
+              >
                 <InfoFilled />
               </el-icon>
             </component>
@@ -898,6 +1027,9 @@ onUnmounted(stop);
 .ledger-comparison__transaction {
   background: linear-gradient(110deg, var(--tcrm-color-option-selected-bg), var(--tcrm-color-card));
   color: var(--tcrm-color-primary-text);
+}
+.ledger-comparison__term {
+  cursor: help;
 }
 .ledger-comparison__settlement {
   background: linear-gradient(110deg, var(--tcrm-color-success-bg), var(--tcrm-color-card));

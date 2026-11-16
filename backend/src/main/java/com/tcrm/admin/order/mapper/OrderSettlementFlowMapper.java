@@ -1,6 +1,7 @@
 package com.tcrm.admin.order.mapper;
 
 import com.baomidou.mybatisplus.core.mapper.BaseMapper;
+import com.tcrm.admin.order.api.OrderStatsApi.ShopSettlementDTO;
 import com.tcrm.admin.order.model.OrderSettlementFlowDO;
 import java.time.Instant;
 import java.util.Collection;
@@ -21,6 +22,26 @@ public interface OrderSettlementFlowMapper extends BaseMapper<OrderSettlementFlo
    */
   String SELECT_FROM =
       "SELECT id, create_by, create_time, update_by, update_time, is_deleted, shop_id, weidian_order_id, order_id, refund_id, trade_type, trade_sub_type, trade_time, remark, amount_raw, amount_cny, query_type, fingerprint, first_pulled_at, last_pulled_at, tenant_id FROM crm_order_settlement_flow ";
+
+  @Select(
+      """
+      <script>
+      SELECT ROUND(COALESCE(SUM(amount_raw) FILTER (WHERE trade_sub_type = '货款收入'), 0), 2) AS increase,
+             ROUND(COALESCE(SUM(-amount_raw) FILTER (WHERE trade_sub_type = '退款'), 0), 2) AS decrease
+      FROM crm_order_settlement_flow
+      WHERE tenant_id = #{tenantId} AND is_deleted = FALSE AND query_type = 'INCOME_DETAIL'
+        AND trade_time &gt;= #{from} AND trade_time &lt; #{until}
+        AND shop_id IN
+        <foreach collection="shopIds" item="shopId" open="(" separator="," close=")">#{shopId}</foreach>
+        AND trade_sub_type IN ('货款收入', '退款')
+      HAVING COUNT(*) &gt; 0 AND COUNT(*) = COUNT(amount_raw)
+      </script>
+      """)
+  ShopSettlementDTO shopReceivables(
+      @Param("tenantId") long tenantId,
+      @Param("shopIds") List<Long> shopIds,
+      @Param("from") Instant from,
+      @Param("until") Instant until);
 
   /** All live flows of one remote order id; the commission basis check filters by query type. */
   @Select(

@@ -62,6 +62,7 @@ public class ShopPerformanceExport {
             label("sales"),
             label("refund"),
             label("net"),
+            label("amountRefundRate"),
             label("average"));
     var rows =
         result.ranking().items().stream()
@@ -79,6 +80,7 @@ public class ShopPerformanceExport {
                         money(row.salesAmount()),
                         money(row.completedRefundAmount()),
                         money(row.netSalesAmount()),
+                        percent(row.amountRefundRate()),
                         money(row.averageOrderAmount())))
             .toList();
     return excel.export(metadata, headers, rows);

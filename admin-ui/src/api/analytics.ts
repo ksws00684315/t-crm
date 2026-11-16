@@ -46,6 +46,8 @@ export interface Summary {
   metrics: Metrics;
   sellingShopCount?: Scalar;
   shopCount?: Scalar;
+  spuCount?: Scalar;
+  settlement?: { increase: Scalar; decrease: Scalar; net: Scalar } | null;
   sellingCount?: Scalar;
   activeCount?: Scalar;
   invitedCount?: Scalar;

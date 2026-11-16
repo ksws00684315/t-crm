@@ -82,10 +82,6 @@ const zhCN = {
     currentUnsettledPeriod: "本期订单 · 当前未结算",
     refreshingResults: "正在更新，暂显示上次查询结果。",
     staleResults: "更新失败，暂显示上次查询结果。可点击「刷新数据」重试。",
-    settlement: "结算净应收",
-    settlementFormula: "结算净应收 = 店铺应收增加 − 应收减少",
-    settlementHint:
-      "按所选期间的微店结算流水统计，店铺应收增加减去应收减少（如退款扣减）。结算流水待接入。",
     pending: "开发中",
     commissionForbidden: "无权限",
     comparison: "较上期 {value}",
@@ -93,7 +89,6 @@ const zhCN = {
     transactionLedger: "交易账 · 订单商品事实",
     settlementLedger: "结算账 · 店铺资金流水",
     ledgerBridge: "对账，不混算",
-    ledgerTransactionDetail: "{sales} 销售额 − {refunds} 同批订单成功退款",
     ledgerDifference: "为什么会不同？",
     ledgerDifferenceHint:
       "交易账按订单付款和退款统计。结算账按平台资金入账统计，两者的时间口径与费用项目不同，金额可能不一致。",
@@ -159,12 +154,50 @@ const zhCN = {
     "shop-performance": {
       detailTitle: "店铺经营详情",
       selling: "有成交店铺数",
-      active: "当前全部店铺 {value}",
+      total: "总店铺数",
+      totalIncludesDisabled: "总数含未启用店铺",
+      paidOrderCount: "支付订单数",
+      units: "销量",
+      spuCount: "成交 SPU",
+      netSalesAmount: "净销售额",
+      settlement: "结算金额",
+      salesAmount: "销售额",
+      cohortRefundAmount: "同批退款",
+      increase: "应收增加",
+      decrease: "应收减少",
+      coverage: "SPU／SKU",
+      kolCount: "达人数",
+      settlementFormula: "按微店流水入账时间汇总应收增加减应收减少。",
+      settlementEmpty: "暂无流水数据",
+      settlementScoped: "仅支持店铺范围",
       identity: "店铺名称及编号",
       ranking: "店铺经营排行",
       rankingCount: "共 {count} 家店铺",
       definitions: {
-        completedRefundAmount: "按退款完结时间累计该店铺在所选期间的成功退款金额。"
+        selling: "按支付时间统计所选期间内至少有一笔符合当前筛选的支付订单的店铺数。",
+        total:
+          "截至所选期间结束已建档的店铺数，含未启用的店铺。限本人数据或按达人筛选时，仅统计期间内有匹配支付订单的店铺。",
+        paidOrderCount: "按支付时间统计所选期间内的有效支付订单，按店铺和订单去重。",
+        units: "所选期间内已支付订单下的 SKU 数量之和，按订单支付时间归期。",
+        spuCount:
+          "所选期间内产生支付订单的 SPU 数。同一个 SPU 在同一家店铺内只计一次，跨店分别统计。",
+        coverage: "所选期间内有成交的 SPU 数与 SKU 数，同一店铺内分别去重。",
+        kolCount: "所选期间内在该店铺有支付订单的达人数量，按达人去重。",
+        salesAmount: "按订单支付时间归期，汇总所选期间内的支付销售额。",
+        cohortRefundAmount:
+          "所选期间支付的这一批订单中，从支付日（第 1 天）起 30 个北京时间自然日内完结的成功退款金额。",
+        completedRefundAmount:
+          "按退款完结时间汇总所选期间内的成功退款，包含此前支付的订单以及超出支付日起 30 天的退款。",
+        netSalesAmount:
+          "所选期间支付的销售额，减去同批订单从支付日（第 1 天）起 30 个北京时间自然日内完结的成功退款。",
+        amountRefundRate: "所选期间内完结的成功退款金额 ÷ 同期支付销售额。销售额为 0 时显示横线。",
+        averageOrderAmount: "所选期间内支付销售额 ÷ 同期支付订单数。订单数为 0 时显示横线。",
+        settlement:
+          "按微店流水入账时间归期，汇总已同步的店铺应收增加减去应收减少，金额单位为元，手续费和分润排除。",
+        increase: "所选期间入账的微店货款收入合计，属于店铺应收增加。",
+        decrease:
+          "所选期间入账的微店退款扣减合计，属于店铺应收减少。提前全额退款未入账的记录不计入。",
+        itemAmount: "订单商品的实付金额，按该订单的支付时间归期。"
       }
     },
     "best-sellers": {

@@ -79,10 +79,6 @@ const enUS: MessageSchema = {
     netSalesAmount: "Net sales",
     netHint:
       "Sales minus successful refunds tied to the same payment period within 30 Beijing calendar days.",
-    settlement: "Net receivable",
-    settlementFormula: "Net receivable = increases − decreases in shop receivables",
-    settlementHint:
-      "Based on Weidian settlement postings in the selected period. Increases in shop receivables are reduced by deductions such as refunds. Settlement data is pending integration.",
     pending: "In development",
     refundPeriodHint:
       "Counts refunds completed during the selected period, including refunds completed after the 30-day window.",
@@ -95,7 +91,6 @@ const enUS: MessageSchema = {
     transactionLedger: "Transaction ledger · Order activity",
     settlementLedger: "Settlement ledger · Shop cash flow",
     ledgerBridge: "Compare ledgers",
-    ledgerTransactionDetail: "{sales} sales − {refunds} successful refunds on those orders",
     ledgerDifference: "Why can the amounts differ?",
     ledgerDifferenceHint:
       "The transaction ledger follows payments and refunds. The settlement ledger follows platform postings, which may use different dates and include different fees.",
@@ -161,13 +156,55 @@ const enUS: MessageSchema = {
     "shop-performance": {
       detailTitle: "Shop performance details",
       selling: "Shops with sales",
-      active: "All shops {value}",
+      total: "Total shops",
+      totalIncludesDisabled: "Total includes disabled shops",
+      paidOrderCount: "Paid orders",
+      units: "Units sold",
+      spuCount: "SPUs sold",
+      netSalesAmount: "Net sales",
+      settlement: "Settlement amount",
+      salesAmount: "Sales",
+      cohortRefundAmount: "Cohort refunds",
+      increase: "Receivables added",
+      decrease: "Receivables deducted",
+      coverage: "SPU / SKU",
+      kolCount: "Creators",
+      settlementFormula: "Receivables added minus receivables deducted, by Weidian posting date.",
+      settlementEmpty: "No settlement flows",
+      settlementScoped: "Shop scope only",
       identity: "Shop name / code",
       ranking: "Shop performance ranking",
       rankingCount: "{count} shop | {count} shops",
       definitions: {
+        selling:
+          "Shops with at least one paid order matching the current filters in the selected period, by payment date.",
+        total:
+          "Shops registered by the end of the selected period, including disabled shops. With creator filters or own-data scope, counts shops with matching paid orders in the period.",
+        paidOrderCount:
+          "Paid orders in the selected period, by payment date and deduplicated by shop and order.",
+        units: "Total SKU quantities in paid orders, grouped by order payment date.",
+        spuCount:
+          "Distinct SPUs with paid orders in the selected period. Each shop counts its SPUs separately.",
+        coverage: "Distinct SPUs and SKUs sold by this shop in the selected period.",
+        kolCount: "Distinct creators with paid orders at this shop in the selected period.",
+        salesAmount: "Paid sales in the selected period, grouped by order payment date.",
+        cohortRefundAmount:
+          "Successful refunds for these paid orders, completed within 30 calendar days in Beijing time, counting the payment date as day 1.",
         completedRefundAmount:
-          "Successful refunds for this shop, grouped by refund completion date."
+          "Successful refunds completed in the selected period, including earlier paid orders and refunds completed more than 30 days after payment.",
+        netSalesAmount:
+          "Paid sales less successful refunds for those orders completed within 30 calendar days in Beijing time, counting the payment date as day 1.",
+        amountRefundRate:
+          "Successful refunds completed in the period divided by paid sales in the same period. A dash is shown when sales are zero.",
+        averageOrderAmount:
+          "Paid sales divided by paid orders for the selected period. A dash is shown when there are no paid orders.",
+        settlement:
+          "Synced Weidian receivables added minus receivables deducted, in yuan by posting date, excluding fees and profit shares.",
+        increase:
+          "Weidian goods revenue posted in the period, recorded as an increase in shop receivables.",
+        decrease:
+          "Weidian refunds posted in the period, recorded as a deduction from shop receivables. Unposted full refunds are excluded.",
+        itemAmount: "The amount paid for an order item, classified by order payment date."
       }
     },
     "best-sellers": {

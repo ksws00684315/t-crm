@@ -10,6 +10,7 @@ import com.tcrm.admin.order.api.OrderStatsApi.RankDimension;
 import com.tcrm.admin.order.api.OrderStatsApi.ScopeDTO;
 import com.tcrm.admin.order.mapper.OrderDailyStatsMapper;
 import com.tcrm.admin.order.mapper.OrderEvidenceMapper;
+import com.tcrm.admin.order.mapper.OrderSettlementFlowMapper;
 import com.tcrm.admin.order.mapper.OrderStatsMapper;
 import com.tcrm.admin.order.service.OrderStatsService;
 import com.tcrm.admin.stats.mapper.StatsRollupMapper;
@@ -106,10 +107,31 @@ class OrderStatsIT {
         """);
     jdbc.update("UPDATE crm_refund SET order_item_id = 1 WHERE order_id = 1");
 
+    jdbc.execute(
+        """
+        INSERT INTO crm_order_settlement_flow (
+          id, tenant_id, shop_id, weidian_order_id, trade_sub_type, trade_time,
+          amount_raw, query_type, fingerprint, first_pulled_at, last_pulled_at, create_time, update_time
+        )
+        SELECT id, tenant, shop, 't144-flow-' || id, subtype, posted::timestamptz,
+               amount, query_type, lpad(id::text, 64, '0'), now(), now(), now(), now()
+        FROM (VALUES
+          (1, 4, 1, '货款收入', '2026-11-02T16:00:00Z', 100.75, 'INCOME_DETAIL'),
+          (2, 4, 1, '退款', '2026-11-03T15:59:59Z', -20.25, 'INCOME_DETAIL'),
+          (3, 4, 1, '交易手续费', '2026-11-03T09:00:00Z', -10, 'INCOME_DETAIL'),
+          (4, 4, 1, '分润', '2026-11-03T09:00:00Z', -30, 'INCOME_DETAIL'),
+          (5, 4, 1, '退款', '2026-11-03T09:00:00Z', -50, 'PRE_SETTLE_REFUND'),
+          (6, 4, 1, '货款收入', '2026-11-03T16:00:00Z', 200, 'INCOME_DETAIL'),
+          (7, 5, 1, '货款收入', '2026-11-03T09:00:00Z', 300, 'INCOME_DETAIL'),
+          (8, 4, 2, '货款收入', '2026-11-03T09:00:00Z', 400, 'INCOME_DETAIL'),
+          (9, 4, 3, '货款收入', '2026-11-03T09:00:00Z', NULL, 'INCOME_DETAIL')
+        ) fixture(id, tenant, shop, subtype, posted, amount, query_type)
+        """);
     var configuration =
         new Configuration(new Environment("t144", new JdbcTransactionFactory(), source));
     configuration.setMapUnderscoreToCamelCase(true);
     configuration.addMapper(OrderStatsMapper.class);
+    configuration.addMapper(OrderSettlementFlowMapper.class);
     configuration.addMapper(OrderDailyStatsMapper.class);
     configuration.addMapper(OrderEvidenceMapper.class);
     configuration.addMapper(KolMapper.class);
@@ -119,6 +141,13 @@ class OrderStatsIT {
 
     try (var session = factory.openSession()) {
       var mapper = session.getMapper(OrderStatsMapper.class);
+      var settlements = session.getMapper(OrderSettlementFlowMapper.class);
+      var settlement = settlements.shopReceivables(4, java.util.List.of(1L), FROM, UNTIL);
+      assertThat(settlement.increase()).isEqualByComparingTo("100.75");
+      assertThat(settlement.decrease()).isEqualByComparingTo("20.25");
+      assertThat(settlement.net()).isEqualByComparingTo("80.50");
+      assertThat(settlements.shopReceivables(4, java.util.List.of(3L), FROM, UNTIL)).isNull();
+      assertThat(settlements.shopReceivables(4, java.util.List.of(4L), FROM, UNTIL)).isNull();
       var own = mapper.totals(new ScopeDTO(4, 9L, 1L, 11L, 9L), FROM, UNTIL);
       assertThat(own.paidOrders()).isEqualTo(1);
       assertThat(own.units()).isEqualTo(3);
@@ -236,7 +265,8 @@ class OrderStatsIT {
       var now = Instant.now().plusSeconds(10);
       assertThat(daily.changedDays(4, Instant.EPOCH, now)).contains(LocalDate.of(2026, 11, 3));
       var rollupMapper = session.getMapper(StatsRollupMapper.class);
-      var service = new StatsRollupService(new OrderStatsService(mapper, daily), rollupMapper);
+      var service =
+          new StatsRollupService(new OrderStatsService(mapper, daily, settlements), rollupMapper);
       var day = LocalDate.of(2026, 11, 3);
       service.enqueue(4, day, day.plusDays(1), now);
       session.commit();

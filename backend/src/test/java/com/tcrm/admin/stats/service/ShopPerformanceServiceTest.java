@@ -10,6 +10,7 @@ import com.tcrm.admin.order.api.OrderStatsApi;
 import com.tcrm.admin.order.api.OrderStatsApi.RankDimension;
 import com.tcrm.admin.order.api.OrderStatsApi.RankFactsDTO;
 import com.tcrm.admin.order.api.OrderStatsApi.ScopeDTO;
+import com.tcrm.admin.order.api.OrderStatsApi.ShopSettlementDTO;
 import com.tcrm.admin.order.api.OrderStatsApi.TotalsDTO;
 import com.tcrm.admin.product.api.ShopAccessApi;
 import com.tcrm.admin.product.api.ShopAccessDTO;
@@ -49,7 +50,9 @@ class ShopPerformanceServiceTest {
   void setup() {
     when(current.user()).thenReturn(account);
     when(account.tenantId()).thenReturn(40L);
-    when(shops.listShops()).thenReturn(List.of(shop(3), shop(2), shop(1), shop(4)));
+    var disabled = new ShopAccessDTO(4L, "Disabled", "r4", 0, "S4", FROM.minusSeconds(1));
+    var newShop = new ShopAccessDTO(5L, "Created later", "r5", 1, "S5", UNTIL);
+    when(shops.listShops()).thenReturn(List.of(shop(3), shop(2), shop(1), disabled, newShop));
     when(orders.totals(any(), any(), any()))
         .thenReturn(new TotalsDTO(4, 8, ZERO, ZERO, ZERO, 0, UNTIL));
     when(orders.rankFacts(any(), any(), any(), any()))
@@ -67,6 +70,10 @@ class ShopPerformanceServiceTest {
     assertThat(result.sortDirection()).isEqualTo("desc");
     assertThat(result.summary().sellingShopCount()).isEqualTo(2);
     assertThat(result.summary().shopCount()).isEqualTo(4);
+    assertThat(result.summary().spuCount()).isEqualTo(4);
+    assertThat(result.ranking().items().getFirst().amountRefundRate())
+        .isEqualByComparingTo("0.125");
+    assertThat(result.ranking().items().getLast().amountRefundRate()).isNull();
     assertThat(result.ranking().items())
         .extracting(ShopRankDTO::shopId)
         .containsExactly(2L, 1L, 3L, 4L);
@@ -80,7 +87,8 @@ class ShopPerformanceServiceTest {
             "salesAmount",
             "completedRefundAmount",
             "netSalesAmount",
-            "averageOrderAmount")) {
+            "averageOrderAmount",
+            "amountRefundRate")) {
       assertThat(service.query(ALL, 1, 50, column, "desc").sortBy()).isEqualTo(column);
       assertThat(service.query(ALL, 1, 100, column, "asc").sortDirection()).isEqualTo("asc");
     }
@@ -102,24 +110,34 @@ class ShopPerformanceServiceTest {
     assertThat(result.meta().filters().shopId()).isEqualTo(1L);
 
     when(account.ownScope()).thenReturn(false);
-    when(orders.countShopsWithPaidOrders(
-            new ScopeDTO(40, null, null, 8L, null, List.of(3L, 2L, 1L, 4L))))
-        .thenReturn(3L);
-    when(orders.countShopsWithPaidOrders(
-            new ScopeDTO(40, null, null, null, 9L, List.of(3L, 2L, 1L, 4L))))
-        .thenReturn(3L);
     assertThat(
             service
                 .query(new FilterDTO(DAY, DAY, null, 8L, null, null), 1, 20, null, null)
                 .summary()
                 .shopCount())
-        .isEqualTo(3);
+        .isEqualTo(2);
     assertThat(
             service
                 .query(new FilterDTO(DAY, DAY, null, null, 9L, null), 1, 20, null, null)
                 .summary()
                 .shopCount())
-        .isEqualTo(3);
+        .isEqualTo(2);
+  }
+
+  @Test
+  void includesBackfilledSalesAndRestrictsStoreSettlementToCompanyShopScope() {
+    when(orders.rankFacts(any(), any(), any(), any())).thenReturn(List.of(facts(5, 1, "80", FROM)));
+    when(orders.shopSettlement(40L, List.of(3L, 2L, 1L, 4L, 5L), FROM, UNTIL))
+        .thenReturn(new ShopSettlementDTO(new BigDecimal("90.25"), new BigDecimal("35.00")));
+    var result = service.query(ALL, 1, 20, "amountRefundRate", "desc");
+    assertThat(result.summary().shopCount()).isEqualTo(5);
+    assertThat(result.summary().sellingShopCount()).isEqualTo(1);
+    assertThat(result.summary().settlement().net()).isEqualByComparingTo("55.25");
+    var restricted =
+        service.query(new FilterDTO(DAY, DAY, null, 8L, null, null), 1, 20, null, null);
+    assertThat(restricted.summary().settlement()).isNull();
+    assertThat(restricted.unavailable())
+        .anyMatch(field -> field.reason().equals("SHOP_SETTLEMENT_SCOPE"));
   }
 
   @Test
@@ -150,7 +168,7 @@ class ShopPerformanceServiceTest {
         orders,
         new BigDecimal(sales),
         ZERO,
-        ZERO,
+        orders == 0 ? ZERO : BigDecimal.TEN,
         0,
         achieved,
         achieved,

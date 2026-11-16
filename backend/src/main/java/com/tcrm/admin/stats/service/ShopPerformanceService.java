@@ -74,8 +74,16 @@ public class ShopPerformanceService {
             && scope.inviterId() == null
             && scope.matchedKolIds() == null
             && scope.matchedInviterIds() == null;
-    var rows =
+    var shopsInPeriod =
         visibleShops.stream()
+            .filter(
+                shop ->
+                    shop.createdAt() == null
+                        || shop.createdAt().isBefore(period.until())
+                        || facts.containsKey(shop.id()))
+            .toList();
+    var rows =
+        shopsInPeriod.stream()
             .filter(shop -> includeShopsWithoutFacts || facts.containsKey(shop.id()))
             .map(shop -> row(shop, facts.get(shop.id())))
             .toList();
@@ -89,15 +97,35 @@ public class ShopPerformanceService {
         overview.overview(
             new ResolvedFilter(scope, period, resolved.filters(), resolved.dataScope()));
     long activeCount = rows.stream().filter(row -> row.paidOrderCount() > 0).count();
-    long shopCount =
-        includeShopsWithoutFacts ? visibleShops.size() : orders.countShopsWithPaidOrders(scope);
+    long shopCount = includeShopsWithoutFacts ? shopsInPeriod.size() : activeCount;
+    long spuCount = rows.stream().mapToLong(ShopRankDTO::spuCount).sum();
+    var settlement =
+        includeShopsWithoutFacts
+            ? orders.shopSettlement(
+                scope.tenantId(), scope.visibleShopIds(), period.from(), period.until())
+            : null;
+    var settlementSummary =
+        settlement == null
+            ? null
+            : new SettlementSummaryDTO(
+                settlement.increase(), settlement.decrease(), settlement.net());
+    var unavailable =
+        totals.unavailable().stream()
+            .filter(field -> !field.field().equals("settlementNetReceivable"))
+            .collect(java.util.stream.Collectors.toCollection(java.util.ArrayList::new));
+    if (settlement == null) {
+      unavailable.add(
+          new UnavailableDTO(
+              "shopSettlement",
+              includeShopsWithoutFacts ? "NO_SETTLEMENT_FLOWS" : "SHOP_SETTLEMENT_SCOPE"));
+    }
     return new ShopPerformanceDTO(
         totals.meta(),
-        new ShopSummaryDTO(totals.summary(), activeCount, shopCount),
+        new ShopSummaryDTO(totals.summary(), activeCount, shopCount, spuCount, settlementSummary),
         totals.previous(),
         totals.change(),
         paged,
-        totals.unavailable(),
+        List.copyOf(unavailable),
         column.name,
         ranking.descending() ? "desc" : "asc");
   }
@@ -117,6 +145,7 @@ public class ShopPerformanceService {
           BigDecimal.ZERO,
           BigDecimal.ZERO,
           BigDecimal.ZERO,
+          null,
           null,
           null,
           null);
@@ -139,6 +168,7 @@ public class ShopPerformanceService {
         facts.completedRefunds(),
         facts.sales().subtract(facts.cohortRefunds()),
         average,
+        StatsOverviewService.divide(facts.completedRefunds(), facts.sales(), 6),
         facts.lastPaidAt(),
         facts.lastRefundedAt());
   }
@@ -153,7 +183,14 @@ public class ShopPerformanceService {
       String sortBy,
       String sortDirection) {}
 
-  public record ShopSummaryDTO(MetricsDTO metrics, long sellingShopCount, long shopCount) {}
+  public record ShopSummaryDTO(
+      MetricsDTO metrics,
+      long sellingShopCount,
+      long shopCount,
+      long spuCount,
+      SettlementSummaryDTO settlement) {}
+
+  public record SettlementSummaryDTO(BigDecimal increase, BigDecimal decrease, BigDecimal net) {}
 
   public record ShopRankDTO(
       Long shopId,
@@ -169,6 +206,7 @@ public class ShopPerformanceService {
       BigDecimal completedRefundAmount,
       BigDecimal netSalesAmount,
       BigDecimal averageOrderAmount,
+      BigDecimal amountRefundRate,
       @com.fasterxml.jackson.annotation.JsonIgnore Instant lastPaidAt,
       @com.fasterxml.jackson.annotation.JsonIgnore Instant lastRefundedAt) {}
 
@@ -182,7 +220,8 @@ public class ShopPerformanceService {
     REFUNDS(
         "completedRefundAmount", ShopRankDTO::completedRefundAmount, ShopRankDTO::lastRefundedAt),
     NET("netSalesAmount", ShopRankDTO::netSalesAmount),
-    AVERAGE("averageOrderAmount", ShopRankDTO::averageOrderAmount);
+    AVERAGE("averageOrderAmount", ShopRankDTO::averageOrderAmount),
+    REFUND_RATE("amountRefundRate", ShopRankDTO::amountRefundRate, ShopRankDTO::lastRefundedAt);
 
     private final String name;
     private final Function<ShopRankDTO, BigDecimal> value;

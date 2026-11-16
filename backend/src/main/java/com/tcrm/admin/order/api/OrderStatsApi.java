@@ -10,6 +10,15 @@ public interface OrderStatsApi {
   /** Shops in the business scope with any paid order, regardless of the selected dates. */
   long countShopsWithPaidOrders(ScopeDTO scope);
 
+  /** Posted Weidian store receivables, in yuan, without fees or profit shares. */
+  ShopSettlementDTO shopSettlement(long tenantId, List<Long> shopIds, Instant from, Instant until);
+
+  record ShopSettlementDTO(BigDecimal increase, BigDecimal decrease) {
+    public BigDecimal net() {
+      return increase.subtract(decrease);
+    }
+  }
+
   TotalsDTO totals(ScopeDTO scope, Instant from, Instant until);
 
   List<RankFactsDTO> rankFacts(

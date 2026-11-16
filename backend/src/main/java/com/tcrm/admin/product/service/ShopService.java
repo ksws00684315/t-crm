@@ -260,7 +260,8 @@ public class ShopService implements ShopAccessApi, CopyTargetShopApi {
                     shop.getShopName(),
                     shop.getWeidianShopId(),
                     shop.getStatus(),
-                    shop.getShopCode()))
+                    shop.getShopCode(),
+                    shop.getCreateTime()))
         .toList();
   }
 

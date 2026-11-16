@@ -2,6 +2,7 @@ package com.tcrm.admin.order.service;
 
 import com.tcrm.admin.order.api.OrderStatsApi;
 import com.tcrm.admin.order.mapper.OrderDailyStatsMapper;
+import com.tcrm.admin.order.mapper.OrderSettlementFlowMapper;
 import com.tcrm.admin.order.mapper.OrderStatsMapper;
 import java.time.Instant;
 import java.time.LocalDate;
@@ -14,14 +15,24 @@ public class OrderStatsService implements OrderStatsApi {
   private final OrderStatsMapper mapper;
   private final OrderDailyStatsMapper daily;
 
-  public OrderStatsService(OrderStatsMapper mapper, OrderDailyStatsMapper daily) {
+  private final OrderSettlementFlowMapper settlements;
+
+  public OrderStatsService(
+      OrderStatsMapper mapper, OrderDailyStatsMapper daily, OrderSettlementFlowMapper settlements) {
     this.mapper = mapper;
     this.daily = daily;
+    this.settlements = settlements;
   }
 
   @Override
   public long countShopsWithPaidOrders(ScopeDTO scope) {
     return mapper.countShopsWithPaidOrders(scope);
+  }
+
+  @Override
+  public ShopSettlementDTO shopSettlement(
+      long tenantId, List<Long> shopIds, Instant from, Instant until) {
+    return shopIds.isEmpty() ? null : settlements.shopReceivables(tenantId, shopIds, from, until);
   }
 
   @Override

@@ -48,6 +48,8 @@ const loading = ref(false);
 const failed = ref(false);
 let request = 0;
 
+const shop = computed(() => props.board === "shop-performance");
+const shopHint = (key: string) => t(`analytics.shop-performance.definitions.${key}`);
 const heading = computed(() => t(`analytics.${props.board}.detailTitle`));
 const identityCode = computed(() =>
   props.board === "best-sellers" ? props.row.sourceItemId : props.row.shopCode || props.row.code
@@ -74,7 +76,7 @@ const cards = computed(() =>
   metricKeys.flatMap(key => {
     // The shop ranking exposes metrics directly on the row.
     const value = props.row.metrics?.[key] ?? props.row[key];
-    if (key === "amountRefundRate" && typeof value !== "string" && typeof value !== "number") {
+    if (!shop.value && key === "amountRefundRate" && value == null) {
       return [];
     }
     let formatted = "—";
@@ -89,8 +91,9 @@ const cards = computed(() =>
               }).format(Number(value))
             : formatAmountWithCurrency(String(value));
     }
-    const hint =
-      key === "netSalesAmount"
+    const hint = shop.value
+      ? shopHint(key)
+      : key === "netSalesAmount"
         ? t("analytics.netHint")
         : key === "completedRefundAmount"
           ? t("analytics.refundPeriodHint")
@@ -122,6 +125,20 @@ const columns = computed<DataColumn[]>(() => [
     minWidth: 168
   }
 ]);
+
+const shopHeaders = computed(() =>
+  shop.value
+    ? columns.value.flatMap(column => {
+        const hint =
+          column.key === "units"
+            ? shopHint("units")
+            : column.key === "amount"
+              ? shopHint(tab.value === "REFUNDS" ? "completedRefundAmount" : "itemAmount")
+              : undefined;
+        return hint ? [{ ...column, hint }] : [];
+      })
+    : []
+);
 
 const creatorColumns = computed<DataColumn[]>(() => [
   { key: "name", label: t("analytics.kol-ranking.identity"), minWidth: 180, align: "left" },
@@ -331,7 +348,10 @@ function changeSize(next: number): void {
             :key="card.key"
             :label="t(`analytics.${card.key}`)"
             :value="card.value"
-            :hint="card.hint"
+            :hint="shop ? undefined : card.hint"
+            :label-terms="
+              shop ? [{ label: t(`analytics.${card.key}`), hint: card.hint }] : undefined
+            "
           />
         </div>
         <section class="analytics-detail__trend">
@@ -365,6 +385,15 @@ function changeSize(next: number): void {
         @update:page="changePage"
         @update:size="changeSize"
       >
+        <template v-for="column in shopHeaders" :key="column.key" #[`header-${column.key}`]>
+          <el-tooltip
+            :content="column.hint"
+            :trigger="['hover', 'focus']"
+            popper-class="analytics-metric-definition"
+          >
+            <span tabindex="0" class="analytics-detail__term">{{ column.label }}</span>
+          </el-tooltip>
+        </template>
         <template #cell-name="{ row: entry }">
           <div>
             {{
@@ -416,6 +445,9 @@ function changeSize(next: number): void {
 </template>
 
 <style scoped>
+.analytics-detail__term {
+  cursor: help;
+}
 .analytics-detail__body {
   display: grid;
   gap: var(--tcrm-space-4);

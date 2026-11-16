@@ -174,7 +174,23 @@ class ShopPerformanceExportTest {
             null);
     var zero = BigDecimal.ZERO;
     var row =
-        new ShopRankDTO(1L, "=cmd", "SHOP-1", 1, 0, 0, 0, 0, 0, zero, zero, zero, null, null, null);
+        new ShopRankDTO(
+            1L,
+            "=cmd",
+            "SHOP-1",
+            1,
+            0,
+            0,
+            0,
+            0,
+            0,
+            zero,
+            zero,
+            zero,
+            null,
+            new BigDecimal("0.125"),
+            null,
+            null);
     var result =
         new ShopPerformanceDTO(
             meta,
@@ -202,6 +218,8 @@ class ShopPerformanceExportTest {
       assertThat(sheet.getRow(8).getCell(0).getStringCellValue()).isEqualTo("Shop code");
       assertThat(sheet.getRow(9).getCell(1).getCellType()).isEqualTo(CellType.STRING);
       assertThat(sheet.getRow(9).getCell(1).getStringCellValue()).isEqualTo("'=cmd");
+      assertThat(sheet.getRow(8).getCell(11).getStringCellValue()).isEqualTo("Amount refund rate");
+      assertThat(sheet.getRow(9).getCell(11).getStringCellValue()).isEqualTo("12.5%");
       assertThat(sheet.getLastRowNum()).isEqualTo(9);
     }
   }

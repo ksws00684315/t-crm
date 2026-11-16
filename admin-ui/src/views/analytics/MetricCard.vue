@@ -27,7 +27,7 @@ const note = computed(() => [props.detail, props.comparison].filter(Boolean).joi
 <template>
   <article
     class="metric-card"
-    :class="[tone && `metric-card--${tone}`, { 'metric-card--with-terms': labelTerms }]"
+    :class="[tone && `metric-card--${tone}`, { 'metric-card--with-terms': labelTerms && icon }]"
     :aria-label="label"
   >
     <el-icon v-if="icon" class="metric-card__icon" aria-hidden="true">
