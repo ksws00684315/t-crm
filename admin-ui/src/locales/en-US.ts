@@ -174,7 +174,7 @@ const enUS: MessageSchema = {
         "Shop settlement flows are available in company shop scope. Clear creator or inviter filters to view them.",
       orderPaidTime: "Order no. / paid at",
       orderRefundTime: "Order no. / refund completed",
-      channelSpu: "Channel + SPU",
+      spuId: "SPU",
       quantity: "Quantity",
       flowTime: "Flow no. / posted at",
       amountType: "Amount type",
@@ -192,8 +192,8 @@ const enUS: MessageSchema = {
           "Weidian order number and payment time in Beijing time. An order may have multiple item lines.",
         orderRefundTime:
           "Weidian order number and refund completion time in Beijing time. An order may have multiple refunds.",
-        channelSpu:
-          "Sales channel and source product ID. Unmapped items show the product ID recorded on the order.",
+        spuId:
+          "Shows the source product’s Weidian ID when linked. Otherwise shows the Weidian item ID on the order line.",
         flow: "CRM flow identifier and the Weidian posting time in Beijing time.",
         amountType:
           "Goods revenues increase shop receivables. Posted refunds decrease shop receivables.",

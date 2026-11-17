@@ -107,15 +107,13 @@ const eventTime = computed(
       hourCycle: "h23"
     })
 );
-const metricKeys: Metric[] = [
-  "salesAmount",
-  "completedRefundAmount",
-  "netSalesAmount",
-  "paidOrderCount",
-  "units",
-  "averageOrderAmount",
-  "amountRefundRate"
-];
+const salesMetrics: Metric[] = ["salesAmount", "completedRefundAmount", "netSalesAmount"];
+const orderMetrics: Metric[] = ["paidOrderCount", "units", "averageOrderAmount"];
+const metricKeys = computed<Metric[]>(() =>
+  shop.value
+    ? [...salesMetrics, "amountRefundRate", ...orderMetrics]
+    : [...salesMetrics, ...orderMetrics, "amountRefundRate"]
+);
 const soldProductCounts = computed(() => {
   const format = (value: unknown) =>
     typeof value === "number" || typeof value === "string"
@@ -124,7 +122,7 @@ const soldProductCounts = computed(() => {
   return { spu: format(props.row.spuCount), sku: format(props.row.skuCount) };
 });
 const cards = computed(() => {
-  const metrics = metricKeys.flatMap(key => {
+  const metrics = metricKeys.value.flatMap(key => {
     const integer = key === "units" || key === "paidOrderCount";
     const value = props.row.metrics?.[key] ?? props.row[key];
     if (!shop.value && key === "amountRefundRate" && value == null) {
@@ -206,9 +204,8 @@ const shopColumns = computed<DataColumn[]>(() => {
       minWidth: 188,
       align: "left"
     },
-    { key: "shopName", label: t("analytics.shop"), minWidth: 98, align: "left" },
     { key: "creatorName", label: t("analytics.creator"), minWidth: 120, align: "left" },
-    { key: "channelSpu", label: local("channelSpu"), minWidth: 122, align: "left" },
+    { key: "spuId", label: local("spuId"), minWidth: 122, align: "left" },
     refund
       ? { key: "amount", label: t("analytics.completedRefundAmount"), minWidth: 116, amount: true }
       : { key: "units", label: local("quantity"), minWidth: 72 }
@@ -451,8 +448,6 @@ function changeSize(next: number): void {
           </div>
           <div class="analytics-detail__metadata">
             <CopyText v-if="identityCode" :value="identityCode" />
-            <span v-if="identityCode && row.weidianShopId" aria-hidden="true">·</span>
-            <CopyText v-if="row.weidianShopId" :value="row.weidianShopId" />
           </div>
           <small v-if="row.shopUpdatedAt"
             >{{ local("updated") }} {{ eventTime.format(new Date(row.shopUpdatedAt)) }}</small
@@ -676,14 +671,10 @@ function changeSize(next: number): void {
             </small>
           </div>
         </template>
-        <template #cell-shopName>{{ name }}</template>
         <template #cell-creatorName="{ row: entry }">{{ entry.creatorName || "—" }}</template>
-        <template #cell-channelSpu="{ row: entry }">
-          <div class="analytics-detail__stack">
-            <el-tag size="small" type="info" effect="light">{{ t("analytics.weidian") }}</el-tag>
-            <CopyText v-if="entry.spuId" :value="entry.spuId" />
-            <small v-else>—</small>
-          </div>
+        <template #cell-spuId="{ row: entry }">
+          <CopyText v-if="entry.spuId" :value="entry.spuId" />
+          <span v-else>—</span>
         </template>
         <template #cell-flow="{ row: entry }">
           <div class="analytics-detail__stack">
