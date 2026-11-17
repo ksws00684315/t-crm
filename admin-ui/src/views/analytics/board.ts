@@ -128,7 +128,7 @@ export function dates(days = 7, now = new Date()): Pick<Filters, "startDate" | "
 
 export const periodModes = ["live", "sevenDays", "thirtyDays", "day", "month", "custom"] as const;
 export type PeriodMode = (typeof periodModes)[number];
-type DateRange = Pick<Filters, "startDate" | "endDate">;
+export type DateRange = Pick<Filters, "startDate" | "endDate">;
 
 export function shiftDate(day: string, offset: number): string {
   return new Date(Date.parse(day) + offset * DAY).toISOString().slice(0, 10);

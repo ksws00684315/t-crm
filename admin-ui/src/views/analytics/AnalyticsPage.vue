@@ -54,6 +54,7 @@ import {
   sortable,
   validDates
 } from "./board";
+import type { DateRange } from "./board";
 import DashboardFilter from "./DashboardFilter.vue";
 import MetricCard from "./MetricCard.vue";
 import QuerySummary from "./QuerySummary.vue";
@@ -174,16 +175,19 @@ function detailActions(row: RankRow) {
 }
 
 function openDetail(row: RankRow): void {
-  const meta = result.value?.meta;
-  if (!meta) return;
-  selectedDetail.value = {
+  if (result.value) selectedDetail.value = detailSelection(row, result.value);
+}
+
+function detailSelection(row: RankRow, displayed: AnalyticsResult) {
+  const { meta } = displayed;
+  return {
     row,
     filters: {
       ...meta.period,
       ...meta.filters,
       shopId: shop || product ? row.shopId : meta.filters.shopId,
       productCode: product ? row.code : undefined,
-      keyword: product && !meta.filters.productKeyword ? result.value?.keyword : undefined,
+      keyword: product && !meta.filters.productKeyword ? displayed.keyword : undefined,
       entityId: creator || inviter ? row.id : undefined
     }
   };
@@ -594,6 +598,7 @@ async function load(): Promise<void> {
     const today = dates(1);
     if (applied.value.endDate !== today.endDate) {
       applied.value = { ...applied.value, ...today };
+      draft.value = { ...draft.value, ...today };
       page.value = 1;
     }
   }
@@ -606,6 +611,18 @@ async function load(): Promise<void> {
     if (id === request) {
       result.value = next;
       displayedQuery.value = requested;
+      const detail = selectedDetail.value;
+      if (
+        detail &&
+        (detail.filters.startDate !== next.meta.period.startDate ||
+          detail.filters.endDate !== next.meta.period.endDate)
+      ) {
+        const previous = detail.row;
+        const row = next.ranking.items.find(item =>
+          shop ? item.shopId === previous.shopId : item.id === previous.id
+        );
+        selectedDetail.value = row ? detailSelection(row, next) : undefined;
+      }
     }
   } catch (error) {
     if (id === request) {
@@ -632,6 +649,21 @@ async function loadOptions(): Promise<void> {
 
 function refresh(): void {
   if (optionsFailed.value) void loadOptions();
+  void load();
+}
+
+function applyPeriod({ startDate, endDate }: DateRange, useLive: boolean): void {
+  const range = { startDate, endDate };
+  if (!validDates(range)) {
+    ElMessage.warning(t("analytics.invalidDates"));
+    return;
+  }
+  const changed = startDate !== applied.value.startDate || endDate !== applied.value.endDate;
+  const startedLive = useLive && !live;
+  live = useLive;
+  if (!changed && !startedLive) return;
+  applied.value = { ...applied.value, ...range };
+  page.value = 1;
   void load();
 }
 
@@ -722,6 +754,7 @@ onUnmounted(stop);
       :loading="loading"
       :options="options"
       :options-failed="optionsFailed"
+      @period-change="applyPeriod"
       @search="search"
       @reset="reset"
       @refresh="refresh"

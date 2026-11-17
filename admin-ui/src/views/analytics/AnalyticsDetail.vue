@@ -273,10 +273,11 @@ async function load(): Promise<void> {
 }
 
 watch(
-  tab,
+  [tab, () => props.filters],
   () => {
     page.value = 1;
     size.value = readPageSize(tableId.value, 20);
+    daily.value = [];
     rows.value = [];
     creatorRows.value = [];
     productGroups.value = [];

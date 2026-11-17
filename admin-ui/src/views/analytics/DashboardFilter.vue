@@ -7,7 +7,7 @@ import NameCode from "@/components/NameCode.vue";
 import { formatNameWithCode } from "@/utils/format";
 import type { Filters, Options } from "@/api/analytics";
 import { adjacentPeriod, dates, monthRange, periodModes, periodRange } from "./board";
-import type { PeriodMode } from "./board";
+import type { DateRange, PeriodMode } from "./board";
 
 defineProps<{
   options?: Options;
@@ -17,7 +17,12 @@ defineProps<{
   showProduct?: boolean;
 }>();
 const filters = defineModel<Filters>({ required: true });
-const emit = defineEmits<{ search: [live: boolean]; reset: []; refresh: [] }>();
+const emit = defineEmits<{
+  search: [live: boolean];
+  periodChange: [range: DateRange, live: boolean];
+  reset: [];
+  refresh: [];
+}>();
 const { t } = useI18n();
 
 const mode = ref<PeriodMode>("sevenDays");
@@ -26,13 +31,22 @@ const today = () => dates(1).endDate;
 const custom = computed(() => [filters.value.startDate, filters.value.endDate]);
 const next = computed(() => adjacentPeriod(mode.value, filters.value, 1, today()));
 
-function setRange(range: Pick<Filters, "startDate" | "endDate">): void {
+function setRange(range: DateRange): void {
   filters.value = { ...filters.value, ...range };
+  emit("periodChange", range, mode.value === "live");
 }
 
 async function selectMode(value: PeriodMode): Promise<void> {
-  if (mode.value !== value && value !== "custom") setRange(periodRange(value));
+  const changed = mode.value !== value;
   mode.value = value;
+  if (changed) {
+    if (value === "custom") {
+      const { startDate, endDate } = filters.value;
+      emit("periodChange", { startDate, endDate }, false);
+    } else {
+      setRange(periodRange(value));
+    }
+  }
   if (value === "day" || value === "month" || value === "custom") {
     await nextTick();
     picker.value?.handleOpen();
@@ -83,7 +97,7 @@ function reset(): void {
     <template #primary>
       <div class="analytics-filter__time">
         <span class="analytics-filter__label">{{ t("analytics.period") }}</span>
-        <div class="analytics-filter__period">
+        <div class="analytics-filter__period" @keyup.enter.stop>
           <el-button-group role="group" :aria-label="t('analytics.period')">
             <el-button
               v-for="choice in periodModes"
