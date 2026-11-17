@@ -302,6 +302,26 @@ describe("DataTable", () => {
     wrapper.unmount();
   });
 
+  it("scrolls rows within a bounded plain drawer when explicitly requested", async () => {
+    const wrapper = mount(DataTable, {
+      props: {
+        tableId: "plain-scroll-rows",
+        rows: [],
+        columns,
+        total: 0,
+        plain: true,
+        scrollRows: true
+      },
+      global: { plugins: [ElementPlus, i18n] }
+    });
+    await flushPromises();
+    expect(wrapper.classes()).toContain("is-fill");
+    const table = wrapper.findComponent({ name: "ElTable" });
+    expect(table.props("height")).toBe("100%");
+    expect(wrapper.find(".data-table__toolbar").exists()).toBe(false);
+    wrapper.unmount();
+  });
+
   it("restores space when a sibling filter collapses without resizing the page or table", async () => {
     const observers: {
       callback: ResizeObserverCallback;

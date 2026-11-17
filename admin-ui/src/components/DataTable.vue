@@ -63,6 +63,8 @@ const props = withDefaults(
     plain?: boolean;
     /** Fill the remaining page space; body scrolls and the pager stays at the card bottom. */
     fillAvailableHeight?: boolean;
+    /** Scroll rows inside a table in an explicitly sized parent, including plain drawers. */
+    scrollRows?: boolean;
     /** Let a dashboard ranking expand in the page while retaining horizontal table scroll. */
     scrollWithPage?: boolean;
     /** Shows the toolbar Export button (P0-1); the page does the fetching and file save. */
@@ -102,6 +104,7 @@ const props = withDefaults(
     rowKey: "id",
     plain: false,
     fillAvailableHeight: false,
+    scrollRows: false,
     scrollWithPage: false,
     exportable: false,
     exporting: false,
@@ -182,7 +185,7 @@ let resizeObserver: ResizeObserver | null = null;
 let measureFrame = 0;
 
 function measureHeights(): void {
-  if (props.plain || (props.scrollWithPage && !fullscreen.value)) {
+  if (props.plain || props.scrollRows || (props.scrollWithPage && !fullscreen.value)) {
     fillMinimumHeight.value = null;
     tableMaxHeight.value = null;
     return;
@@ -323,6 +326,7 @@ watch(
     props.rows,
     props.plain,
     props.fillAvailableHeight,
+    props.scrollRows,
     props.scrollWithPage,
     props.paged,
     props.exportable
@@ -487,7 +491,7 @@ function canMove(index: number, delta: -1 | 1): boolean {
     ref="rootEl"
     class="data-table"
     :style="
-      fillAvailableHeight && !plain && fillMinimumHeight
+      fillAvailableHeight && !plain && !scrollRows && fillMinimumHeight
         ? { minHeight: `${fillMinimumHeight}px` }
         : undefined
     "
@@ -495,7 +499,7 @@ function canMove(index: number, delta: -1 | 1): boolean {
       {
         'is-fullscreen': fullscreen,
         'is-plain': plain,
-        'is-fill': fillAvailableHeight && !plain,
+        'is-fill': scrollRows || (fillAvailableHeight && !plain),
         'is-page-scroll': scrollWithPage && !fullscreen,
         'is-legacy-order': legacyOrderStyle
       },
@@ -605,8 +609,10 @@ function canMove(index: number, delta: -1 | 1): boolean {
         :row-class-name="rowClassName"
         :span-method="spanMethod ? resolveSpanMethod : undefined"
         size="default"
-        :height="fillAvailableHeight && !plain ? '100%' : undefined"
-        :max-height="plain || fillAvailableHeight ? undefined : (tableMaxHeight ?? undefined)"
+        :height="scrollRows || (fillAvailableHeight && !plain) ? '100%' : undefined"
+        :max-height="
+          plain || scrollRows || fillAvailableHeight ? undefined : (tableMaxHeight ?? undefined)
+        "
         :default-expand-all="defaultExpandAll"
         :stripe="legacyOrderStyle"
         @selection-change="onSelection"

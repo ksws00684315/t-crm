@@ -428,7 +428,10 @@ function changeSize(next: number): void {
     class="analytics-detail"
     @close="emit('close')"
   >
-    <div class="analytics-detail__body">
+    <div
+      class="analytics-detail__body"
+      :class="{ 'analytics-detail__body--fixed': shop && tab !== 'overview' }"
+    >
       <section v-if="shop" class="analytics-detail__identity analytics-detail__identity--shop">
         <span class="analytics-detail__shop-avatar" aria-hidden="true">{{
           Array.from(name)[0]
@@ -592,7 +595,8 @@ function changeSize(next: number): void {
         :size="size"
         :page-sizes="[20, 50, 100]"
         :total="total"
-        scroll-with-page
+        :scroll-with-page="!shop"
+        :scroll-rows="shop"
         plain
         @retry="load"
         @update:page="changePage"
@@ -726,6 +730,11 @@ function changeSize(next: number): void {
 .analytics-detail__body {
   display: grid;
   gap: var(--tcrm-space-4);
+}
+.analytics-detail__body--fixed {
+  height: 100%;
+  grid-template-columns: minmax(0, 1fr);
+  grid-template-rows: auto auto minmax(0, 1fr);
 }
 .analytics-detail__identity,
 .analytics-detail__trend {
