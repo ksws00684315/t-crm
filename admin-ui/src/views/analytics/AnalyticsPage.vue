@@ -6,7 +6,8 @@ import {
   onDeactivated,
   onMounted,
   onUnmounted,
-  ref
+  ref,
+  watch
 } from "vue";
 import { useRoute } from "vue-router";
 import { useI18n } from "vue-i18n";
@@ -54,7 +55,7 @@ import {
   sortable,
   validDates
 } from "./board";
-import type { DateRange } from "./board";
+import type { DateRange, PeriodMode } from "./board";
 import DashboardFilter from "./DashboardFilter.vue";
 import MetricCard from "./MetricCard.vue";
 import QuerySummary from "./QuerySummary.vue";
@@ -64,13 +65,17 @@ defineOptions({ name: "AnalyticsPage" });
 const { t, te, locale } = useI18n();
 const AnalyticsDetail = defineAsyncComponent(() => import("./AnalyticsDetail.vue"));
 const me = useUserStore();
-const board = boards[String(useRoute().name)]!;
+const route = useRoute();
+const board = boards[String(route.name)]!;
 const shop = board === "shop-performance";
 const product = board === "best-sellers";
 const creator = board === "kol-ranking";
 const inviter = board === "inviter-performance";
 const draft = ref<Filters>(dates());
 const applied = ref<Filters>({ ...draft.value });
+const filterVersion = ref(0);
+const initialPeriodMode = ref<PeriodMode>("sevenDays");
+let lastShopShortcut: string | undefined;
 const page = ref(1);
 const size = ref(20);
 const sortBy = ref("netSalesAmount");
@@ -724,9 +729,51 @@ async function download(): Promise<void> {
   }
 }
 
+function applyShopShortcut(): boolean {
+  if (!product || route.name !== "AnalyticsBestSellers") {
+    lastShopShortcut = undefined;
+    return false;
+  }
+  const { shopId, startDate, endDate } = route.query;
+  if (
+    route.fullPath === lastShopShortcut ||
+    typeof shopId !== "string" ||
+    !/^[1-9][0-9]{0,18}$/.test(shopId)
+  )
+    return false;
+  lastShopShortcut = route.fullPath;
+  const range =
+    typeof startDate === "string" &&
+    typeof endDate === "string" &&
+    /^\d{4}-\d{2}-\d{2}$/.test(startDate) &&
+    /^\d{4}-\d{2}-\d{2}$/.test(endDate) &&
+    validDates({ startDate, endDate })
+      ? { startDate, endDate }
+      : undefined;
+  draft.value = { ...(range ?? dates()), shopId };
+  applied.value = { ...draft.value };
+  initialPeriodMode.value = range
+    ? range.startDate === range.endDate
+      ? "day"
+      : "custom"
+    : "sevenDays";
+  filterVersion.value++;
+  page.value = 1;
+  live = false;
+  return true;
+}
+
+watch(
+  () => route.fullPath,
+  () => {
+    if (applyShopShortcut() && active) void load();
+  }
+);
+
 function start(): void {
   if (active) return;
   active = true;
+  applyShopShortcut();
   void load();
   if (!options.value) void loadOptions();
   timer = setInterval(() => {
@@ -748,7 +795,9 @@ onUnmounted(stop);
 <template>
   <div class="analytics-page">
     <DashboardFilter
+      :key="filterVersion"
       v-model="draft"
+      :initial-mode="initialPeriodMode"
       :show-inviter="creator"
       :show-product="product || inviter"
       :loading="loading"
@@ -1122,6 +1171,7 @@ onUnmounted(stop);
     <AnalyticsDetail
       v-if="selectedDetail"
       :board="board"
+      :data-scope="result?.meta.dataScope"
       :row="selectedDetail.row"
       :name="identity(selectedDetail.row)"
       :filters="selectedDetail.filters"

@@ -140,6 +140,26 @@ class AnalyticsDetailServiceTest {
     verifyNoInteractions(evidence);
   }
 
+  @Test
+  void settlementFlowsUseShopAndPeriodAndEnforceOrderAndCompanyScope() {
+    var filters = filters(1L);
+    assertThatThrownBy(() -> details.shopSettlementFlows(filters, 1, 20))
+        .isInstanceOf(BusinessException.class);
+    when(overview.canView("order:view")).thenReturn(true);
+    when(overview.resolve(filters)).thenReturn(resolved(new ScopeDTO(4, 9L, 1L, null, null)));
+    assertThatThrownBy(() -> details.shopSettlementFlows(filters, 1, 20))
+        .isInstanceOf(BusinessException.class);
+    var period = new StatsPeriod(day, day);
+    var expected = new PageResult<OrderEvidenceApi.SettlementFlowRow>(List.of(), 0, 1, 20);
+    when(overview.resolve(filters))
+        .thenReturn(
+            new ResolvedFilter(new ScopeDTO(4, null, 1L, null, null), period, null, DataScope.ALL));
+    when(shops.findShop(1L)).thenReturn(new ShopAccessDTO(1L, "Shop", "remote", 1, "S1"));
+    when(evidence.shopSettlementFlows(4L, 1L, period.from(), period.until(), 1, 20))
+        .thenReturn(expected);
+    assertThat(details.shopSettlementFlows(filters, 1, 20)).isEqualTo(expected);
+  }
+
   private FilterDTO filters(Long shopId) {
     return new FilterDTO(day, day, shopId, null, null, "WEIDIAN");
   }

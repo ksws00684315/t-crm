@@ -162,6 +162,46 @@ const enUS: MessageSchema = {
       sku: "Variant code of the sold item.",
       product: "Product name recorded on the order."
     },
+    shopDrawer: {
+      viewBestSellers: "View shop best sellers",
+      updated: "Updated",
+      countedTab: "{label} ({count} orders)",
+      averageOrderAmount: "Average order value",
+      soldProducts: "Products sold",
+      soldProductCounts: "{spu} SPU / {sku} SKU",
+      settlement: "Settlement flows",
+      settlementScope:
+        "Shop settlement flows are available in company shop scope. Clear creator or inviter filters to view them.",
+      orderPaidTime: "Order no. / paid at",
+      orderRefundTime: "Order no. / refund completed",
+      channelSpu: "Channel + SPU",
+      quantity: "Quantity",
+      flowTime: "Flow no. / posted at",
+      amountType: "Amount type",
+      direction: "Direction",
+      amount: "Amount",
+      addedType: "Shop receivables added",
+      deductedType: "Shop receivables deducted",
+      added: "Increase",
+      deducted: "Decrease",
+      multipleItems: "Order-level flow · {count} items",
+      definitions: {
+        soldProducts:
+          "Distinct SPUs and distinct SKUs with paid sales at this shop in the selected period.",
+        orderPaidTime:
+          "Weidian order number and payment time in Beijing time. An order may have multiple item lines.",
+        orderRefundTime:
+          "Weidian order number and refund completion time in Beijing time. An order may have multiple refunds.",
+        channelSpu:
+          "Sales channel and source product ID. Unmapped items show the product ID recorded on the order.",
+        flow: "CRM flow identifier and the Weidian posting time in Beijing time.",
+        amountType:
+          "Goods revenues increase shop receivables. Posted refunds decrease shop receivables.",
+        direction: "Whether the posting increases or decreases shop receivables.",
+        settlement:
+          "Synced goods revenue or refunded amount in CNY. Fees and profit shares are excluded."
+      }
+    },
     "shop-performance": {
       detailTitle: "Shop performance details",
       selling: "Shops with sales",

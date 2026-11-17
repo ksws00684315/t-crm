@@ -31,7 +31,25 @@ public interface OrderEvidenceApi {
       String sku,
       Integer units,
       BigDecimal amount,
+      Instant eventTime,
+      Long shopId,
+      String creatorName,
+      String spuId,
+      String imageUrl) {}
+
+  record SettlementFlowRow(
+      Long id,
+      String orderNo,
+      String product,
+      String sku,
+      String imageUrl,
+      Integer itemCount,
+      String amountType,
+      BigDecimal amount,
       Instant eventTime) {}
+
+  PageResult<SettlementFlowRow> shopSettlementFlows(
+      long tenantId, long shopId, Instant from, Instant until, int page, int size);
 
   enum ProductBreakdown {
     SKUS,

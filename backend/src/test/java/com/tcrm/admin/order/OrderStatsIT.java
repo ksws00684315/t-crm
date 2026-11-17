@@ -110,10 +110,11 @@ class OrderStatsIT {
     jdbc.execute(
         """
         INSERT INTO crm_order_settlement_flow (
-          id, tenant_id, shop_id, weidian_order_id, trade_sub_type, trade_time,
+          id, tenant_id, shop_id, weidian_order_id, refund_id, trade_sub_type, trade_time,
           amount_raw, query_type, fingerprint, first_pulled_at, last_pulled_at, create_time, update_time
         )
-        SELECT id, tenant, shop, 't144-flow-' || id, subtype, posted::timestamptz,
+        SELECT id, tenant, shop, CASE WHEN id IN (1, 2) THEN 't144-1' ELSE 't144-flow-' || id END,
+               CASE WHEN id = 2 THEN 't144-r1' END, subtype, posted::timestamptz,
                amount, query_type, lpad(id::text, 64, '0'), now(), now(), now(), now()
         FROM (VALUES
           (1, 4, 1, '货款收入', '2026-11-02T16:00:00Z', 100.75, 'INCOME_DETAIL'),
@@ -146,6 +147,26 @@ class OrderStatsIT {
       assertThat(settlement.increase()).isEqualByComparingTo("100.75");
       assertThat(settlement.decrease()).isEqualByComparingTo("20.25");
       assertThat(settlement.net()).isEqualByComparingTo("80.50");
+      assertThat(settlements.countShopReceivables(4, 1, FROM, UNTIL)).isEqualTo(2);
+      var flows = settlements.pageShopReceivables(4, 1, FROM, UNTIL, 20, 0);
+      assertThat(flows)
+          .satisfiesExactly(
+              refund -> {
+                assertThat(refund.amountType()).isEqualTo("REFUND");
+                assertThat(refund.amount()).isEqualByComparingTo("-20.25");
+                assertThat(refund.eventTime()).isEqualTo(UNTIL.minusSeconds(1));
+                assertThat(refund.product()).isEqualTo("A");
+                assertThat(refund.sku()).isEqualTo("1");
+              },
+              income -> {
+                assertThat(income.amountType()).isEqualTo("INCREASE");
+                assertThat(income.eventTime()).isEqualTo(FROM);
+                assertThat(income.itemCount()).isEqualTo(2);
+                assertThat(income.product()).isNull();
+              });
+      assertThat(settlements.pageShopReceivables(4, 1, FROM, UNTIL, 1, 1))
+          .singleElement()
+          .satisfies(flow -> assertThat(flow.id()).isEqualTo(1L));
       assertThat(settlements.shopReceivables(4, java.util.List.of(3L), FROM, UNTIL)).isNull();
       assertThat(settlements.shopReceivables(4, java.util.List.of(4L), FROM, UNTIL)).isNull();
       var own = mapper.totals(new ScopeDTO(4, 9L, 1L, 11L, 9L), FROM, UNTIL);
@@ -284,8 +305,8 @@ class OrderStatsIT {
     jdbc.update(
         """
         INSERT INTO crm_product (id, product_code, shop_id, tenant_id, weidian_item_id, name,
-          price, create_time, update_time)
-        VALUES (90, 'T144-PROD', 1, 4, '678900', 'Source Alpha', 100, now(), now())
+          price, image_url, create_time, update_time)
+        VALUES (90, 'T144-PROD', 1, 4, '678900', 'Source Alpha', 100, 'https://example.test/product.png', now(), now())
         """);
     jdbc.update("UPDATE crm_order_item SET product_id = 90 WHERE id IN (1, 2)");
     jdbc.update("UPDATE crm_order_item SET weidian_item_id = 'B', kol_id = 12 WHERE id = 2");
@@ -327,6 +348,13 @@ class OrderStatsIT {
       var selection = new Selection(shopScope, null, null, "product:90", "B", FROM, UNTIL);
       var evidence = session.getMapper(OrderEvidenceMapper.class);
       assertThat(evidence.count(selection, Kind.ORDERS)).isEqualTo(2);
+      assertThat(evidence.page(selection, Kind.ORDERS, 20, 0))
+          .allSatisfy(
+              row -> {
+                assertThat(row.shopId()).isEqualTo(1L);
+                assertThat(row.spuId()).isEqualTo("678900");
+                assertThat(row.imageUrl()).isEqualTo("https://example.test/product.png");
+              });
       var creatorSearch =
           new ScopeDTO(
               4, null, 1L, null, null, java.util.List.of(1L), java.util.List.of(12L), null);

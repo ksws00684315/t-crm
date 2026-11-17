@@ -9,7 +9,18 @@ public record ShopAccessDTO(
     String weidianShopId,
     Integer status,
     String shopCode,
-    Instant createdAt) {
+    Instant createdAt,
+    Instant updatedAt) {
+  public ShopAccessDTO(
+      Long id,
+      String name,
+      String weidianShopId,
+      Integer status,
+      String shopCode,
+      Instant createdAt) {
+    this(id, name, weidianShopId, status, shopCode, createdAt, null);
+  }
+
   public ShopAccessDTO(
       Long id, String name, String weidianShopId, Integer status, String shopCode) {
     this(id, name, weidianShopId, status, shopCode, null);

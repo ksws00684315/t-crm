@@ -84,6 +84,9 @@ export interface RankRow {
   shopId?: string;
   shopName?: string;
   shopCode?: string;
+  weidianShopId?: string;
+  shopUpdatedAt?: string;
+  refundedOrderCount?: Scalar;
   status?: number;
   name?: string;
   code?: string;
@@ -125,6 +128,27 @@ export interface EvidenceRow {
   units?: number;
   amount: Scalar;
   eventTime: string;
+  creatorName?: string;
+  spuId?: string;
+  imageUrl?: string;
+}
+export interface SettlementFlowRow {
+  id: string;
+  orderNo: string;
+  product?: string;
+  sku?: string;
+  imageUrl?: string;
+  itemCount?: number;
+  amountType: "INCREASE" | "REFUND";
+  amount: Scalar | null;
+  eventTime: string;
+}
+export function queryShopSettlementFlows(params: DetailQuery & { page: number; size: number }) {
+  return http.request<{ items: SettlementFlowRow[]; total: Scalar; page: number; size: number }>({
+    method: "get",
+    url: "/stats/shop-performance/settlement-flows",
+    params
+  });
 }
 export interface DailyAmount {
   day: string;

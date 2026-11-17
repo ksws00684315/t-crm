@@ -9,12 +9,13 @@ import type { Filters, Options } from "@/api/analytics";
 import { adjacentPeriod, dates, monthRange, periodModes, periodRange } from "./board";
 import type { DateRange, PeriodMode } from "./board";
 
-defineProps<{
+const props = defineProps<{
   options?: Options;
   loading: boolean;
   optionsFailed: boolean;
   showInviter?: boolean;
   showProduct?: boolean;
+  initialMode?: PeriodMode;
 }>();
 const filters = defineModel<Filters>({ required: true });
 const emit = defineEmits<{
@@ -25,7 +26,7 @@ const emit = defineEmits<{
 }>();
 const { t } = useI18n();
 
-const mode = ref<PeriodMode>("sevenDays");
+const mode = ref<PeriodMode>(props.initialMode ?? "sevenDays");
 const picker = ref<{ handleOpen: () => void }>();
 const today = () => dates(1).endDate;
 const custom = computed(() => [filters.value.startDate, filters.value.endDate]);

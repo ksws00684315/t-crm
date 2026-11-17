@@ -2,7 +2,9 @@ package com.tcrm.admin.order.service;
 
 import com.tcrm.admin.order.api.OrderEvidenceApi;
 import com.tcrm.admin.order.mapper.OrderEvidenceMapper;
+import com.tcrm.admin.order.mapper.OrderSettlementFlowMapper;
 import com.tcrm.admin.shared.PageResult;
+import java.time.Instant;
 import java.util.List;
 import org.springframework.stereotype.Service;
 
@@ -10,8 +12,23 @@ import org.springframework.stereotype.Service;
 public class OrderEvidenceService implements OrderEvidenceApi {
   private final OrderEvidenceMapper evidence;
 
-  public OrderEvidenceService(OrderEvidenceMapper evidence) {
+  private final OrderSettlementFlowMapper settlements;
+
+  public OrderEvidenceService(OrderEvidenceMapper evidence, OrderSettlementFlowMapper settlements) {
     this.evidence = evidence;
+    this.settlements = settlements;
+  }
+
+  @Override
+  public PageResult<SettlementFlowRow> shopSettlementFlows(
+      long tenantId, long shopId, Instant from, Instant until, int page, int size) {
+    long offset = (long) (page - 1) * size;
+    var rows = settlements.pageShopReceivables(tenantId, shopId, from, until, size, offset);
+    long total =
+        rows.size() < size && (page == 1 || !rows.isEmpty())
+            ? offset + rows.size()
+            : settlements.countShopReceivables(tenantId, shopId, from, until);
+    return new PageResult<>(rows, total, page, size);
   }
 
   @Override

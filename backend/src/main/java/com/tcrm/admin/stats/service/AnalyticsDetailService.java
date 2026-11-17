@@ -9,12 +9,14 @@ import com.tcrm.admin.order.api.OrderEvidenceApi.Kind;
 import com.tcrm.admin.order.api.OrderEvidenceApi.ProductBreakdown;
 import com.tcrm.admin.order.api.OrderEvidenceApi.ProductGroup;
 import com.tcrm.admin.order.api.OrderEvidenceApi.Selection;
+import com.tcrm.admin.order.api.OrderEvidenceApi.SettlementFlowRow;
 import com.tcrm.admin.order.api.OrderStatsApi;
 import com.tcrm.admin.order.api.OrderStatsApi.RankDimension;
 import com.tcrm.admin.order.api.OrderStatsApi.RankFactsDTO;
 import com.tcrm.admin.order.api.OrderStatsApi.ScopeDTO;
 import com.tcrm.admin.product.api.ShopAccessApi;
 import com.tcrm.admin.product.api.ShopAccessDTO;
+import com.tcrm.admin.security.api.DataScope;
 import com.tcrm.admin.shared.BusinessException;
 import com.tcrm.admin.shared.ErrorCode;
 import com.tcrm.admin.shared.PageResult;
@@ -87,6 +89,37 @@ public class AnalyticsDetailService {
             resolved.period(),
             null,
             evidence.page(selection, activity, ranking.page(), ranking.size()));
+  }
+
+  @Transactional(readOnly = true, isolation = Isolation.REPEATABLE_READ)
+  public PageResult<SettlementFlowRow> shopSettlementFlows(
+      FilterDTO filters, Integer page, Integer size) {
+    if (!overview.canView("order:view")) {
+      throw new BusinessException(ErrorCode.AUTH_FORBIDDEN);
+    }
+    var ranking = StatsRanking.resolve(page, size, null);
+    var resolved = overview.resolve(filters);
+    var scope = resolved.scope();
+    if (resolved.dataScope() != DataScope.ALL
+        || scope.ownerId() != null
+        || scope.kolId() != null
+        || scope.inviterId() != null
+        || scope.matchedKolIds() != null
+        || scope.matchedInviterIds() != null
+        || scope.productKeyword() != null) {
+      throw new BusinessException(ErrorCode.AUTH_FORBIDDEN);
+    }
+    validate(Board.SHOP, scope, null, null);
+    if (shops.findShop(scope.shopId()) == null) {
+      throw new BusinessException(ErrorCode.COMMON_NOT_FOUND);
+    }
+    return evidence.shopSettlementFlows(
+        scope.tenantId(),
+        scope.shopId(),
+        resolved.period().from(),
+        resolved.period().until(),
+        ranking.page(),
+        ranking.size());
   }
 
   @Transactional(readOnly = true, isolation = Isolation.REPEATABLE_READ)

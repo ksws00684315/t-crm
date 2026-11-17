@@ -20,7 +20,7 @@ public interface OrderEvidenceMapper {
       <script>
       <bind name="productSearch" value="s.scope.productKeyword"/>
       WITH scoped_orders AS NOT MATERIALIZED (
-        SELECT o.id, o.weidian_order_id, o.pay_time, o.pay_amount
+        SELECT o.id, o.weidian_order_id, o.shop_id, o.kol_id, o.pay_time, o.pay_amount
         FROM crm_order o
         WHERE o.tenant_id = #{s.scope.tenantId} AND NOT o.is_deleted AND o.pay_time IS NOT NULL
         <if test="s.scope.shopId != null">AND o.shop_id = #{s.scope.shopId}</if>
@@ -57,7 +57,8 @@ public interface OrderEvidenceMapper {
           #{shop}
         </foreach>
       ), scoped_items AS NOT MATERIALIZED (
-        SELECT i.id, i.order_id, i.item_name, i.sku_id, i.sku_name, i.kol_id, i.quantity, i.pay_amount
+        SELECT i.id, i.order_id, i.item_name, i.sku_id, i.sku_name, i.kol_id, i.quantity,
+               i.pay_amount, i.product_id, i.weidian_item_id
         FROM crm_order_item i
         WHERE i.tenant_id = #{s.scope.tenantId} AND NOT i.is_deleted
         <if test="s.productCode != null">
@@ -102,7 +103,8 @@ public interface OrderEvidenceMapper {
       """
       SELECT i.id, o.weidian_order_id AS order_no, NULL::text AS refund_no,
              i.item_name AS product, i.sku_name AS sku, i.quantity AS units,
-             i.pay_amount AS amount, o.pay_time AS event_time
+             i.pay_amount AS amount, o.pay_time AS event_time,
+             o.shop_id, COALESCE(i.kol_id, o.kol_id) AS creator_id, i.product_id, i.weidian_item_id
       FROM scoped_orders o JOIN scoped_items i ON i.order_id = o.id
       WHERE o.pay_time &gt;= #{s.from} AND o.pay_time &lt; #{s.until}
       """;
@@ -111,7 +113,8 @@ public interface OrderEvidenceMapper {
       """
       SELECT r.id, o.weidian_order_id AS order_no, r.weidian_refund_no AS refund_no,
              i.item_name AS product, i.sku_name AS sku, NULL::integer AS units,
-             r.amount, r.finish_time AS event_time
+             r.amount, r.finish_time AS event_time,
+             o.shop_id, COALESCE(i.kol_id, o.kol_id) AS creator_id, i.product_id, i.weidian_item_id
       FROM scoped_orders o JOIN crm_refund r ON r.order_id = o.id
       <choose>
         <when test="s.productCode != null or s.scope.productKeyword != null">JOIN</when>
@@ -145,8 +148,16 @@ public interface OrderEvidenceMapper {
   @Select(
       EVIDENCE
           + """
-      SELECT id, order_no, refund_no, product, sku, units, amount, event_time
-      FROM evidence ORDER BY event_time DESC, id DESC LIMIT #{size} OFFSET #{offset}
+      , paged AS (
+        SELECT * FROM evidence ORDER BY event_time DESC, id DESC LIMIT #{size} OFFSET #{offset}
+      )
+      SELECT e.id, e.order_no, e.refund_no, e.product, e.sku, e.units, e.amount, e.event_time,
+             e.shop_id, k.name AS creator_name, COALESCE(p.weidian_item_id, e.weidian_item_id) AS spu_id,
+             p.image_url
+      FROM paged e
+      LEFT JOIN crm_product p ON p.id = e.product_id AND p.tenant_id = #{s.scope.tenantId}
+      LEFT JOIN crm_kol k ON k.id = e.creator_id AND k.tenant_id = #{s.scope.tenantId}
+      ORDER BY e.event_time DESC, e.id DESC
       </script>
       """)
   List<EvidenceRow> page(

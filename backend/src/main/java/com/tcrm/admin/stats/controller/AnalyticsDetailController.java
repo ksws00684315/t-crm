@@ -4,6 +4,7 @@ import cn.dev33.satoken.annotation.SaCheckPermission;
 import com.tcrm.admin.order.api.OrderEvidenceApi.Kind;
 import com.tcrm.admin.order.api.OrderEvidenceApi.ProductBreakdown;
 import com.tcrm.admin.order.api.OrderEvidenceApi.ProductGroup;
+import com.tcrm.admin.order.api.OrderEvidenceApi.SettlementFlowRow;
 import com.tcrm.admin.shared.PageResult;
 import com.tcrm.admin.shared.R;
 import com.tcrm.admin.stats.service.AnalyticsDetailService;
@@ -34,6 +35,15 @@ public class AnalyticsDetailController {
   public R<Detail> shop(
       @Valid @ModelAttribute StatsOverviewQuery filters, @ModelAttribute ActivityQuery activity) {
     return query(Board.SHOP, filters, null, null, activity);
+  }
+
+  @GetMapping("/shop-performance/settlement-flows")
+  @SaCheckPermission({"dashboard:shop", "order:view"})
+  public R<PageResult<SettlementFlowRow>> shopSettlementFlows(
+      @Valid @ModelAttribute StatsOverviewQuery filters,
+      @RequestParam(required = false) Integer page,
+      @RequestParam(required = false) Integer size) {
+    return R.ok(details.shopSettlementFlows(filters.toFilter(), page, size));
   }
 
   @GetMapping("/best-sellers/details")
