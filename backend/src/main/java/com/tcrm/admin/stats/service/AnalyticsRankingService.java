@@ -201,7 +201,7 @@ public class AnalyticsRankingService {
                   p.lastRefundedAt(),
                   StatsOverviewService.metrics(productTotals(p)),
                   product == null ? null : product.imageUrl(),
-                  product == null ? null : product.sourceItemId(),
+                  p.spuId(),
                   null,
                   null,
                   null,

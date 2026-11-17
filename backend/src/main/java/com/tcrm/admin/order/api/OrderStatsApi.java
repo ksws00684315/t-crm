@@ -161,7 +161,8 @@ public interface OrderStatsApi {
       long cohortRefundedOrders,
       Instant lastPaidAt,
       Instant lastRefundedAt,
-      Instant updatedAt) {}
+      Instant updatedAt,
+      String spuId) {}
 
   record DailyFactDTO(
       String grain,

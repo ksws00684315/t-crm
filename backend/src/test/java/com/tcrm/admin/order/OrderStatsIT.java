@@ -325,11 +325,15 @@ class OrderStatsIT {
           .filteredOn(row -> row.shopId() != null)
           .hasSize(2)
           .allSatisfy(row -> assertThat(row.spu()).isEqualTo("product:90"));
-      for (String key : java.util.List.of("90", "678900", "ALPHA")) {
+      for (String key : java.util.List.of("90", "ALPHA")) {
         assertThat(productMapper.productFacts(visible, key, FROM, UNTIL))
             .filteredOn(row -> row.shopId() != null)
             .hasSize(2);
       }
+      assertThat(productMapper.productFacts(visible, "678900", FROM, UNTIL))
+          .filteredOn(row -> row.shopId() != null)
+          .singleElement()
+          .satisfies(row -> assertThat(row.shopId()).isEqualTo(1L));
       assertThat(productMapper.productFacts(visible, "B", FROM, UNTIL))
           .filteredOn(row -> row.shopId() != null)
           .singleElement()
@@ -377,6 +381,93 @@ class OrderStatsIT {
     measureNinetyDayQueries(jdbc, factory);
     checkCreatorCards(jdbc, factory);
     checkInviterSearch(jdbc, factory);
+    checkFirstShopSpu(jdbc, factory);
+  }
+
+  private static void checkFirstShopSpu(JdbcTemplate jdbc, SqlSessionFactory factory) {
+    jdbc.update(
+        """
+        INSERT INTO crm_product (id, product_code, shop_id, tenant_id, weidian_item_id, name,
+          price, create_time, update_time)
+        VALUES (91, 'T144-SPU', 11, 4, '7890', 'Product A', 100, now(), now())
+        """);
+    jdbc.update(
+        """
+        INSERT INTO crm_kol_item (id, tenant_id, kol_id, product_id, shop_id, weidian_item_id,
+          valid_from, create_time, update_time)
+        SELECT id, 4, id, 91, shop, item, '2026-11-01T00:00:00Z', created::timestamptz, now()
+        FROM (VALUES (951,11,'8800','2026-11-01T00:00:00Z'),
+                     (952,11,'9900','2026-11-02T00:00:00Z'),
+                     (953,12,'9400','2026-11-01T00:00:00Z'),
+                     (954,12,'9300','2026-11-02T00:00:00Z')) links(id,shop,item,created)
+        """);
+    jdbc.update(
+        """
+        INSERT INTO crm_order (id, tenant_id, shop_id, weidian_order_id, kol_id, bd_user_id,
+          attribution_status, order_status, raw_status, order_time, pay_time, total_amount,
+          pay_amount, freight, discount, source, last_sync_time, create_time, update_time)
+        SELECT id, 4, shop, 't144-spu-' || id, kol, CASE WHEN kol IS NULL THEN NULL ELSE 9 END,
+          CASE WHEN kol IS NULL THEN 'NON_KOL' ELSE 'ATTRIBUTED' END,
+          'PAID', '1', '2026-11-03T00:00:00Z', '2026-11-03T00:00:00Z',
+          amount, amount, 0, 0, 1, now(), now(), now()
+        FROM (VALUES (951,11,NULL,100), (952,11,951,200), (953,11,952,300),
+                     (954,12,954,400), (955,11,NULL,50)) orders(id,shop,kol,amount)
+        """);
+    jdbc.update(
+        """
+        INSERT INTO crm_order_item (id, tenant_id, order_id, sub_order_id, weidian_item_id, sku_id,
+          item_name, sku_name, quantity, pay_amount, refund_amount, kol_id, product_id,
+          attribution_type, create_time, update_time)
+        SELECT id, 4, id, 't144-spu-line-' || id, item, id::text, 'Product A', 'SKU', units, amount, 0,
+          kol, product, CASE WHEN kol IS NULL THEN 3 ELSE 1 END, now(), now()
+        FROM (VALUES (951,'7890',1,100,NULL,NULL), (952,'8800',2,200,951,91),
+          (953,'9900',3,300,952,NULL), (954,'9300',4,400,954,91), (955,'9999',1,50,NULL,NULL))
+          lines(id,item,units,amount,kol,product)
+        """);
+    jdbc.update(
+        """
+        INSERT INTO crm_refund (id, tenant_id, order_id, order_item_id, weidian_refund_no, amount,
+          raw_status, refund_status, refund_time, finish_time, create_time, update_time)
+        VALUES (951,4,953,953,'t144-spu-refund',30,'10','SUCCESS','2026-11-03T00:00:00Z',
+          '2026-11-03T01:00:00Z',now(),now())
+        """);
+    try (var session = factory.openSession()) {
+      var mapper = session.getMapper(OrderDailyStatsMapper.class);
+      var scope = new ScopeDTO(4, null, null, null, null, java.util.List.of(11L, 12L));
+      assertThat(mapper.productFacts(scope, null, FROM, UNTIL))
+          .filteredOn(p -> p.shopId() != null)
+          .extracting(p -> p.spuId())
+          .containsExactlyInAnyOrder("7890", "9400", "9999");
+      for (String keyword : java.util.List.of("7890", "8800", "9900")) {
+        assertThat(mapper.productFacts(scope, keyword, FROM, UNTIL))
+            .filteredOn(p -> p.shopId() != null)
+            .singleElement()
+            .satisfies(
+                p -> {
+                  assertThat(p.shopId()).isEqualTo(11L);
+                  assertThat(p.spuId()).isEqualTo("7890");
+                  assertThat(p.paidOrders()).isEqualTo(3);
+                  assertThat(p.units()).isEqualTo(6);
+                  assertThat(p.sales()).isEqualByComparingTo("600");
+                  assertThat(p.cohortRefunds()).isEqualByComparingTo("30");
+                });
+      }
+      var selection = new Selection(scope, null, null, "product:91", null, FROM, UNTIL);
+      var evidence = session.getMapper(OrderEvidenceMapper.class);
+      assertThat(evidence.page(selection, Kind.ORDERS, 20, 0))
+          .extracting(row -> row.spuId())
+          .containsExactlyInAnyOrder("7890", "7890", "7890", "9400");
+      assertThat(evidence.page(selection, Kind.REFUNDS, 20, 0))
+          .extracting(row -> row.spuId())
+          .containsExactly("7890");
+      var store = new ScopeDTO(4, null, 11L, null, null, java.util.List.of(11L));
+      var stats = session.getMapper(OrderStatsMapper.class);
+      assertThat(stats.totals(store.withProductKeyword("7890"), FROM, UNTIL).sales())
+          .isEqualByComparingTo("600");
+      assertThat(stats.rankFacts(store, RankDimension.SHOP, FROM, UNTIL))
+          .singleElement()
+          .satisfies(row -> assertThat(row.spuCount()).isEqualTo(2));
+    }
   }
 
   private static void checkInviterSearch(JdbcTemplate jdbc, SqlSessionFactory factory) {
@@ -468,7 +559,7 @@ class OrderStatsIT {
       jdbc.update(
           "UPDATE crm_commission_item_state SET released_commission_cny = 8 WHERE id = 701");
       jdbc.update(
-          "UPDATE crm_order_item SET item_name = 'Other', weidian_item_id = 'B' WHERE id = 2");
+          "UPDATE crm_order_item SET item_name = 'Other', weidian_item_id = 'B', product_id = NULL WHERE id = 2");
       jdbc.update("UPDATE crm_order_item SET item_name = 'Single selected item' WHERE id = 1");
       var productScope = scoped.withProductKeyword("Single selected item");
       session.clearCache();

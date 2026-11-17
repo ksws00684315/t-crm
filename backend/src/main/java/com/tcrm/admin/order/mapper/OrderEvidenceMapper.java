@@ -51,38 +51,50 @@ public interface OrderEvidenceMapper {
             </otherwise>
           </choose>
         </if>
-        <if test="s.productCode != null">AND o.attribution_status = 'ATTRIBUTED'</if>
         AND o.shop_id IN
         <foreach collection="s.scope.visibleShopIds" item="shop" open="(" separator="," close=")">
           #{shop}
         </foreach>
-      ), scoped_items AS NOT MATERIALIZED (
-        SELECT i.id, i.order_id, i.item_name, i.sku_id, i.sku_name, i.kol_id, i.quantity,
-               i.pay_amount, i.product_id, i.weidian_item_id
-        FROM crm_order_item i
+      ), visible_items AS NOT MATERIALIZED (
+        SELECT i.id, i.order_id, i.tenant_id, i.item_name, i.sku_id, i.sku_name, i.kol_id,
+               i.quantity, i.pay_amount, i.weidian_item_id, o.shop_id, reporting_product.id AS reporting_product_id,
+      """
+          + OrderProductSql.GROUP_KEY
+          + """
+               AS spu,
+      """
+          + OrderProductSql.SPU_ID
+          + """
+               AS spu_id
+        FROM scoped_orders o JOIN crm_order_item i ON i.order_id = o.id
+      """
+          + OrderProductSql.PRODUCT_JOIN
+          + OrderProductSql.FIRST_LINK_JOIN
+          + """
         WHERE i.tenant_id = #{s.scope.tenantId} AND NOT i.is_deleted
+      ), scoped_items AS NOT MATERIALIZED (
+        SELECT line.* FROM visible_items line WHERE TRUE
         <if test="s.productCode != null">
-          AND i.kol_id IS NOT NULL
           <choose>
             <when test="s.productCode.startsWith('product:')">
-              AND ('product:' || i.product_id) = #{s.productCode}
+              AND line.spu = #{s.productCode}
             </when>
             <when test="s.productCode.startsWith('unmapped:')">
-              AND i.product_id IS NULL AND ('unmapped:' || i.weidian_item_id) = #{s.productCode}
+              AND line.spu = #{s.productCode}
             </when>
             <otherwise>
-              AND i.weidian_item_id = #{s.productCode}
+              AND line.weidian_item_id = #{s.productCode}
               <if test="s.keyword != null">
-                AND (strpos(lower(i.item_name), lower(#{s.keyword})) &gt; 0 OR i.weidian_item_id = #{s.keyword})
+                AND (strpos(lower(line.item_name), lower(#{s.keyword})) &gt; 0 OR line.weidian_item_id = #{s.keyword})
               </if>
             </otherwise>
           </choose>
-          <if test="s.scope.kolId != null">AND i.kol_id = #{s.scope.kolId}</if>
+          <if test="s.scope.kolId != null">AND line.kol_id = #{s.scope.kolId}</if>
           <if test="s.scope.matchedKolIds != null">
             <choose>
               <when test="s.scope.matchedKolIds.isEmpty()">AND FALSE</when>
               <otherwise>
-                AND i.kol_id IN
+                AND line.kol_id IN
                 <foreach collection="s.scope.matchedKolIds" item="matched" open="(" separator="," close=")">
                   #{matched}
                 </foreach>
@@ -91,10 +103,12 @@ public interface OrderEvidenceMapper {
           </if>
         </if>
         <if test="s.scope.productKeyword != null">
-          AND
+          AND (line.shop_id, line.spu) IN (
+            SELECT i.shop_id, i.spu FROM visible_items i WHERE
       """
-          + OrderStatsMapper.PRODUCT_MATCH
+          + OrderProductSql.MATCH
           + """
+          )
         </if>
       ),
       """;
@@ -104,7 +118,7 @@ public interface OrderEvidenceMapper {
       SELECT i.id, o.weidian_order_id AS order_no, NULL::text AS refund_no,
              i.item_name AS product, i.sku_name AS sku, i.quantity AS units,
              i.pay_amount AS amount, o.pay_time AS event_time,
-             o.shop_id, COALESCE(i.kol_id, o.kol_id) AS creator_id, i.product_id, i.weidian_item_id
+             o.shop_id, COALESCE(i.kol_id, o.kol_id) AS creator_id, i.reporting_product_id, i.spu_id
       FROM scoped_orders o JOIN scoped_items i ON i.order_id = o.id
       WHERE o.pay_time &gt;= #{s.from} AND o.pay_time &lt; #{s.until}
       """;
@@ -114,7 +128,7 @@ public interface OrderEvidenceMapper {
       SELECT r.id, o.weidian_order_id AS order_no, r.weidian_refund_no AS refund_no,
              i.item_name AS product, i.sku_name AS sku, NULL::integer AS units,
              r.amount, r.finish_time AS event_time,
-             o.shop_id, COALESCE(i.kol_id, o.kol_id) AS creator_id, i.product_id, i.weidian_item_id
+             o.shop_id, COALESCE(i.kol_id, o.kol_id) AS creator_id, i.reporting_product_id, i.spu_id
       FROM scoped_orders o JOIN crm_refund r ON r.order_id = o.id
       <choose>
         <when test="s.productCode != null or s.scope.productKeyword != null">JOIN</when>
@@ -152,10 +166,10 @@ public interface OrderEvidenceMapper {
         SELECT * FROM evidence ORDER BY event_time DESC, id DESC LIMIT #{size} OFFSET #{offset}
       )
       SELECT e.id, e.order_no, e.refund_no, e.product, e.sku, e.units, e.amount, e.event_time,
-             e.shop_id, k.name AS creator_name, COALESCE(p.weidian_item_id, e.weidian_item_id) AS spu_id,
+             e.shop_id, k.name AS creator_name, e.spu_id,
              p.image_url
       FROM paged e
-      LEFT JOIN crm_product p ON p.id = e.product_id AND p.tenant_id = #{s.scope.tenantId}
+      LEFT JOIN crm_product p ON p.id = e.reporting_product_id AND p.tenant_id = #{s.scope.tenantId}
       LEFT JOIN crm_kol k ON k.id = e.creator_id AND k.tenant_id = #{s.scope.tenantId}
       ORDER BY e.event_time DESC, e.id DESC
       </script>
@@ -210,6 +224,7 @@ public interface OrderEvidenceMapper {
             <otherwise>i.kol_id::text AS code, NULL::text AS label</otherwise>
           </choose>
         FROM scoped_items i
+        <if test="group.name() == 'CREATORS'">WHERE i.kol_id IS NOT NULL</if>
       ), paid_items AS (
         SELECT i.*, o.pay_time
         FROM scoped_orders o JOIN item_groups i ON i.order_id = o.id

@@ -296,7 +296,8 @@ class AnalyticsRankingServiceTest {
         1,
         FROM,
         null,
-        FROM);
+        FROM,
+        shop == null ? null : "source-50");
   }
 
   private static RankFactsDTO person(long id, long paid) {

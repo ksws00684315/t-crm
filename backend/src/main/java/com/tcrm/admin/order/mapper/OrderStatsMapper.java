@@ -19,33 +19,36 @@ import org.apache.ibatis.annotations.Select;
  */
 @Mapper
 public interface OrderStatsMapper {
-  // Alias i is the order item; bind its keyword as productSearch.
-  String PRODUCT_MATCH =
-      """
-      (strpos(lower(i.item_name), lower(#{productSearch})) &gt; 0
-        OR i.weidian_item_id = #{productSearch}
-        OR i.product_id::text = #{productSearch}
-        OR ('product:' || i.product_id) = #{productSearch}
-        OR (i.product_id IS NULL AND ('unmapped:' || i.weidian_item_id) = #{productSearch})
-        OR EXISTS (
-          SELECT 1 FROM crm_product product WHERE product.id = i.product_id
-            AND product.tenant_id = i.tenant_id
-            AND (strpos(lower(product.name), lower(#{productSearch})) &gt; 0
-              OR product.weidian_item_id = #{productSearch}
-              OR lower(product.product_code) = lower(#{productSearch}))
-        ))
-      """;
-
   String PRODUCT_ITEMS =
       """
       <if test="scope.productKeyword != null">
-        product_items AS NOT MATERIALIZED (
-          SELECT i.id, i.order_id, i.pay_amount
-          FROM crm_order_item i
-          WHERE i.tenant_id = #{scope.tenantId} AND NOT i.is_deleted AND
+        searchable_items AS NOT MATERIALIZED (
+          SELECT i.id, i.order_id, o.shop_id, i.tenant_id, i.pay_amount, i.item_name, i.weidian_item_id,
+                 reporting_product.id AS reporting_product_id,
       """
-          + PRODUCT_MATCH
+          + OrderProductSql.GROUP_KEY
           + """
+                 AS spu,
+      """
+          + OrderProductSql.SPU_ID
+          + """
+                 AS spu_id
+          FROM crm_order_item i JOIN crm_order o ON o.id = i.order_id
+      """
+          + OrderProductSql.PRODUCT_JOIN
+          + OrderProductSql.FIRST_LINK_JOIN
+          + """
+          WHERE i.tenant_id = #{scope.tenantId} AND o.tenant_id = #{scope.tenantId}
+            AND NOT i.is_deleted AND NOT o.is_deleted AND o.pay_time IS NOT NULL
+          <if test="scope.shopId != null">AND o.shop_id = #{scope.shopId}</if>
+        ), product_items AS NOT MATERIALIZED (
+          SELECT line.id, line.order_id, line.pay_amount FROM searchable_items line
+          WHERE (line.shop_id, line.spu) IN (
+            SELECT i.shop_id, i.spu FROM searchable_items i WHERE
+      """
+          + OrderProductSql.MATCH
+          + """
+          )
         ),
       </if>
       """;
@@ -147,10 +150,20 @@ public interface OrderStatsMapper {
   @Select(
       SCOPED_ORDERS
           + """
-      SELECT COUNT(DISTINCT (p.shop_id, COALESCE('product:' || i.product_id, i.weidian_item_id)))
-      FROM scoped_orders p JOIN crm_order_item i ON i.order_id = p.id AND i.tenant_id = #{scope.tenantId}
+      SELECT COUNT(DISTINCT (o.shop_id,
+      """
+          + OrderProductSql.GROUP_KEY
+          + """
+      ))
+      FROM scoped_orders o JOIN crm_order_item i ON i.order_id = o.id AND i.tenant_id = #{scope.tenantId}
+      """
+          + OrderProductSql.PRODUCT_JOIN
+          + """
       WHERE NOT i.is_deleted AND i.weidian_item_id != ''
-        AND p.pay_time &gt;= #{from} AND p.pay_time &lt; #{until}
+        AND o.pay_time &gt;= #{from} AND o.pay_time &lt; #{until}
+      """
+          + MATCHED_ITEM
+          + """
       </script>
       """)
   long creatorSpuCount(
@@ -374,18 +387,25 @@ public interface OrderStatsMapper {
         FROM ranked_paid GROUP BY entity_id
       ),
       items AS (
-        SELECT p.entity_id, SUM(i.quantity) AS units,
-               COUNT(DISTINCT (p.shop_id, COALESCE('product:' || i.product_id, i.weidian_item_id)))
+        SELECT o.entity_id, SUM(i.quantity) AS units,
+               COUNT(DISTINCT (o.shop_id,
+      """
+          + OrderProductSql.GROUP_KEY
+          + """
+                 ))
                  FILTER (WHERE i.weidian_item_id != '') AS spu_count,
-               COUNT(DISTINCT (p.shop_id, i.weidian_item_id, i.sku_id))
+               COUNT(DISTINCT (o.shop_id, i.weidian_item_id, i.sku_id))
                  FILTER (WHERE i.weidian_item_id != '' AND i.sku_id != '') AS sku_count,
-               COUNT(DISTINCT i.kol_item_id) FILTER (WHERE i.kol_id = p.kol_id) AS link_count
-        FROM crm_order_item i JOIN ranked_paid p ON p.id = i.order_id
+               COUNT(DISTINCT i.kol_item_id) FILTER (WHERE i.kol_id = o.kol_id) AS link_count
+        FROM crm_order_item i JOIN ranked_paid o ON o.id = i.order_id
+      """
+          + OrderProductSql.PRODUCT_JOIN
+          + """
         WHERE i.tenant_id = #{scope.tenantId} AND NOT i.is_deleted
       """
           + MATCHED_ITEM
           + """
-        GROUP BY p.entity_id
+        GROUP BY o.entity_id
       ),
       cohort AS (
         SELECT p.entity_id, SUM(r.amount) AS amount

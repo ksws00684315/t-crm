@@ -21,14 +21,24 @@ public interface OrderDailyStatsMapper {
       <bind name="productSearch" value="keyword"/>
       WITH lines AS NOT MATERIALIZED (
         SELECT o.id AS order_id, o.shop_id, o.pay_time, i.id AS line_id,
-               COALESCE('product:' || i.product_id, 'unmapped:' || i.weidian_item_id) AS spu,
+               """
+          + OrderProductSql.GROUP_KEY
+          + """
+                 AS spu,
+               """
+          + OrderProductSql.SPU_ID
+          + """
+                 AS spu_id,
                i.weidian_item_id, i.tenant_id,
-               i.item_name, i.product_id, i.kol_id, i.quantity, i.pay_amount,
+               i.item_name, reporting_product.id AS reporting_product_id, i.kol_id, i.quantity, i.pay_amount,
                GREATEST(o.update_time, i.update_time) AS updated_at
         FROM crm_order o JOIN crm_order_item i ON i.order_id = o.id
+      """
+          + OrderProductSql.PRODUCT_JOIN
+          + OrderProductSql.FIRST_LINK_JOIN
+          + """
         WHERE o.tenant_id = #{scope.tenantId} AND i.tenant_id = #{scope.tenantId}
           AND NOT o.is_deleted AND NOT i.is_deleted AND o.pay_time IS NOT NULL
-          AND o.attribution_status = 'ATTRIBUTED' AND i.kol_id IS NOT NULL
           AND i.weidian_item_id != ''
         <if test="scope.ownerId != null">AND o.bd_user_id = #{scope.ownerId}</if>
         <if test="scope.matchedInviterIds != null">
@@ -73,25 +83,24 @@ public interface OrderDailyStatsMapper {
             SELECT i.shop_id, i.spu FROM lines i
             WHERE
       """
-          + OrderStatsMapper.PRODUCT_MATCH
+          + OrderProductSql.MATCH
           + """
-               OR i.spu = #{keyword}
           )
         </if>
       ),
       paid AS (
-        SELECT order_id, shop_id, pay_time, line_id, spu, item_name, product_id,
+        SELECT order_id, shop_id, pay_time, line_id, spu, spu_id, item_name, reporting_product_id,
                kol_id, quantity, pay_amount, updated_at
         FROM selected_lines WHERE pay_time &gt;= #{from} AND pay_time &lt; #{until}
       ),
       events AS (
-        SELECT shop_id, spu, item_name, product_id, order_id, kol_id, quantity,
+        SELECT shop_id, spu, spu_id, item_name, reporting_product_id, order_id, kol_id, quantity,
                pay_amount AS sales, 0::numeric AS cohort, 0::numeric AS completed,
                NULL::bigint AS refund_order, NULL::bigint AS cohort_order,
                pay_time, NULL::timestamptz AS finish_time, updated_at
         FROM paid
         UNION ALL
-        SELECT p.shop_id, p.spu, p.item_name, p.product_id, NULL, NULL, 0, 0, r.amount, 0,
+        SELECT p.shop_id, p.spu, p.spu_id, p.item_name, p.reporting_product_id, NULL, NULL, 0, 0, r.amount, 0,
                NULL, p.order_id, p.pay_time, NULL, r.update_time
         FROM crm_refund r JOIN paid p ON r.order_item_id = p.line_id AND r.order_id = p.order_id
         WHERE r.tenant_id = #{scope.tenantId} AND NOT r.is_deleted AND r.refund_status = 'SUCCESS'
@@ -99,20 +108,20 @@ public interface OrderDailyStatsMapper {
           + OrderStatsMapper.COHORT_REFUND_WINDOW
           + """
         UNION ALL
-        SELECT p.shop_id, p.spu, p.item_name, p.product_id, NULL, NULL, 0, 0, 0, r.amount,
+        SELECT p.shop_id, p.spu, p.spu_id, p.item_name, p.reporting_product_id, NULL, NULL, 0, 0, 0, r.amount,
                p.order_id, NULL, NULL, r.finish_time, r.update_time
         FROM crm_refund r JOIN selected_lines p ON r.order_item_id = p.line_id AND r.order_id = p.order_id
         WHERE r.tenant_id = #{scope.tenantId} AND NOT r.is_deleted AND r.refund_status = 'SUCCESS'
           AND r.finish_time &gt;= #{from} AND r.finish_time &lt; #{until}
       )
-      SELECT shop_id, spu, MAX(item_name) AS name, MAX(product_id) AS product_id,
+      SELECT shop_id, spu, MAX(item_name) AS name, MAX(reporting_product_id) AS product_id,
              COUNT(DISTINCT order_id) AS paid_orders, COALESCE(SUM(quantity), 0) AS units,
              COUNT(DISTINCT kol_id) AS kol_count, COALESCE(SUM(sales), 0) AS sales,
              COALESCE(SUM(cohort), 0) AS cohort_refunds,
              COALESCE(SUM(completed), 0) AS completed_refunds,
              COUNT(DISTINCT refund_order) AS refunded_orders,
              COUNT(DISTINCT cohort_order) AS cohort_refunded_orders,
-             MAX(pay_time) AS last_paid_at, MAX(finish_time) AS last_refunded_at, MAX(updated_at) AS updated_at
+             MAX(pay_time) AS last_paid_at, MAX(finish_time) AS last_refunded_at, MAX(updated_at) AS updated_at, MAX(spu_id) AS spu_id
       FROM events
       GROUP BY GROUPING SETS ((shop_id, spu), ())
       </script>

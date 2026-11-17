@@ -193,7 +193,7 @@ const enUS: MessageSchema = {
         orderRefundTime:
           "Weidian order number and refund completion time in Beijing time. An order may have multiple refunds.",
         spuId:
-          "Shows the source product’s Weidian ID when linked. Otherwise shows the Weidian item ID on the order line.",
+          "Shows the first known Weidian link for the product in this shop. Linked copies share one SPU. Unmapped links keep their order item ID.",
         flow: "CRM flow identifier and the Weidian posting time in Beijing time.",
         amountType:
           "Goods revenues increase shop receivables. Posted refunds decrease shop receivables.",
@@ -281,7 +281,7 @@ const enUS: MessageSchema = {
         identity:
           "The name from the order and the linked source product image. A placeholder appears if the image is unavailable.",
         channelCode:
-          "The order channel and the item ID from the original source link. A dash indicates no linked source product.",
+          "The order channel and the first known Weidian link for the product in its selling shop. Unmapped links retain their own item ID.",
         shop: "The shop where the order was placed. A product is counted separately in each shop.",
         kolCount: "Distinct creators with a paid sale of this product during the selected period.",
         units:
