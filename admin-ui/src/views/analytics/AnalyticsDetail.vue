@@ -116,6 +116,13 @@ const metricKeys: Metric[] = [
   "averageOrderAmount",
   "amountRefundRate"
 ];
+const soldProductCounts = computed(() => {
+  const format = (value: unknown) =>
+    typeof value === "number" || typeof value === "string"
+      ? new Intl.NumberFormat(locale.value).format(BigInt(String(value)))
+      : "—";
+  return { spu: format(props.row.spuCount), sku: format(props.row.skuCount) };
+});
 const cards = computed(() => {
   const metrics = metricKeys.flatMap(key => {
     const integer = key === "units" || key === "paidOrderCount";
@@ -139,19 +146,12 @@ const cards = computed(() => {
     return [{ key, label, value: formatted, hint }];
   });
   if (!shop.value) return metrics;
-  const format = (value: unknown) =>
-    typeof value === "number" || typeof value === "string"
-      ? new Intl.NumberFormat(locale.value).format(BigInt(String(value)))
-      : "—";
   return [
     ...metrics,
     {
       key: "soldProducts",
       label: local("soldProducts"),
-      value: t("analytics.shopDrawer.soldProductCounts", {
-        spu: format(props.row.spuCount),
-        sku: format(props.row.skuCount)
-      }),
+      value: t("analytics.shopDrawer.soldProductCounts", soldProductCounts.value),
       hint: termHint("soldProducts")
     }
   ];
@@ -459,7 +459,7 @@ function changeSize(next: number): void {
           <RouterLink
             v-if="row.shopId"
             :to="shopShortcut"
-            class="el-button el-button--primary"
+            class="el-button el-button--primary analytics-detail__shop-link"
             @click="emit('close')"
           >
             {{ local("viewBestSellers") }}
@@ -520,11 +520,26 @@ function changeSize(next: number): void {
           <MetricCard
             v-for="card in cards"
             :key="card.key"
-            :class="{ 'analytics-detail__coverage': card.key === 'soldProducts' }"
             :label="card.label"
             :value="card.value"
             :hint="card.hint"
-          />
+          >
+            <template v-if="card.key === 'soldProducts'" #value>
+              <i18n-t
+                keypath="analytics.shopDrawer.soldProductCounts"
+                tag="span"
+                scope="global"
+                class="analytics-detail__coverage"
+              >
+                <template #spu
+                  ><span>{{ soldProductCounts.spu }}</span></template
+                >
+                <template #sku
+                  ><span>{{ soldProductCounts.sku }}</span></template
+                >
+              </i18n-t>
+            </template>
+          </MetricCard>
         </div>
         <section class="analytics-detail__trend">
           <h3>{{ t("analytics.drilldown.daily") }}</h3>
@@ -787,6 +802,12 @@ function changeSize(next: number): void {
 .analytics-detail__shop-actions {
   margin-inline-start: auto;
   justify-items: end;
+  gap: var(--tcrm-space-2);
+}
+.analytics-detail__shop-link {
+  min-height: var(--tcrm-control-height-large);
+  padding-inline: var(--tcrm-space-5);
+  text-decoration: none;
 }
 .analytics-detail__product {
   display: flex;
@@ -823,8 +844,11 @@ function changeSize(next: number): void {
   color: var(--tcrm-color-danger);
   font-weight: 600;
 }
-.analytics-detail__coverage :deep(strong) {
+.analytics-detail__coverage {
   font-size: var(--tcrm-font-size-section);
+}
+.analytics-detail__coverage > span {
+  font-size: var(--tcrm-font-size-dashboard-metric);
 }
 .analytics-detail__cards {
   display: grid;

@@ -59,7 +59,9 @@ const note = computed(() => [props.detail, props.comparison].filter(Boolean).joi
       <div v-if="unavailable" class="metric-card__state">
         <el-tag type="info" effect="light">{{ value }}</el-tag>
       </div>
-      <strong v-else class="metric-card__text" :title="value">{{ value }}</strong>
+      <strong v-else class="metric-card__text" :title="value"
+        ><slot name="value">{{ value }}</slot></strong
+      >
       <small v-if="detailTerms" class="metric-card__note metric-card__terms">
         <template v-for="(term, index) in detailTerms" :key="term.label">
           <span v-if="index" aria-hidden="true">·</span>
