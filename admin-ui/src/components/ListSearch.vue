@@ -155,6 +155,14 @@ function onEnter(event: KeyboardEvent): void {
      label-width): a plain declaration is enough (review R-22). */
   margin-left: 0;
 }
+/* Task 156: one width for every filter control in the search row, text inputs and dropdowns
+   alike. A page's `.filter-w-*` class still works elsewhere but must not make a select here
+   narrower than the inputs next to it. Date range pickers keep their own width. */
+.list-search__form :deep(.el-input),
+.list-search__form :deep(.el-select),
+.list-search__form :deep(.el-cascader) {
+  width: 100%;
+}
 .list-search__row,
 .list-search__actions,
 .list-search__chips {

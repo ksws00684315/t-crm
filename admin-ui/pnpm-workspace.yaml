@@ -7,3 +7,9 @@ onlyBuiltDependencies:
 overrides:
   glob: 14.0.2
   "minimatch@<11.0.1": 11.0.1
+
+# Temporary exception: picomatch <= 4.0.7 ReDoS (GHSA-fc5q-39xc-vjpf). No patched version
+# exists as of 2026-11-18; drop this entry once a fixed release is available.
+auditConfig:
+  ignoreGhsas:
+    - GHSA-fc5q-39xc-vjpf

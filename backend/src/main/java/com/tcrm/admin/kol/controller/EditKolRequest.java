@@ -10,7 +10,8 @@ import java.util.List;
 
 /**
  * Ordinary edit body (task 28 / 29): profile fields only. Email is shown read-only in the admin UI
- * and is never accepted here; promotion fields go through promotion-config.
+ * and is never accepted here; promotion fields go through promotion-config. The business Discord
+ * and WhatsApp accounts (task 156) are the inviter tab of the profile dialog.
  */
 public record EditKolRequest(
     @NotBlank @Size(max = KolRules.MAX_NAME) String name,
@@ -18,8 +19,9 @@ public record EditKolRequest(
     @CountryCode String country,
     @Size(max = KolRules.MAX_SOCIAL_ACCOUNTS) List<@Valid SocialAccountRequest> socialAccounts,
     @Size(max = KolRules.MAX_REMARK) String remark,
-    @Size(max = KolRules.MAX_WHATSAPP) @Pattern(regexp = KolRules.WHATSAPP_PATTERN)
-        String whatsapp) {
+    @Size(max = KolRules.MAX_WHATSAPP) @Pattern(regexp = KolRules.WHATSAPP_PATTERN) String whatsapp,
+    @Size(max = KolRules.MAX_BD_ACCOUNT) String bdDiscord,
+    @Size(max = KolRules.MAX_BD_ACCOUNT) String bdWhatsapp) {
   EditKolCommand toCommand() {
     return new EditKolCommand(
         name,
@@ -27,6 +29,8 @@ public record EditKolRequest(
         country,
         KolRequests.social(socialAccounts),
         remark,
-        KolRequests.text(whatsapp));
+        KolRequests.text(whatsapp),
+        KolRequests.text(bdDiscord),
+        KolRequests.text(bdWhatsapp));
   }
 }

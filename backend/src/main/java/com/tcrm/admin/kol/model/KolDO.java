@@ -8,11 +8,12 @@ import java.math.BigDecimal;
 import java.time.Instant;
 
 /**
- * KOL row. Nullable editable columns ({@code defaultRate}, {@code remark}) use ALWAYS so clears
- * survive updateById; {@code bdUserId} is NEVER written by entity updates — only {@code
- * KolService.updateBdUser} sets it through a column whitelist. Account columns ({@code
- * passwordHash}, {@code accountStatus}, {@code credentialVersion}, {@code lastLoginTime}) are also
- * NEVER written by entity updates; {@code KolAccountStoreService} owns them with column whitelists.
+ * KOL row. Nullable editable columns ({@code defaultRate}, {@code remark}, {@code whatsapp}, {@code
+ * bdDiscord}, {@code bdWhatsapp}) use ALWAYS so clears survive updateById; {@code bdUserId} is
+ * NEVER written by entity updates — only {@code KolService.updateBdUser} sets it through a column
+ * whitelist. Account columns ({@code passwordHash}, {@code accountStatus}, {@code
+ * credentialVersion}, {@code lastLoginTime}) are also NEVER written by entity updates; {@code
+ * KolAccountStoreService} owns them with column whitelists.
  */
 @TableName("crm_kol")
 public class KolDO extends BaseEntity {
@@ -28,6 +29,14 @@ public class KolDO extends BaseEntity {
   /** Ownership; changed only by KolService.updateBdUser via LambdaUpdateWrapper. */
   @TableField(updateStrategy = FieldStrategy.NEVER)
   private Long bdUserId;
+
+  /** Company business Discord account managing this creator; nullable and clearable (task 156). */
+  @TableField(updateStrategy = FieldStrategy.ALWAYS)
+  private String bdDiscord;
+
+  /** Company business WhatsApp account managing this creator; nullable and clearable (task 156). */
+  @TableField(updateStrategy = FieldStrategy.ALWAYS)
+  private String bdWhatsapp;
 
   @TableField(updateStrategy = FieldStrategy.ALWAYS)
   private BigDecimal defaultRate;
@@ -143,6 +152,22 @@ public class KolDO extends BaseEntity {
 
   public void setBdUserId(Long value) {
     this.bdUserId = value;
+  }
+
+  public String getBdDiscord() {
+    return bdDiscord;
+  }
+
+  public void setBdDiscord(String value) {
+    this.bdDiscord = value;
+  }
+
+  public String getBdWhatsapp() {
+    return bdWhatsapp;
+  }
+
+  public void setBdWhatsapp(String value) {
+    this.bdWhatsapp = value;
   }
 
   public BigDecimal getDefaultRate() {

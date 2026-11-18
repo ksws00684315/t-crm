@@ -173,6 +173,10 @@ export interface KolVO {
   /** Null means "no BD assigned". */
   bdUserId: string | null;
   bdUserName: string | null;
+  /** Company business Discord account managing the creator (task 156); null when unset. */
+  bdDiscord: string | null;
+  /** Company business WhatsApp account managing the creator (task 156); null when unset. */
+  bdWhatsapp: string | null;
   defaultRate: string | null;
   /** 1 = enabled, 0 = disabled. */
   status: 0 | 1;

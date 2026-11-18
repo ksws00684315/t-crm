@@ -1101,6 +1101,17 @@ const enUS: MessageSchema = {
     disabledNotOwned: "Only the assigned BD can act on this creator",
     disabledCommissionApproved: "Approve the creator before changing commission",
     editProfileTitle: "Edit profile - {code} ({name})",
+    /** Profile dialog tabs and the read-only / edit switch (task 156). */
+    tabProfile: "Creator profile",
+    tabInviter: "Inviter details",
+    inviterHint: "Taken from the creator's current business owner and read-only",
+    inviterAccountsHint:
+      "Both accounts are recorded per creator and not taken from the inviter; the same business owner may use different accounts for different creators",
+    bdDiscord: "Discord account",
+    bdDiscordPlaceholder: "Business Discord account handling this creator",
+    bdWhatsapp: "WhatsApp account",
+    bdWhatsappPlaceholder: "Business WhatsApp account handling this creator",
+    editProfile: "Edit",
     /** Super-administrator password reset (task 147); the generated password is shown once. */
     resetPassword: "Reset password",
     resetPasswordTitle: "Reset creator password",
