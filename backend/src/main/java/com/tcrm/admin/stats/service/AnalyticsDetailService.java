@@ -10,6 +10,7 @@ import com.tcrm.admin.order.api.OrderEvidenceApi.ProductBreakdown;
 import com.tcrm.admin.order.api.OrderEvidenceApi.ProductGroup;
 import com.tcrm.admin.order.api.OrderEvidenceApi.Selection;
 import com.tcrm.admin.order.api.OrderEvidenceApi.SettlementFlowRow;
+import com.tcrm.admin.order.api.OrderEvidenceApi.ShopCreatorCounts;
 import com.tcrm.admin.order.api.OrderStatsApi;
 import com.tcrm.admin.order.api.OrderStatsApi.RankDimension;
 import com.tcrm.admin.order.api.OrderStatsApi.RankFactsDTO;
@@ -84,11 +85,28 @@ public class AnalyticsDetailService {
     var resolved = overview.resolve(filters);
     var selection = select(resolved, board, entityId, productCode, keyword);
     return activity == null
-        ? new Detail(resolved.period(), evidence.daily(selection), null)
+        ? new Detail(
+            resolved.period(),
+            evidence.daily(selection),
+            null,
+            board == Board.SHOP ? shopOverview(resolved, selection) : null)
         : new Detail(
             resolved.period(),
             null,
-            evidence.page(selection, activity, ranking.page(), ranking.size()));
+            evidence.page(selection, activity, ranking.page(), ranking.size()),
+            null);
+  }
+
+  private ShopOverview shopOverview(
+      StatsOverviewService.ResolvedFilter resolved, Selection selection) {
+    var scope = selection.scope();
+    var settlement =
+        settlementAllowed(resolved)
+            ? orders.shopSettlement(
+                scope.tenantId(), List.of(scope.shopId()), selection.from(), selection.until())
+            : null;
+    return new ShopOverview(
+        settlement == null ? null : settlement.net(), evidence.shopCreatorCounts(selection));
   }
 
   @Transactional(readOnly = true, isolation = Isolation.REPEATABLE_READ)
@@ -100,13 +118,7 @@ public class AnalyticsDetailService {
     var ranking = StatsRanking.resolve(page, size, null);
     var resolved = overview.resolve(filters);
     var scope = resolved.scope();
-    if (resolved.dataScope() != DataScope.ALL
-        || scope.ownerId() != null
-        || scope.kolId() != null
-        || scope.inviterId() != null
-        || scope.matchedKolIds() != null
-        || scope.matchedInviterIds() != null
-        || scope.productKeyword() != null) {
+    if (!settlementAllowed(resolved)) {
       throw new BusinessException(ErrorCode.AUTH_FORBIDDEN);
     }
     validate(Board.SHOP, scope, null, null);
@@ -120,6 +132,18 @@ public class AnalyticsDetailService {
         resolved.period().until(),
         ranking.page(),
         ranking.size());
+  }
+
+  private boolean settlementAllowed(StatsOverviewService.ResolvedFilter resolved) {
+    var scope = resolved.scope();
+    return overview.canView("order:view")
+        && resolved.dataScope() == DataScope.ALL
+        && scope.ownerId() == null
+        && scope.kolId() == null
+        && scope.inviterId() == null
+        && scope.matchedKolIds() == null
+        && scope.matchedInviterIds() == null
+        && scope.productKeyword() == null;
   }
 
   @Transactional(readOnly = true, isolation = Isolation.REPEATABLE_READ)
@@ -325,6 +349,11 @@ public class AnalyticsDetailService {
       boolean transferred,
       String currentInviter) {}
 
+  public record ShopOverview(BigDecimal settlementAmount, ShopCreatorCounts creatorCounts) {}
+
   public record Detail(
-      StatsPeriod period, List<DailyAmount> daily, PageResult<EvidenceRow> activity) {}
+      StatsPeriod period,
+      List<DailyAmount> daily,
+      PageResult<EvidenceRow> activity,
+      ShopOverview shopOverview) {}
 }

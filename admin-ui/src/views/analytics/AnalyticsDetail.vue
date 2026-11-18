@@ -20,6 +20,7 @@ import {
   type ProductBreakdown,
   type ProductGroup,
   type RankRow,
+  type ShopDetailOverview,
   type SettlementFlowRow
 } from "@/api/analytics";
 import { formatAmountWithCurrency } from "@/utils/format";
@@ -49,6 +50,7 @@ const page = ref(1);
 const size = ref(20);
 const tableId = computed(() => `analytics-detail-${shop.value ? "shop-" : ""}${tab.value}`);
 const daily = ref<DailyAmount[]>([]);
+const shopOverview = ref<ShopDetailOverview | null>(null);
 const rows = ref<EvidenceRow[]>([]);
 const flowRows = ref<SettlementFlowRow[]>([]);
 const creatorRows = ref<InviterCreatorRow[]>([]);
@@ -114,13 +116,18 @@ const metricKeys = computed<Metric[]>(() =>
     ? [...salesMetrics, "amountRefundRate", ...orderMetrics]
     : [...salesMetrics, ...orderMetrics, "amountRefundRate"]
 );
-const soldProductCounts = computed(() => {
-  const format = (value: unknown) =>
-    typeof value === "number" || typeof value === "string"
-      ? new Intl.NumberFormat(locale.value).format(BigInt(String(value)))
-      : "—";
-  return { spu: format(props.row.spuCount), sku: format(props.row.skuCount) };
-});
+function formatCount(value: unknown): string {
+  return typeof value === "number" || typeof value === "string"
+    ? new Intl.NumberFormat(locale.value).format(BigInt(String(value)))
+    : "—";
+}
+function formatMoney(value: string | number | null | undefined): string {
+  return value == null ? "—" : formatAmountWithCurrency(String(value));
+}
+const soldProductCounts = computed(() => ({
+  spu: formatCount(props.row.spuCount),
+  sku: formatCount(props.row.skuCount)
+}));
 const cards = computed(() => {
   const metrics = metricKeys.value.flatMap(key => {
     const integer = key === "units" || key === "paidOrderCount";
@@ -144,13 +151,26 @@ const cards = computed(() => {
     return [{ key, label, value: formatted, hint }];
   });
   if (!shop.value) return metrics;
+  const counts = shopOverview.value?.creatorCounts;
   return [
+    {
+      key: "settlementAmount",
+      label: local("settlementAmount"),
+      value: formatMoney(shopOverview.value?.settlementAmount),
+      hint: termHint("settlementAmount")
+    },
     ...metrics,
     {
       key: "soldProducts",
       label: local("soldProducts"),
       value: t("analytics.shopDrawer.soldProductCounts", soldProductCounts.value),
       hint: termHint("soldProducts")
+    },
+    {
+      key: "creatorCounts",
+      label: local("creatorCounts"),
+      value: counts ? `${formatCount(counts.selling)} / ${formatCount(counts.total)}` : "—",
+      hint: termHint("creatorCounts")
     }
   ];
 });
@@ -206,9 +226,24 @@ const shopColumns = computed<DataColumn[]>(() => {
     },
     { key: "creatorName", label: t("analytics.creator"), minWidth: 120, align: "left" },
     { key: "spuId", label: local("spuId"), minWidth: 122, align: "left" },
-    refund
-      ? { key: "amount", label: t("analytics.completedRefundAmount"), minWidth: 116, amount: true }
-      : { key: "units", label: local("quantity"), minWidth: 72 }
+    ...(refund
+      ? [
+          {
+            key: "amount",
+            label: t("analytics.completedRefundAmount"),
+            minWidth: 116,
+            amount: true
+          }
+        ]
+      : [
+          { key: "units", label: local("quantity"), minWidth: 72 },
+          ...["orderPaidAmount", "refundAmount", "netTransactionAmount"].map(key => ({
+            key,
+            label: local(key),
+            minWidth: 112,
+            amount: true
+          }))
+        ])
   ];
 });
 
@@ -373,6 +408,7 @@ async function load(): Promise<void> {
     });
     if (id !== request) return;
     daily.value = result.daily ?? [];
+    shopOverview.value = result.shopOverview ?? null;
     rows.value = result.activity?.items ?? [];
     total.value = Number(result.activity?.total ?? 0);
   } catch {
@@ -394,6 +430,7 @@ watch(
     page.value = 1;
     size.value = readPageSize(tableId.value, 20);
     daily.value = [];
+    shopOverview.value = null;
     rows.value = [];
     flowRows.value = [];
     creatorRows.value = [];
@@ -514,7 +551,7 @@ function changeSize(next: number): void {
         />
       </el-tabs>
       <template v-if="tab === 'overview'">
-        <div class="analytics-detail__cards">
+        <div class="analytics-detail__cards" :class="{ 'analytics-detail__cards--shop': shop }">
           <MetricCard
             v-for="card in cards"
             :key="card.key"
@@ -588,6 +625,7 @@ function changeSize(next: number): void {
         :failed="failed"
         :page="page"
         :size="size"
+        :class="{ 'analytics-detail__orders': shop && tab === 'ORDERS' }"
         :page-sizes="[20, 50, 100]"
         :total="total"
         :scroll-with-page="!shop"
@@ -666,9 +704,6 @@ function changeSize(next: number): void {
             <small v-if="shop && tab !== 'settlements'">{{
               eventTime.format(new Date(entry.eventTime))
             }}</small>
-            <small v-if="shop && tab === 'REFUNDS' && entry.refundNo">
-              {{ t("analytics.drilldown.refundNo") }} <CopyText :value="entry.refundNo" />
-            </small>
           </div>
         </template>
         <template #cell-creatorName="{ row: entry }">{{ entry.creatorName || "—" }}</template>
@@ -695,6 +730,15 @@ function changeSize(next: number): void {
           </el-tag>
         </template>
         <template #cell-refundNo="{ row: entry }"><CopyText :value="entry.refundNo" /></template>
+        <template #cell-orderPaidAmount="{ row: entry }">{{ formatMoney(entry.amount) }}</template>
+        <template #cell-refundAmount="{ row: entry }">
+          <span :class="{ 'analytics-detail__amount--deducted': Number(entry.refundAmount) > 0 }">
+            {{ formatMoney(entry.refundAmount) }}
+          </span>
+        </template>
+        <template #cell-netTransactionAmount="{ row: entry }">
+          <strong>{{ formatMoney(entry.netTransactionAmount) }}</strong>
+        </template>
         <template #cell-amount="{ row: entry }">
           <span
             :class="{
@@ -854,6 +898,17 @@ function changeSize(next: number): void {
   display: grid;
   grid-template-columns: repeat(4, minmax(0, 1fr));
   gap: var(--tcrm-space-3);
+}
+.analytics-detail__cards--shop {
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+}
+.analytics-detail__orders :deep(.el-table__cell.tcrm-amount) {
+  text-align: right;
+}
+@media (max-width: 1000px) {
+  .analytics-detail__cards--shop {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
 }
 @media (max-width: 860px) {
   .analytics-detail__cards {

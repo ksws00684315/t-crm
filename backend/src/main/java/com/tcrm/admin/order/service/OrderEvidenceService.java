@@ -61,6 +61,11 @@ public class OrderEvidenceService implements OrderEvidenceApi {
   }
 
   @Override
+  public ShopCreatorCounts shopCreatorCounts(Selection selection) {
+    return evidence.shopCreatorCounts(selection);
+  }
+
+  @Override
   public List<DailyAmount> daily(Selection selection) {
     return selection.scope().visibleShopIds().isEmpty() ? List.of() : evidence.daily(selection);
   }

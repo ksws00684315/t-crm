@@ -141,6 +141,34 @@ class AnalyticsDetailServiceTest {
   }
 
   @Test
+  void shopOverviewReturnsPeriodCreatorCountsAndCompanySettlement() {
+    var filters = filters(1L);
+    var period = new StatsPeriod(day, day);
+    var scope = new ScopeDTO(4, null, 1L, null, null);
+    var counts = new OrderEvidenceApi.ShopCreatorCounts(3, 5);
+    when(overview.canView("order:view")).thenReturn(true);
+    when(shops.listShops()).thenReturn(List.of(new ShopAccessDTO(1L, "Shop", "remote", 1, "S1")));
+    when(evidence.shopCreatorCounts(any())).thenReturn(counts);
+    when(orders.shopSettlement(4L, List.of(1L), period.from(), period.until()))
+        .thenReturn(
+            new OrderStatsApi.ShopSettlementDTO(new BigDecimal("170"), new BigDecimal("20")));
+    when(overview.resolve(filters))
+        .thenReturn(new ResolvedFilter(scope, period, null, DataScope.ALL));
+
+    var result = details.detail(Board.SHOP, filters, null, null, null, null, null, null);
+    assertThat(result.shopOverview().creatorCounts()).isEqualTo(counts);
+    assertThat(result.shopOverview().settlementAmount()).isEqualByComparingTo("150");
+
+    when(overview.canView("order:view")).thenReturn(false);
+    assertThat(
+            details
+                .detail(Board.SHOP, filters, null, null, null, null, null, null)
+                .shopOverview()
+                .settlementAmount())
+        .isNull();
+  }
+
+  @Test
   void settlementFlowsUseShopAndPeriodAndEnforceOrderAndCompanyScope() {
     var filters = filters(1L);
     assertThatThrownBy(() -> details.shopSettlementFlows(filters, 1, 20))

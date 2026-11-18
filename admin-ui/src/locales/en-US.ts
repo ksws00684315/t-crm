@@ -170,12 +170,17 @@ const enUS: MessageSchema = {
       soldProducts: "Products sold",
       soldProductCounts: "{spu} SPU / {sku} SKU",
       settlement: "Settlement flows",
+      settlementAmount: "Settlement amount",
+      creatorCounts: "Selling creators / Total creators",
       settlementScope:
         "Shop settlement flows are available in company shop scope. Clear creator or inviter filters to view them.",
       orderPaidTime: "Order no. / paid at",
       orderRefundTime: "Order no. / refund completed",
       spuId: "SPU",
       quantity: "Quantity",
+      orderPaidAmount: "Paid amount",
+      refundAmount: "Refund amount",
+      netTransactionAmount: "Net transaction amount",
       flowTime: "Flow no. / posted at",
       amountType: "Amount type",
       direction: "Direction",
@@ -186,6 +191,15 @@ const enUS: MessageSchema = {
       deducted: "Decrease",
       multipleItems: "Order-level flow · {count} items",
       definitions: {
+        settlementAmount:
+          "Shop goods receipts less posted refunds for the selected period, by Weidian posting time. Available in company shop scope.",
+        creatorCounts:
+          "Selling creators had paid orders in this shop during the selected period. Total creators also includes those with a dedicated product link in this shop during the period.",
+        orderPaidAmount:
+          "The amount paid for this item line. Other items in the order appear on their own lines.",
+        refundAmount:
+          "Successful refunds tied to this item line and completed within 30 calendar days of payment.",
+        netTransactionAmount: "The amount paid for this item line less its successful refunds.",
         soldProducts:
           "Distinct SPUs and distinct SKUs with paid sales at this shop in the selected period.",
         orderPaidTime:

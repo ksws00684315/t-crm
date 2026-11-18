@@ -35,7 +35,13 @@ public interface OrderEvidenceApi {
       Long shopId,
       String creatorName,
       String spuId,
-      String imageUrl) {}
+      String imageUrl,
+      BigDecimal refundAmount,
+      BigDecimal netTransactionAmount) {}
+
+  record ShopCreatorCounts(long selling, long total) {}
+
+  ShopCreatorCounts shopCreatorCounts(Selection selection);
 
   record SettlementFlowRow(
       Long id,

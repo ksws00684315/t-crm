@@ -127,6 +127,8 @@ export interface EvidenceRow {
   sku?: string;
   units?: number;
   amount: Scalar;
+  refundAmount?: Scalar;
+  netTransactionAmount?: Scalar;
   eventTime: string;
   creatorName?: string;
   spuId?: string;
@@ -155,9 +157,14 @@ export interface DailyAmount {
   sales: Scalar;
   refunds: Scalar;
 }
+export interface ShopDetailOverview {
+  settlementAmount: Scalar | null;
+  creatorCounts: { selling: Scalar; total: Scalar };
+}
 interface DetailResult {
   daily: DailyAmount[] | null;
   activity: { items: EvidenceRow[]; total: Scalar; page: number; size: number } | null;
+  shopOverview?: ShopDetailOverview | null;
 }
 export function queryAnalyticsDetail(
   board: Board,

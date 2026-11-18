@@ -399,7 +399,8 @@ class OrderStatsIT {
         FROM (VALUES (951,11,'8800','2026-11-01T00:00:00Z'),
                      (952,11,'9900','2026-11-02T00:00:00Z'),
                      (953,12,'9400','2026-11-01T00:00:00Z'),
-                     (954,12,'9300','2026-11-02T00:00:00Z')) links(id,shop,item,created)
+                     (954,12,'9300','2026-11-02T00:00:00Z'),
+                     (956,11,'9600','2026-11-02T00:00:00Z')) links(id,shop,item,created)
         """);
     jdbc.update(
         """
@@ -429,7 +430,9 @@ class OrderStatsIT {
         INSERT INTO crm_refund (id, tenant_id, order_id, order_item_id, weidian_refund_no, amount,
           raw_status, refund_status, refund_time, finish_time, create_time, update_time)
         VALUES (951,4,953,953,'t144-spu-refund',30,'10','SUCCESS','2026-11-03T00:00:00Z',
-          '2026-11-03T01:00:00Z',now(),now())
+          '2026-11-03T01:00:00Z',now(),now()),
+          (952,4,953,953,'t144-spu-late-refund',50,'10','SUCCESS','2026-12-04T00:00:00Z',
+          '2026-12-04T01:00:00Z',now(),now())
         """);
     try (var session = factory.openSession()) {
       var mapper = session.getMapper(OrderDailyStatsMapper.class);
@@ -457,10 +460,23 @@ class OrderStatsIT {
       assertThat(evidence.page(selection, Kind.ORDERS, 20, 0))
           .extracting(row -> row.spuId())
           .containsExactlyInAnyOrder("7890", "7890", "7890", "9400");
+      assertThat(evidence.page(selection, Kind.ORDERS, 20, 0))
+          .filteredOn(row -> row.id() == 953)
+          .singleElement()
+          .satisfies(
+              row -> {
+                assertThat(row.amount()).isEqualByComparingTo("300");
+                assertThat(row.refundAmount()).isEqualByComparingTo("30");
+                assertThat(row.netTransactionAmount()).isEqualByComparingTo("270");
+              });
       assertThat(evidence.page(selection, Kind.REFUNDS, 20, 0))
           .extracting(row -> row.spuId())
           .containsExactly("7890");
       var store = new ScopeDTO(4, null, 11L, null, null, java.util.List.of(11L));
+      var counts =
+          evidence.shopCreatorCounts(new Selection(store, null, null, null, null, FROM, UNTIL));
+      assertThat(counts.selling()).isEqualTo(2);
+      assertThat(counts.total()).isEqualTo(3);
       var stats = session.getMapper(OrderStatsMapper.class);
       assertThat(stats.totals(store.withProductKeyword("7890"), FROM, UNTIL).sales())
           .isEqualByComparingTo("600");
