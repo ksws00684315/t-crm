@@ -822,12 +822,12 @@ const zhCN = {
       contents: "带货数据"
     },
     metric: {
-      costBreakdown: "佣金支出{commission}元 + 样品成本{sample}元 + 坑位费{slot}元",
+      costBreakdown: "佣金{commission} + 样品成本{sample} + 坑位费{slot}",
       contentCount: "内容条数",
       clicks: "累计点击量",
       orders: "累计出单量",
       gmv: "累计带货GMV",
-      totalCost: "累计总投入成本",
+      totalCost: "累计投入成本",
       roi: "累计ROI"
     },
     weekly: {
@@ -854,6 +854,7 @@ const zhCN = {
       publishDate: "发布日期",
       contentForm: "内容形式",
       publishUrl: "发布内容链接",
+      publishTitleColumn: "发布内容标题",
       clicks: "点击量",
       orders: "出单量",
       gmv: "带货GMV",

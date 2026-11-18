@@ -849,12 +849,12 @@ const enUS: MessageSchema = {
       contents: "Sales results"
     },
     metric: {
-      costBreakdown: "Commission {commission} CNY + Samples {sample} CNY + Placement {slot} CNY",
+      costBreakdown: "Commission {commission} + Samples {sample} + Placement {slot}",
       contentCount: "Content records",
       clicks: "Total clicks",
       orders: "Total orders",
       gmv: "Total GMV",
-      totalCost: "Total cost",
+      totalCost: "Cumulative cost",
       roi: "Total ROI"
     },
     weekly: {
@@ -881,6 +881,7 @@ const enUS: MessageSchema = {
       publishDate: "Publish date",
       contentForm: "Format",
       publishUrl: "Content link",
+      publishTitleColumn: "Published content title",
       clicks: "Clicks",
       orders: "Orders",
       gmv: "GMV",

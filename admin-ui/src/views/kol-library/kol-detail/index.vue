@@ -114,9 +114,9 @@ const metrics = computed(() => {
       breakdown:
         totals?.commissionCost != null && totals.sampleCost != null && totals.slotFee != null
           ? t("library.metric.costBreakdown", {
-              commission: money(totals.commissionCost).replace(/^¥/, ""),
-              sample: money(totals.sampleCost).replace(/^¥/, ""),
-              slot: money(totals.slotFee).replace(/^¥/, "")
+              commission: money(totals.commissionCost),
+              sample: money(totals.sampleCost),
+              slot: money(totals.slotFee)
             })
           : undefined
     },
@@ -254,7 +254,7 @@ const contentColumns = computed<DataColumn[]>(() => [
   {
     key: "publishUrl",
     align: "left" as const,
-    label: t("library.content.publishUrl"),
+    label: t("library.content.publishTitleColumn"),
     minWidth: 200
   },
   { key: "clicks", label: t("library.content.clicks"), amount: true, width: 100 },
@@ -704,7 +704,7 @@ onMounted(() => {
           </el-card>
         </el-tab-pane>
 
-        <el-tab-pane :label="t('library.tab.contents')" name="contents">
+        <el-tab-pane :label="t('library.tab.contents')" name="contents" class="contents-pane">
           <div class="metrics" data-test="library-metrics">
             <div v-for="metric in metrics" :key="metric.key" class="metric-card">
               <span class="metric-card__label">{{ metric.label }}</span>
@@ -752,12 +752,14 @@ onMounted(() => {
             <template #cell-publishUrl="{ row }">
               <div class="content-link">
                 <a
+                  v-if="asContent(row).publishUrl"
                   :href="asContent(row).publishUrl"
                   target="_blank"
                   rel="noopener noreferrer"
                   data-test="content-link"
-                  >{{ asContent(row).publishUrl }}</a
+                  >{{ asContent(row).publishTitle?.trim() || t("library.weekly.noTitle") }}</a
                 >
+                <span v-else>{{ asContent(row).publishTitle?.trim() || "—" }}</span>
               </div>
             </template>
             <template #cell-gmv="{ row }">{{ money(asContent(row).gmv) }}</template>
@@ -1031,9 +1033,12 @@ onMounted(() => {
     grid-template-columns: minmax(0, 45%) minmax(0, 1fr);
   }
 }
+.contents-pane {
+  container: library-sales / inline-size;
+}
 .metrics {
   display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
+  grid-template-columns: minmax(0, 1fr);
   gap: var(--tcrm-space-3);
   margin-bottom: var(--tcrm-space-4);
 }
@@ -1051,7 +1056,8 @@ onMounted(() => {
   color: var(--tcrm-color-text-secondary);
   font-size: var(--tcrm-font-size-help);
   line-height: 18px;
-  overflow-wrap: anywhere;
+  overflow-x: auto;
+  white-space: nowrap;
 }
 .metric-card__label {
   color: var(--tcrm-color-text-secondary);
@@ -1086,19 +1092,19 @@ onMounted(() => {
 </style>
 
 <style scoped>
-@media (min-width: 1600px) {
-  .metrics {
-    grid-template-columns: repeat(6, minmax(0, 1fr));
-  }
-}
-@media (max-width: 767px) {
+@container library-sales (min-width: 680px) {
   .metrics {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 }
-@media (max-width: 420px) {
+@container library-sales (min-width: 1030px) {
   .metrics {
-    grid-template-columns: minmax(0, 1fr);
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+}
+@container library-sales (min-width: 2070px) {
+  .metrics {
+    grid-template-columns: repeat(6, minmax(0, 1fr));
   }
 }
 </style>

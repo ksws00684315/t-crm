@@ -12,7 +12,8 @@ import {
 import {
   LIBRARY_CONTENT_FORMS,
   LIBRARY_SAMPLE_STATUSES,
-  libraryOptionLabel
+  libraryOptionLabel,
+  sampleTagType
 } from "@/utils/kol-library";
 import { formatAmountWithCurrency } from "@/utils/format";
 import { notifyError } from "@/utils/notify";
@@ -147,56 +148,89 @@ async function submit(): Promise<void> {
     :is="content ? ElDrawer : ElDialog"
     :model-value="modelValue"
     :title="title"
-    v-bind="content ? { size: 'min(680px, 100vw)' } : { width: '720px', top: '6vh' }"
+    v-bind="
+      content
+        ? {
+            size: 'min(680px, 100vw)',
+            headerClass: readOnly ? 'content-record-drawer-header' : undefined
+          }
+        : { width: '720px', top: '6vh' }
+    "
     :close-on-click-modal="!saving"
     :close-on-press-escape="!saving"
     data-test="content-dialog"
     @update:model-value="emit('update:modelValue', $event)"
   >
     <!-- The title and this footer stay visible; only the body scrolls (norm 13 §3.7). -->
-    <section v-if="readOnly" class="content-record">
-      <el-descriptions :column="1" border class="content-record__details">
-        <el-descriptions-item :label="t('library.content.publishUrl')">
-          <a
-            class="content-record__link"
-            :href="form.publishUrl"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            {{ form.publishUrl }}
-          </a>
-        </el-descriptions-item>
-        <el-descriptions-item :label="t('library.content.publishTitle')">
-          {{ form.publishTitle || "—" }}
-        </el-descriptions-item>
-        <el-descriptions-item :label="t('library.content.publishDate')">
-          {{ form.publishDate }}
-        </el-descriptions-item>
-        <el-descriptions-item :label="t('library.content.contentForm')">
-          {{ libraryOptionLabel("contentForm", form.contentForm) }}
-        </el-descriptions-item>
-        <el-descriptions-item :label="t('library.content.sampleStatus')">
-          {{ libraryOptionLabel("sampleStatus", form.sampleStatus) }}
-        </el-descriptions-item>
-        <el-descriptions-item
+    <div v-if="readOnly" class="content-record">
+      <dl class="content-record__group content-record__group--header">
+        <div class="content-record__field">
+          <dt>{{ t("library.content.publishTitle") }}</dt>
+          <dd class="content-record__title">{{ form.publishTitle || "—" }}</dd>
+        </div>
+        <div class="content-record__field">
+          <dt>{{ t("library.content.publishUrl") }}</dt>
+          <dd>
+            <a
+              v-if="form.publishUrl"
+              class="content-record__link"
+              :href="form.publishUrl"
+              target="_blank"
+              rel="noopener noreferrer"
+            >
+              {{ form.publishUrl }}
+            </a>
+            <span v-else class="content-record__empty">—</span>
+          </dd>
+        </div>
+      </dl>
+      <dl class="content-record__group">
+        <div class="content-record__field">
+          <dt>{{ t("library.content.publishDate") }}</dt>
+          <dd>{{ form.publishDate }}</dd>
+        </div>
+        <div class="content-record__field">
+          <dt>{{ t("library.content.contentForm") }}</dt>
+          <dd>{{ libraryOptionLabel("contentForm", form.contentForm) }}</dd>
+        </div>
+        <div class="content-record__field">
+          <dt>{{ t("library.content.sampleStatus") }}</dt>
+          <dd>
+            <el-tag v-if="form.sampleStatus" size="small" :type="sampleTagType(form.sampleStatus)">
+              {{ libraryOptionLabel("sampleStatus", form.sampleStatus) }}
+            </el-tag>
+            <span v-else class="content-record__empty">—</span>
+          </dd>
+        </div>
+      </dl>
+      <dl class="content-record__group content-record__group--numbers">
+        <div
           v-for="field in ['sampleCost', 'slotFee'] as const"
           :key="field"
-          :label="t(`library.content.${field}`)"
+          class="content-record__field"
         >
-          {{ form[field] == null ? "—" : formatAmountWithCurrency(form[field], "CNY") }}
-        </el-descriptions-item>
-        <el-descriptions-item :label="t('library.content.commissionRate')">
-          {{ form.commissionRate == null ? "—" : `${form.commissionRate}%` }}
-        </el-descriptions-item>
-        <el-descriptions-item
+          <dt>{{ t(`library.content.${field}`) }}</dt>
+          <dd v-if="form[field] != null">{{ formatAmountWithCurrency(form[field], "CNY") }}</dd>
+          <dd v-else class="content-record__empty">—</dd>
+        </div>
+        <div class="content-record__field">
+          <dt>{{ t("library.content.commissionRate") }}</dt>
+          <dd v-if="form.commissionRate != null">{{ form.commissionRate }}%</dd>
+          <dd v-else class="content-record__empty">—</dd>
+        </div>
+      </dl>
+      <dl class="content-record__group content-record__group--notes">
+        <div
           v-for="field in ['nextAction', 'remark'] as const"
           :key="field"
-          :label="t(`library.content.${field}`)"
+          class="content-record__field"
         >
-          {{ form[field] || "—" }}
-        </el-descriptions-item>
-      </el-descriptions>
-    </section>
+          <dt>{{ t(`library.content.${field}`) }}</dt>
+          <dd v-if="form[field]?.trim()">{{ form[field] }}</dd>
+          <dd v-else class="content-record__empty">—</dd>
+        </div>
+      </dl>
+    </div>
     <el-form
       v-else
       ref="formRef"
@@ -206,11 +240,11 @@ async function submit(): Promise<void> {
       class="content-dialog__body"
       @submit.prevent
     >
-      <el-form-item :label="t('library.content.publishUrl')" prop="publishUrl">
-        <el-input v-model="form.publishUrl" maxlength="512" data-test="content-url" />
-      </el-form-item>
       <el-form-item :label="t('library.content.publishTitle')" prop="publishTitle">
         <el-input v-model="form.publishTitle" maxlength="200" data-test="content-title" />
+      </el-form-item>
+      <el-form-item :label="t('library.content.publishUrl')" prop="publishUrl">
+        <el-input v-model="form.publishUrl" maxlength="512" data-test="content-url" />
       </el-form-item>
       <el-form-item :label="t('library.content.publishDate')" prop="publishDate">
         <el-date-picker
@@ -319,18 +353,71 @@ async function submit(): Promise<void> {
 </template>
 
 <style scoped>
-.content-record__link {
-  color: var(--tcrm-color-primary-text);
+:global(.el-drawer__header.content-record-drawer-header) {
+  margin-bottom: 0;
 }
-.content-record__details {
+.content-record {
+  --content-label-width: 10rem;
+  color: var(--tcrm-color-text);
+  font-size: var(--tcrm-font-size-body);
+  line-height: var(--tcrm-line-height-body);
+}
+.content-record__group {
+  display: grid;
+  gap: var(--tcrm-space-3);
+  margin: 0;
+  padding: var(--tcrm-space-4);
+}
+.content-record__group--header {
+  background: var(--tcrm-color-page);
+  border-radius: var(--tcrm-radius-card);
+}
+.content-record__group--numbers,
+.content-record__group--notes {
+  border-top: 1px solid var(--tcrm-color-border);
+}
+.content-record__field {
+  display: grid;
+  grid-template-columns: var(--content-label-width) minmax(0, 1fr);
+  align-items: baseline;
+  column-gap: var(--tcrm-space-4);
+}
+.content-record__field dt,
+.content-record__empty {
+  color: var(--tcrm-color-text-secondary);
+}
+.content-record__field dd {
+  margin: 0;
   overflow-wrap: anywhere;
 }
-.content-record__details :deep(.el-descriptions__label) {
-  width: 120px;
+.content-record__title {
+  font-size: var(--tcrm-font-size-section);
+  line-height: var(--tcrm-line-height-section);
+  font-weight: 600;
+}
+.content-record__group--numbers dd {
+  font-variant-numeric: tabular-nums;
+}
+.content-record__group--notes dd {
+  white-space: pre-wrap;
+}
+.content-record__link {
+  color: var(--tcrm-color-primary-text);
+  text-decoration: underline;
+  text-underline-offset: 0.18em;
+}
+.content-record__link:hover {
+  color: var(--tcrm-color-primary-hover);
 }
 .content-dialog__body {
   max-height: 64vh;
   overflow-y: auto;
   padding-right: var(--tcrm-space-2);
+}
+@media (max-width: 520px) {
+  .content-record__field {
+    grid-template-columns: minmax(0, 1fr);
+    row-gap: var(--tcrm-space-1);
+  }
 }
 </style>

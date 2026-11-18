@@ -302,6 +302,7 @@ async function submit(row: object) {
       <DataTable
         v-else
         table-id="library-weekly-data"
+        class="weekly__table"
         plain
         :paged="false"
         :total="history.length"
@@ -344,6 +345,7 @@ async function submit(row: object) {
             v-if="canEdit && isEditing(row)"
             link
             type="primary"
+            class="weekly__action"
             :loading="saving"
             @click="submit(row)"
             >{{ t("common.save") }}</el-button
@@ -352,6 +354,7 @@ async function submit(row: object) {
             v-else-if="canEdit"
             link
             type="primary"
+            class="weekly__action"
             :disabled="saving"
             @click="startEdit(row as LibraryWeeklyData)"
             >{{ t("common.edit") }}</el-button
@@ -365,6 +368,19 @@ async function submit(row: object) {
 </template>
 
 <style scoped>
+.weekly__table :deep(.el-table) {
+  --el-table-row-hover-bg-color: var(--tcrm-color-card);
+}
+.weekly__table :deep(.el-table__body td.el-table__cell) {
+  transition: none;
+}
+.weekly__table :deep(.el-table__body tr:hover > td.el-table__cell) {
+  background-color: var(--tcrm-color-muted);
+}
+.weekly__action,
+#app .weekly__action {
+  font-weight: 400;
+}
 .weekly {
   display: grid;
   gap: var(--tcrm-space-4);
