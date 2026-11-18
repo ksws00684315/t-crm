@@ -25,6 +25,7 @@ import {
   LIBRARY_OUTREACH_STATUSES,
   LIBRARY_PLATFORMS,
   LIBRARY_SAMPLE_STATUSES,
+  LIBRARY_SAMPLE_TYPES,
   libraryDefaultValue,
   libraryOptionLabel
 } from "@/utils/kol-library";
@@ -107,6 +108,8 @@ function emptyForm(): LibraryKolRequest {
     audienceCountry: null,
     audienceAgeRange: null,
     audienceGender: null,
+    audienceAgeShare: null,
+    audienceGenderShare: null,
     contact: null,
     contentQuality: null,
     salesPotential: null,
@@ -118,6 +121,7 @@ function emptyForm(): LibraryKolRequest {
     followUpOwner: "",
     lastContactDate: null,
     sampleStatus: libraryDefaultValue(LIBRARY_SAMPLE_STATUSES),
+    sampleType: null,
     trackingNo: null,
     sampleDate: null,
     followUpRemark: null
@@ -212,6 +216,8 @@ function fill(detail: LibraryKolDetailVO): void {
     audienceCountry: detail.audienceCountry,
     audienceAgeRange: detail.audienceAgeRange,
     audienceGender: detail.audienceGender,
+    audienceAgeShare: detail.audienceAgeShare ?? null,
+    audienceGenderShare: detail.audienceGenderShare ?? null,
     contact: detail.contact,
     contentQuality: detail.contentQuality,
     salesPotential: detail.salesPotential,
@@ -223,6 +229,7 @@ function fill(detail: LibraryKolDetailVO): void {
     followUpOwner: detail.followUpOwner,
     lastContactDate: detail.lastContactDate,
     sampleStatus: detail.sampleStatus,
+    sampleType: detail.sampleType ?? null,
     trackingNo: detail.trackingNo,
     sampleDate: detail.sampleDate,
     followUpRemark: detail.followUpRemark
@@ -286,6 +293,8 @@ function toRequest(): LibraryKolRequest {
     followUpRemark: clean(form.followUpRemark),
     followers: form.followers === null || `${form.followers}` === "" ? null : form.followers,
     avgViews: form.avgViews === null || `${form.avgViews}` === "" ? null : form.avgViews,
+    audienceAgeShare: form.audienceAgeShare || null,
+    audienceGenderShare: form.audienceGenderShare || null,
     engagementRate:
       form.engagementRate === null || form.engagementRate === "" ? null : form.engagementRate
   };
@@ -573,7 +582,11 @@ onMounted(() => {
             <el-card shadow="never" class="form-card" data-test="section-audience">
               <template #header>{{ t("library.formSection.audience") }}</template>
               <div class="form-card__grid">
-                <el-form-item :label="t('library.field.audienceCountry')" prop="audienceCountry">
+                <el-form-item
+                  :label="t('library.field.audienceCountry')"
+                  prop="audienceCountry"
+                  class="form-card__wide"
+                >
                   <el-input
                     v-model="form.audienceCountry"
                     maxlength="64"
@@ -590,6 +603,18 @@ onMounted(() => {
                     />
                   </el-select>
                 </el-form-item>
+                <el-form-item :label="t('library.field.audienceAgeShare')" prop="audienceAgeShare">
+                  <el-input
+                    v-model="form.audienceAgeShare"
+                    type="number"
+                    min="0"
+                    max="100"
+                    step="0.01"
+                    data-test="audience-age-share"
+                  >
+                    <template #suffix>%</template>
+                  </el-input>
+                </el-form-item>
                 <el-form-item :label="t('library.field.audienceGender')" prop="audienceGender">
                   <el-select v-model="form.audienceGender" clearable data-test="audience-gender">
                     <el-option
@@ -599,6 +624,21 @@ onMounted(() => {
                       :value="option.value"
                     />
                   </el-select>
+                </el-form-item>
+                <el-form-item
+                  :label="t('library.field.audienceGenderShare')"
+                  prop="audienceGenderShare"
+                >
+                  <el-input
+                    v-model="form.audienceGenderShare"
+                    type="number"
+                    min="0"
+                    max="100"
+                    step="0.01"
+                    data-test="audience-gender-share"
+                  >
+                    <template #suffix>%</template>
+                  </el-input>
                 </el-form-item>
               </div>
             </el-card>
@@ -650,6 +690,21 @@ onMounted(() => {
                     v-for="option in LIBRARY_SAMPLE_STATUSES"
                     :key="option.value"
                     :label="libraryOptionLabel('sampleStatus', option.value)"
+                    :value="option.value"
+                  />
+                </el-select>
+              </el-form-item>
+              <el-form-item :label="t('library.field.sampleType')" prop="sampleType">
+                <el-select
+                  v-model="form.sampleType"
+                  clearable
+                  :value-on-clear="null"
+                  data-test="sample-type"
+                >
+                  <el-option
+                    v-for="option in LIBRARY_SAMPLE_TYPES"
+                    :key="option.value"
+                    :label="libraryOptionLabel('sampleType', option.value)"
                     :value="option.value"
                   />
                 </el-select>

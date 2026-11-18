@@ -74,8 +74,7 @@ export const LIBRARY_AUDIENCE_AGES = options<LibraryAudienceAge>([
 ]);
 export const LIBRARY_AUDIENCE_GENDERS = options<LibraryAudienceGender>([
   "MOSTLY_FEMALE",
-  "MOSTLY_MALE",
-  "BALANCED"
+  "MOSTLY_MALE"
 ]);
 
 /** Option key in the language pack for one value of the given option family. */

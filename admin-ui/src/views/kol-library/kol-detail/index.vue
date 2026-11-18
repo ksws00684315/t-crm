@@ -20,12 +20,13 @@ import { formatAmountWithCurrency } from "@/utils/format";
 import { libraryOptionLabel, outreachTagType, sampleTagType } from "@/utils/kol-library";
 import { notifyError } from "@/utils/notify";
 import { libraryAbilities } from "@/utils/permission";
+import LibraryWeeklyDrawer from "./LibraryWeeklyDrawer.vue";
 import LibraryContentDialog from "./LibraryContentDialog.vue";
 import LibraryFollowUpDialog from "./LibraryFollowUpDialog.vue";
 
 defineOptions({ name: "LibraryKolDetailPage" });
 
-const { t } = useI18n();
+const { t, locale } = useI18n();
 const route = useRoute();
 const router = useRouter();
 const tabs = useTabsStore();
@@ -43,6 +44,8 @@ const contentsFailed = ref(false);
 const activeTab = ref<"profile" | "contents">("profile");
 
 const contentDialogVisible = ref(false);
+const weeklyContent = ref<LibraryContentVO | null>(null);
+const weeklyOpen = ref(false);
 const editingContent = ref<LibraryContentVO | null>(null);
 const followUpVisible = ref(false);
 const deleting = ref(false);
@@ -62,7 +65,14 @@ const initials = computed(() => {
 
 const countFormat = new Intl.NumberFormat("en-US");
 
-function formatCount(value: string | null): string {
+function audienceValue(label: string, share: string | null | undefined): string {
+  if (share == null || label === "—") return label;
+  const value = Number(share).toLocaleString(locale.value, { maximumFractionDigits: 2 });
+  return locale.value.startsWith("zh") ? `${label}（${value}%）` : `${label} (${value}%)`;
+}
+
+function formatCount(value: string | number | null): string {
+  if (typeof value === "number") return countFormat.format(value);
   return value && /^\d+$/.test(value) ? countFormat.format(BigInt(value)) : show(value);
 }
 
@@ -84,15 +94,43 @@ const metrics = computed(() => {
     {
       key: "contentCount",
       label: t("library.metric.contentCount"),
-      value: show(totals?.contentCount)
+      value: formatCount(totals?.contentCount ?? null)
     },
-    { key: "clicks", label: t("library.metric.clicks"), value: show(totals?.clicks) },
-    { key: "orders", label: t("library.metric.orders"), value: show(totals?.orders) },
+    {
+      key: "clicks",
+      label: t("library.metric.clicks"),
+      value: formatCount(totals?.clicks ?? null)
+    },
+    {
+      key: "orders",
+      label: t("library.metric.orders"),
+      value: formatCount(totals?.orders ?? null)
+    },
     { key: "gmv", label: t("library.metric.gmv"), value: money(totals?.gmv) },
-    { key: "totalCost", label: t("library.metric.totalCost"), value: money(totals?.totalCost) },
+    {
+      key: "totalCost",
+      label: t("library.metric.totalCost"),
+      value: money(totals?.totalCost),
+      breakdown:
+        totals?.commissionCost != null && totals.sampleCost != null && totals.slotFee != null
+          ? t("library.metric.costBreakdown", {
+              commission: money(totals.commissionCost).replace(/^¥/, ""),
+              sample: money(totals.sampleCost).replace(/^¥/, ""),
+              slot: money(totals.slotFee).replace(/^¥/, "")
+            })
+          : undefined
+    },
     { key: "roi", label: t("library.metric.roi"), value: show(totals?.roi) }
   ];
 });
+
+function formatLibraryEntryDate(created: string): string {
+  const date = new Date(created);
+  if (Number.isNaN(date.getTime())) return "—";
+  const month = String(date.getMonth() + 1).padStart(2, "0");
+  const day = String(date.getDate()).padStart(2, "0");
+  return `${date.getFullYear()}-${month}-${day}`;
+}
 
 /** Money in CNY with the ¥ sign and grouping; an empty value shows a dash. */
 function money(value: string | null | undefined): string {
@@ -165,11 +203,14 @@ const profileGroups = computed<ProfileGroup[]>(() => {
         },
         {
           label: t("library.field.audienceAgeRange"),
-          value: option("audienceAge", row.audienceAgeRange)
+          value: audienceValue(option("audienceAge", row.audienceAgeRange), row.audienceAgeShare)
         },
         {
           label: t("library.field.audienceGender"),
-          value: option("audienceGender", row.audienceGender)
+          value: audienceValue(
+            option("audienceGender", row.audienceGender),
+            row.audienceGenderShare
+          )
         }
       ]
     },
@@ -177,6 +218,10 @@ const profileGroups = computed<ProfileGroup[]>(() => {
       key: "followUp",
       title: t("library.group.followUp"),
       fields: [
+        {
+          label: t("library.field.libraryEntryDate"),
+          value: formatLibraryEntryDate(row.createTime)
+        },
         {
           label: t("library.field.outreachStatus"),
           tags: [option("outreachStatus", row.outreachStatus)],
@@ -188,6 +233,10 @@ const profileGroups = computed<ProfileGroup[]>(() => {
           label: t("library.field.sampleStatus"),
           tags: [option("sampleStatus", row.sampleStatus)],
           tagType: sampleTagType(row.sampleStatus)
+        },
+        {
+          label: t("library.field.sampleType"),
+          value: option("sampleType", row.sampleType ?? null)
         },
         { label: t("library.field.trackingNo"), value: show(row.trackingNo) },
         { label: t("library.field.sampleDate"), value: show(row.sampleDate) },
@@ -211,7 +260,6 @@ const contentColumns = computed<DataColumn[]>(() => [
   { key: "clicks", label: t("library.content.clicks"), amount: true, width: 100 },
   { key: "orders", label: t("library.content.orders"), amount: true, width: 90 },
   { key: "gmv", label: t("library.content.gmv"), amount: true, width: 130 },
-  { key: "sampleType", label: t("library.content.sampleType"), width: 90 },
   { key: "sampleCost", label: t("library.content.sampleCost"), amount: true, width: 110 },
   { key: "slotFee", label: t("library.content.slotFee"), amount: true, width: 110 },
   {
@@ -228,17 +276,25 @@ const contentColumns = computed<DataColumn[]>(() => [
   },
   { key: "totalCost", label: t("library.content.totalCost"), amount: true, width: 120 },
   { key: "actualRoi", label: t("library.content.actualRoi"), amount: true, width: 100 },
-  { key: "actions", label: t("common.actions"), width: 96 }
+  { key: "actions", label: t("common.actions"), width: 190 }
 ]);
 
 function contentActions(row: LibraryContentVO): RowAction[] {
   return [
     {
-      key: "edit",
-      label: t("common.edit"),
-      testId: `content-edit-${row.id}`,
-      hidden: !abilities.value.canEdit,
+      key: "view",
+      label: t("library.content.viewTitle"),
+      testId: `content-view-${row.id}`,
       onClick: () => openContentDialog(row)
+    },
+    {
+      key: "weekly",
+      label: t("library.weekly.title"),
+      testId: `content-weekly-${row.id}`,
+      onClick: () => {
+        weeklyContent.value = row;
+        weeklyOpen.value = true;
+      }
     },
     {
       key: "delete",
@@ -327,6 +383,10 @@ function openFollowUp(): void {
 
 async function onContentSaved(): Promise<void> {
   await loadAll();
+  if (weeklyContent.value) {
+    weeklyContent.value =
+      contents.value.find(row => row.id === weeklyContent.value?.id) ?? weeklyContent.value;
+  }
   activeTab.value = "contents";
 }
 
@@ -534,11 +594,25 @@ onMounted(() => {
                 </div>
                 <div>
                   <dt>{{ t("library.field.audienceAgeRange") }}</dt>
-                  <dd>{{ option("audienceAge", detail.audienceAgeRange) }}</dd>
+                  <dd>
+                    {{
+                      audienceValue(
+                        option("audienceAge", detail.audienceAgeRange),
+                        detail.audienceAgeShare
+                      )
+                    }}
+                  </dd>
                 </div>
                 <div>
                   <dt>{{ t("library.field.audienceGender") }}</dt>
-                  <dd>{{ option("audienceGender", detail.audienceGender) }}</dd>
+                  <dd>
+                    {{
+                      audienceValue(
+                        option("audienceGender", detail.audienceGender),
+                        detail.audienceGenderShare
+                      )
+                    }}
+                  </dd>
                 </div>
               </dl>
             </section>
@@ -637,6 +711,13 @@ onMounted(() => {
               <span class="metric-card__value" :data-test="`metric-${metric.key}`">
                 {{ metric.value }}
               </span>
+              <small
+                v-if="metric.breakdown"
+                class="metric-card__breakdown"
+                data-test="cost-breakdown"
+              >
+                {{ metric.breakdown }}
+              </small>
             </div>
           </div>
           <!-- The actions live above the table: a plain table has no toolbar of its own. -->
@@ -677,15 +758,9 @@ onMounted(() => {
                   data-test="content-link"
                   >{{ asContent(row).publishUrl }}</a
                 >
-                <CopyText :value="asContent(row).publishUrl" />
               </div>
             </template>
             <template #cell-gmv="{ row }">{{ money(asContent(row).gmv) }}</template>
-            <template #cell-sampleType="{ row }">
-              {{
-                asContent(row).sampleType ? option("sampleType", asContent(row).sampleType) : "—"
-              }}
-            </template>
             <template #cell-sampleCost="{ row }">{{ money(asContent(row).sampleCost) }}</template>
             <template #cell-slotFee="{ row }">{{ money(asContent(row).slotFee) }}</template>
             <template #cell-commissionRate="{ row }">
@@ -711,6 +786,15 @@ onMounted(() => {
       v-model="contentDialogVisible"
       :kol-id="detail.id"
       :content="editingContent"
+      :can-edit="abilities.canEdit"
+      @saved="onContentSaved"
+    />
+    <LibraryWeeklyDrawer
+      v-if="detail && weeklyContent"
+      v-model="weeklyOpen"
+      :creator="detail"
+      :content="weeklyContent"
+      :can-edit="abilities.canEdit"
       @saved="onContentSaved"
     />
     <LibraryFollowUpDialog
@@ -949,7 +1033,7 @@ onMounted(() => {
 }
 .metrics {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+  grid-template-columns: repeat(3, minmax(0, 1fr));
   gap: var(--tcrm-space-3);
   margin-bottom: var(--tcrm-space-4);
 }
@@ -957,16 +1041,26 @@ onMounted(() => {
   display: flex;
   flex-direction: column;
   gap: var(--tcrm-space-1);
-  padding: var(--tcrm-space-3);
+  min-width: 0;
+  padding: var(--tcrm-space-4);
   background: var(--tcrm-color-card);
   border: 1px solid var(--tcrm-color-border);
   border-radius: var(--tcrm-radius-card);
+}
+.metric-card__breakdown {
+  color: var(--tcrm-color-text-secondary);
+  font-size: var(--tcrm-font-size-help);
+  line-height: 18px;
+  overflow-wrap: anywhere;
 }
 .metric-card__label {
   color: var(--tcrm-color-text-secondary);
   font-size: var(--tcrm-font-size-body);
 }
 .metric-card__value {
+  font-variant-numeric: tabular-nums;
+  overflow-wrap: anywhere;
+  line-height: var(--tcrm-line-height-title);
   font-weight: 600;
   font-size: var(--tcrm-font-size-title);
 }
@@ -988,5 +1082,23 @@ onMounted(() => {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+</style>
+
+<style scoped>
+@media (min-width: 1600px) {
+  .metrics {
+    grid-template-columns: repeat(6, minmax(0, 1fr));
+  }
+}
+@media (max-width: 767px) {
+  .metrics {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+@media (max-width: 420px) {
+  .metrics {
+    grid-template-columns: minmax(0, 1fr);
+  }
 }
 </style>

@@ -35,6 +35,8 @@ const detail: LibraryKolDetailVO = {
   audienceCountry: null,
   audienceAgeRange: "AGE_25_34",
   audienceGender: "FEMALE" as never,
+  audienceAgeShare: "20",
+  audienceGenderShare: "80",
   contact: "+1 555 0100",
   contentQuality: "HIGH",
   salesPotential: null,
@@ -185,12 +187,19 @@ describe("creator library form", () => {
       "备注"
     ]);
     expect(labels("section-account-type")).toEqual(["内容类目", "近期平均播放量", "互动率（%）"]);
-    expect(labels("section-audience")).toEqual(["国家/地区", "年龄段", "性别"]);
+    expect(labels("section-audience")).toEqual([
+      "国家/地区",
+      "年龄段",
+      "年龄占比（%）",
+      "性别",
+      "性别占比（%）"
+    ]);
     expect(labels("tab-follow-up")).toEqual([
       "建联状态",
       "跟进负责人",
       "最近沟通时间",
       "寄样状态",
+      "样品类型",
       "寄样单号",
       "寄样日期",
       "跟进备注"
@@ -364,6 +373,20 @@ describe("creator library form", () => {
     wrapper.unmount();
   });
 
+  it("allows manual changes to both optional audience percentages", async () => {
+    const { wrapper } = await mountAt("/kol-library/kols/11/edit");
+    await fill(wrapper, "audience-age-share", "25");
+    await fill(wrapper, "audience-gender-share", "75");
+    await save(wrapper);
+    await eventually(() =>
+      expect(libraryApi.updateLibraryKol).toHaveBeenCalledWith(
+        "11",
+        expect.objectContaining({ audienceAgeShare: "25", audienceGenderShare: "75" })
+      )
+    );
+    wrapper.unmount();
+  });
+
   it("loads the stored profile when editing and saves it back", async () => {
     const { wrapper } = await mountAt("/kol-library/kols/11/edit");
     expect(libraryApi.getLibraryKol).toHaveBeenCalledWith("11");
@@ -372,6 +395,8 @@ describe("creator library form", () => {
     expect(textareaOf(wrapper, "follow-up-remark").element.value).toBe("call on friday");
     await fill(wrapper, "display-name", "Beauty by Amy II");
     await save(wrapper);
+    expect(inputOf(wrapper, "audience-age-share").element.value).toBe("20");
+    expect(inputOf(wrapper, "audience-gender-share").element.value).toBe("80");
     await eventually(() => expect(libraryApi.updateLibraryKol).toHaveBeenCalled());
     expect(libraryApi.updateLibraryKol).toHaveBeenCalledWith(
       "11",

@@ -22,6 +22,8 @@ public record LibraryKolCommand(
     String audienceCountry,
     String audienceAgeRange,
     String audienceGender,
+    BigDecimal audienceAgeShare,
+    BigDecimal audienceGenderShare,
     String contact,
     String contentQuality,
     String salesPotential,
@@ -33,6 +35,7 @@ public record LibraryKolCommand(
     String followUpOwner,
     LocalDate lastContactDate,
     String sampleStatus,
+    String sampleType,
     String trackingNo,
     LocalDate sampleDate,
     String followUpRemark) {}
