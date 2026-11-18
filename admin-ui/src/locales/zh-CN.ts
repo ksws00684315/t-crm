@@ -701,12 +701,13 @@ const zhCN = {
       upload: "上传表格",
       title: "批量导入达人",
       guide:
-        "请在 Excel 模板的「达人导入」工作表填写新达人。平台和达人 ID 已存在时，该行会提示重复。",
-      rules: "请填写高亮列。支持 .xlsx，最多 200 行、2 MB。",
+        "请在 Excel 模板的「达人导入」工作表从 B 列开始填写，每位达人占一列。平台和达人 ID 已存在时会提示重复。",
+      rules: "请填写高亮字段。支持 .xlsx，最多 200 位达人、2 MB。",
       file: "选择 Excel 表格",
       submit: "开始导入",
       result: "新增 {created} 条，失败 {failed} 条。",
       row: "第 {row} 行",
+      recordColumn: "{column} 列",
       invalidCell: "「{column}」填写有误，请核对模板中的格式和示例",
       viewList: "查看达人列表"
     },
@@ -782,6 +783,8 @@ const zhCN = {
       engagementRate: "互动率（%）",
       audienceCountry: "国家/地区",
       audienceAgeRange: "年龄段",
+      audienceAgeShare: "年龄占比（%）",
+      audienceGenderShare: "性别占比（%）",
       audienceGender: "性别",
       contact: "联系方式",
       contactPlaceholder: "国家区号 + 号码",
@@ -798,6 +801,8 @@ const zhCN = {
       sampleStatus: "寄样状态",
       trackingNo: "寄样单号",
       sampleDate: "寄样日期",
+      sampleType: "样品类型",
+      libraryEntryDate: "达人入库时间",
       followUpRemark: "跟进备注"
     },
     validation: {
@@ -817,17 +822,39 @@ const zhCN = {
       contents: "带货数据"
     },
     metric: {
+      costBreakdown: "佣金{commission} + 样品成本{sample} + 坑位费{slot}",
       contentCount: "内容条数",
       clicks: "累计点击量",
       orders: "累计出单量",
       gmv: "累计带货GMV",
-      totalCost: "累计总投入成本",
+      totalCost: "累计投入成本",
       roi: "累计ROI"
     },
+    weekly: {
+      title: "数据明细",
+      updatedAt: "最近数据更新时间",
+      note: "该视频累计数据，含已有历史累计及已保存的周数据",
+      week: "时间",
+      selectWeek: "选择自然周",
+      integer: "整数",
+      decimal: "最多两位小数",
+      submit: "提交本周数据",
+      locked: "提交后该行锁定，并自动新增一行",
+      invalid: "请填写自然周、非负整数及最多两位小数的 GMV",
+      empty: "暂未录入周度数据",
+      noTitle: "未填写视频标题"
+    },
     content: {
+      titleRequired: "请输入内容标题",
+      formRequired: "请选择内容形式",
+      sampleStatus: "样品状态",
+      remark: "备注",
+      viewTitle: "基础信息",
+      publishTitle: "内容标题",
       publishDate: "发布日期",
       contentForm: "内容形式",
       publishUrl: "发布内容链接",
+      publishTitleColumn: "发布内容标题",
       clicks: "点击量",
       orders: "出单量",
       gmv: "带货GMV",
@@ -918,15 +945,15 @@ const zhCN = {
       PHOTO_SHOOT: "寄拍"
     },
     audienceAge: {
-      AGE_18_24: "18~24",
-      AGE_25_34: "25~34",
-      AGE_35_44: "35~44",
-      AGE_45_54: "45~54",
-      AGE_55_PLUS: "55+"
+      AGE_18_24: "18~24岁",
+      AGE_25_34: "25~34岁",
+      AGE_35_44: "35~44岁",
+      AGE_45_54: "45~54岁",
+      AGE_55_PLUS: "55岁及以上"
     },
     audienceGender: {
-      MOSTLY_FEMALE: "女性为主",
-      MOSTLY_MALE: "男性为主",
+      MOSTLY_FEMALE: "女性",
+      MOSTLY_MALE: "男性",
       BALANCED: "均衡"
     }
   },

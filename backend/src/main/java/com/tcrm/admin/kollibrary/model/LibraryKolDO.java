@@ -52,6 +52,9 @@ public class LibraryKolDO extends BaseEntity {
   @TableField(updateStrategy = FieldStrategy.ALWAYS)
   private LibraryAudienceGender audienceGender;
 
+  private BigDecimal audienceAgeShare;
+  private BigDecimal audienceGenderShare;
+
   @TableField(updateStrategy = FieldStrategy.ALWAYS)
   private String contact;
 
@@ -82,6 +85,16 @@ public class LibraryKolDO extends BaseEntity {
   private LocalDate lastContactDate;
 
   private LibrarySampleStatus sampleStatus;
+
+  private LibrarySampleType sampleType;
+
+  public LibrarySampleType getSampleType() {
+    return sampleType;
+  }
+
+  public void setSampleType(LibrarySampleType value) {
+    sampleType = value;
+  }
 
   @TableField(updateStrategy = FieldStrategy.ALWAYS)
   private String trackingNo;
@@ -186,6 +199,22 @@ public class LibraryKolDO extends BaseEntity {
 
   public void setAudienceAgeRange(LibraryAudienceAge value) {
     this.audienceAgeRange = value;
+  }
+
+  public BigDecimal getAudienceAgeShare() {
+    return audienceAgeShare;
+  }
+
+  public void setAudienceAgeShare(BigDecimal value) {
+    this.audienceAgeShare = value;
+  }
+
+  public BigDecimal getAudienceGenderShare() {
+    return audienceGenderShare;
+  }
+
+  public void setAudienceGenderShare(BigDecimal value) {
+    this.audienceGenderShare = value;
   }
 
   public LibraryAudienceGender getAudienceGender() {

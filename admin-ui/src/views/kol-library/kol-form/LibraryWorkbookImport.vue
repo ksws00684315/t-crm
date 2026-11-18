@@ -112,7 +112,11 @@ function reset(): void {
         </p>
         <ul v-if="result.errors.length" class="workbook-errors">
           <li v-for="error in result.errors" :key="error.row">
-            <strong>{{ t("library.workbook.row", { row: error.row }) }}</strong>
+            <strong>{{
+              error.recordColumn
+                ? t("library.workbook.recordColumn", { column: error.recordColumn })
+                : t("library.workbook.row", { row: error.row })
+            }}</strong>
             {{
               error.column
                 ? t("library.workbook.invalidCell", { column: error.column })
