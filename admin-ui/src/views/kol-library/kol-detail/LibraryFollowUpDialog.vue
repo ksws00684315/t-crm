@@ -11,6 +11,7 @@ import {
 import {
   LIBRARY_OUTREACH_STATUSES,
   LIBRARY_SAMPLE_STATUSES,
+  LIBRARY_SAMPLE_TYPES,
   libraryOptionLabel
 } from "@/utils/kol-library";
 import { notifyError } from "@/utils/notify";
@@ -31,6 +32,7 @@ const form = reactive<LibraryFollowUpRequest>({
   outreachStatus: "NOT_CONTACTED",
   lastContactDate: null,
   sampleStatus: "NOT_SENT",
+  sampleType: null,
   trackingNo: null,
   sampleDate: null,
   followUpRemark: null
@@ -62,11 +64,12 @@ watch(
   () => props.modelValue,
   open => {
     if (!open) return;
-    // Starts from the stored follow-up state; only this dialog's six fields change.
+    // Starts from the stored follow-up state; only this dialog's fields change.
     Object.assign(form, {
       outreachStatus: props.detail.outreachStatus,
       lastContactDate: props.detail.lastContactDate,
       sampleStatus: props.detail.sampleStatus,
+      sampleType: props.detail.sampleType ?? null,
       trackingNo: props.detail.trackingNo,
       sampleDate: props.detail.sampleDate,
       followUpRemark: props.detail.followUpRemark
@@ -136,6 +139,21 @@ async function submit(): Promise<void> {
             v-for="option in LIBRARY_SAMPLE_STATUSES"
             :key="option.value"
             :label="libraryOptionLabel('sampleStatus', option.value)"
+            :value="option.value"
+          />
+        </el-select>
+      </el-form-item>
+      <el-form-item :label="t('library.field.sampleType')" prop="sampleType">
+        <el-select
+          v-model="form.sampleType"
+          clearable
+          :value-on-clear="null"
+          data-test="follow-up-sample-type"
+        >
+          <el-option
+            v-for="option in LIBRARY_SAMPLE_TYPES"
+            :key="option.value"
+            :label="libraryOptionLabel('sampleType', option.value)"
             :value="option.value"
           />
         </el-select>

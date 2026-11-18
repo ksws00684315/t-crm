@@ -18,6 +18,7 @@ import com.tcrm.admin.kollibrary.model.LibraryOption;
 import com.tcrm.admin.kollibrary.model.LibraryOutreachStatus;
 import com.tcrm.admin.kollibrary.model.LibraryPlatform;
 import com.tcrm.admin.kollibrary.model.LibrarySampleStatus;
+import com.tcrm.admin.kollibrary.model.LibrarySampleType;
 import com.tcrm.admin.security.api.CurrentUserContext;
 import com.tcrm.admin.shared.BusinessException;
 import com.tcrm.admin.shared.ErrorCode;
@@ -211,6 +212,9 @@ public class LibraryKolService {
             .set(LibraryKolDO::getOutreachStatus, outreach)
             .set(LibraryKolDO::getLastContactDate, command.lastContactDate())
             .set(LibraryKolDO::getSampleStatus, sample)
+            .set(
+                LibraryKolDO::getSampleType,
+                optional(LibrarySampleType.class, command.sampleType()))
             .set(LibraryKolDO::getTrackingNo, strip(command.trackingNo()))
             .set(LibraryKolDO::getSampleDate, command.sampleDate())
             .set(LibraryKolDO::getFollowUpRemark, text(command.followUpRemark(), 1000))
@@ -304,6 +308,8 @@ public class LibraryKolService {
     row.setAudienceCountry(text(command.audienceCountry(), 64));
     row.setAudienceAgeRange(optional(LibraryAudienceAge.class, command.audienceAgeRange()));
     row.setAudienceGender(optional(LibraryAudienceGender.class, command.audienceGender()));
+    row.setAudienceAgeShare(percent(command.audienceAgeShare()));
+    row.setAudienceGenderShare(percent(command.audienceGenderShare()));
     row.setContact(text(command.contact(), 128));
     row.setContentQuality(optional(LibraryLevel.class, command.contentQuality()));
     row.setSalesPotential(optional(LibraryLevel.class, command.salesPotential()));
@@ -325,6 +331,7 @@ public class LibraryKolService {
     }
     row.setFollowUpOwner(requiredText(command.followUpOwner()));
     row.setLastContactDate(command.lastContactDate());
+    row.setSampleType(optional(LibrarySampleType.class, command.sampleType()));
     row.setSampleStatus(
         creating && blank(command.sampleStatus())
             ? LibrarySampleStatus.NOT_SENT
@@ -355,6 +362,8 @@ public class LibraryKolService {
         .set(LibraryKolDO::getAudienceCountry, row.getAudienceCountry())
         .set(LibraryKolDO::getAudienceAgeRange, row.getAudienceAgeRange())
         .set(LibraryKolDO::getAudienceGender, row.getAudienceGender())
+        .set(LibraryKolDO::getAudienceAgeShare, row.getAudienceAgeShare())
+        .set(LibraryKolDO::getAudienceGenderShare, row.getAudienceGenderShare())
         .set(LibraryKolDO::getContact, row.getContact())
         .set(LibraryKolDO::getContentQuality, row.getContentQuality())
         .set(LibraryKolDO::getSalesPotential, row.getSalesPotential())
@@ -369,6 +378,7 @@ public class LibraryKolService {
         .set(LibraryKolDO::getFollowUpOwner, row.getFollowUpOwner())
         .set(LibraryKolDO::getLastContactDate, row.getLastContactDate())
         .set(LibraryKolDO::getSampleStatus, row.getSampleStatus())
+        .set(LibraryKolDO::getSampleType, row.getSampleType())
         .set(LibraryKolDO::getTrackingNo, row.getTrackingNo())
         .set(LibraryKolDO::getSampleDate, row.getSampleDate())
         .set(LibraryKolDO::getFollowUpRemark, row.getFollowUpRemark());
@@ -445,7 +455,10 @@ public class LibraryKolService {
             totals.orders(),
             totals.gmv(),
             totals.totalCost(),
-            totals.roi());
+            totals.roi(),
+            totals.commissionCost(),
+            totals.sampleCost(),
+            totals.slotFee());
     return new LibraryKolDTO.Detail(
         row.getId(),
         name(row.getPlatform()),
@@ -460,6 +473,8 @@ public class LibraryKolService {
         row.getAudienceCountry(),
         name(row.getAudienceAgeRange()),
         name(row.getAudienceGender()),
+        row.getAudienceAgeShare(),
+        row.getAudienceGenderShare(),
         row.getContact(),
         name(row.getContentQuality()),
         name(row.getSalesPotential()),
@@ -471,6 +486,7 @@ public class LibraryKolService {
         row.getFollowUpOwner(),
         row.getLastContactDate(),
         name(row.getSampleStatus()),
+        name(row.getSampleType()),
         row.getTrackingNo(),
         row.getSampleDate(),
         row.getFollowUpRemark(),

@@ -24,6 +24,8 @@ public record LibraryKolRequest(
     @Size(max = 64) String audienceCountry,
     @Size(max = 16) String audienceAgeRange,
     @Size(max = 16) String audienceGender,
+    BigDecimal audienceAgeShare,
+    BigDecimal audienceGenderShare,
     @Size(max = 128) String contact,
     @Size(max = 8) String contentQuality,
     @Size(max = 8) String salesPotential,
@@ -35,6 +37,7 @@ public record LibraryKolRequest(
     @Size(max = 64) String followUpOwner,
     LocalDate lastContactDate,
     @Size(max = 16) String sampleStatus,
+    @Size(max = 16) String sampleType,
     @Size(max = 64) String trackingNo,
     LocalDate sampleDate,
     @Size(max = 1000) String followUpRemark) {
@@ -53,6 +56,8 @@ public record LibraryKolRequest(
         audienceCountry,
         audienceAgeRange,
         audienceGender,
+        audienceAgeShare,
+        audienceGenderShare,
         contact,
         contentQuality,
         salesPotential,
@@ -64,6 +69,7 @@ public record LibraryKolRequest(
         followUpOwner,
         lastContactDate,
         sampleStatus,
+        sampleType,
         trackingNo,
         sampleDate,
         followUpRemark);

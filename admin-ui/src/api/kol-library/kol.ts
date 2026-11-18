@@ -83,6 +83,9 @@ export interface LibraryTotals {
   gmv: string;
   totalCost: string;
   roi: string | null;
+  commissionCost?: string;
+  sampleCost?: string;
+  slotFee?: string;
 }
 
 /** Full profile and totals of the detail page. */
@@ -100,6 +103,8 @@ export interface LibraryKolDetailVO {
   audienceCountry: string | null;
   audienceAgeRange: LibraryAudienceAge | null;
   audienceGender: LibraryAudienceGender | null;
+  audienceAgeShare?: string | null;
+  audienceGenderShare?: string | null;
   contact: string | null;
   contentQuality: LibraryLevel | null;
   salesPotential: LibraryLevel | null;
@@ -111,6 +116,7 @@ export interface LibraryKolDetailVO {
   followUpOwner: string;
   lastContactDate: string | null;
   sampleStatus: LibrarySampleStatus;
+  sampleType?: LibrarySampleType | null;
   trackingNo: string | null;
   sampleDate: string | null;
   followUpRemark: string | null;
@@ -130,6 +136,7 @@ export interface LibraryFollowUpRequest {
   outreachStatus: LibraryOutreachStatus;
   lastContactDate: string | null;
   sampleStatus: LibrarySampleStatus;
+  sampleType?: LibrarySampleType | null;
   trackingNo: string | null;
   sampleDate: string | null;
   followUpRemark: string | null;
@@ -137,8 +144,10 @@ export interface LibraryFollowUpRequest {
 
 /** One content record with its calculated fields (requirement 1.2.6 ③). */
 export interface LibraryContentVO {
+  hasWeeklyData?: boolean;
   id: string;
   publishUrl: string;
+  publishTitle?: string | null;
   publishDate: string;
   contentForm: LibraryContentForm;
   clicks: string | null;
@@ -152,14 +161,24 @@ export interface LibraryContentVO {
   totalCost: string;
   actualRoi: string | null;
   nextAction: string | null;
+  remark?: string | null;
+  sampleStatus?: LibrarySampleStatus | null;
   updateTime: string;
 }
 
-/** The manual fields of one content record; the calculated three are never sent. */
-export type LibraryContentRequest = Omit<
-  LibraryContentVO,
-  "id" | "updateTime" | "estimatedCommission" | "totalCost" | "actualRoi"
->;
+/** Fields editable in the basic information form. Sales are written through the weekly API. */
+export interface LibraryContentRequest {
+  publishUrl: string;
+  publishTitle: string;
+  publishDate: string;
+  contentForm: LibraryContentForm;
+  commissionRate: string | null;
+  sampleCost: string | null;
+  sampleStatus: LibrarySampleStatus | null;
+  slotFee: string | null;
+  nextAction: string | null;
+  remark: string | null;
+}
 
 /** `data` of a 409 KOL_LIBRARY_DUPLICATE answer: who entered the creator first. */
 export interface LibraryDuplicate {
@@ -191,7 +210,7 @@ export function createLibraryKol(request: LibraryKolRequest): Promise<LibraryKol
 
 export interface LibraryWorkbookImportResult {
   created: number;
-  errors: { row: number; errorCode: string; column: string | null }[];
+  errors: { row: number; errorCode: string; column: string | null; recordColumn?: string | null }[];
 }
 
 export function downloadLibraryWorkbookTemplate() {
@@ -220,7 +239,7 @@ export function updateLibraryKol(
   });
 }
 
-/** Updates the six follow-up fields only; the other groups are left as they are. */
+/** Updates the follow-up fields only; the other groups are left as they are. */
 export function updateLibraryFollowUp(
   id: string,
   request: LibraryFollowUpRequest
@@ -272,5 +291,39 @@ export function deleteLibraryContent(kolId: string, contentId: string): Promise<
   return http.request<null>({
     method: "delete",
     url: `/kol-library/kols/${kolId}/contents/${contentId}`
+  });
+}
+
+export interface LibraryWeeklyInput {
+  weekStart: string;
+  clicks: string;
+  orders: string;
+  gmv: string;
+}
+
+export interface LibraryWeeklyData extends LibraryWeeklyInput {
+  updatedAt: string;
+}
+
+export function listLibraryWeeklyData(kolId: string, contentId: string) {
+  return http.request<LibraryWeeklyData[]>({
+    method: "get",
+    url: `/kol-library/kols/${kolId}/contents/${contentId}/weekly-data`
+  });
+}
+
+export function appendLibraryWeek(kolId: string, contentId: string, data: LibraryWeeklyInput) {
+  return http.request<LibraryWeeklyData[]>({
+    method: "post",
+    url: `/kol-library/kols/${kolId}/contents/${contentId}/weekly-data`,
+    data
+  });
+}
+
+export function updateLibraryWeek(kolId: string, contentId: string, data: LibraryWeeklyInput) {
+  return http.request<LibraryWeeklyData[]>({
+    method: "put",
+    url: `/kol-library/kols/${kolId}/contents/${contentId}/weekly-data`,
+    data
   });
 }

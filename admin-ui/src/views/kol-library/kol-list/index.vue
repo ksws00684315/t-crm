@@ -31,6 +31,8 @@ import { readPageSize } from "@/utils/table-prefs";
 
 defineOptions({ name: "LibraryKolListPage" });
 
+const gradeTagTypes = { S: "warning", A: "primary", B: "success", C: "info" } as const;
+
 const { t, locale } = useI18n();
 const router = useRouter();
 const me = useUserStore();
@@ -433,7 +435,15 @@ onMounted(load);
         </el-tag>
       </template>
       <template #cell-grade="{ row }">
-        {{ asKol(row).grade ? libraryOptionLabel("grade", asKol(row).grade) : "—" }}
+        <el-tag
+          v-if="asKol(row).grade"
+          class="kol-grade"
+          size="small"
+          :type="gradeTagTypes[asKol(row).grade ?? 'C']"
+        >
+          {{ libraryOptionLabel("grade", asKol(row).grade) }}
+        </el-tag>
+        <span v-else>—</span>
       </template>
       <template #actions="{ row }">
         <RowActions :actions="rowActions(asKol(row))" />
@@ -472,5 +482,8 @@ onMounted(load);
   display: flex;
   flex-wrap: wrap;
   gap: 4px;
+}
+.kol-grade {
+  font-weight: 600;
 }
 </style>

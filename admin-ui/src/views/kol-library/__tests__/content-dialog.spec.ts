@@ -18,6 +18,7 @@ vi.mock("@/api/kol-library/kol");
 const existing: LibraryContentVO = {
   id: "31",
   publishUrl: "https://www.tiktok.com/@amy/video/1",
+  publishTitle: "Amy video",
   publishDate: "2026-10-01",
   contentForm: "SHORT_VIDEO",
   clicks: "1200",
@@ -41,14 +42,10 @@ function inputOf(wrapper: ReturnType<typeof mount>, testId: string): DOMWrapper<
   return new DOMWrapper(field);
 }
 
-function calculated(wrapper: ReturnType<typeof mount>, testId: string): string {
-  return wrapper.find(`[data-test="${testId}"]`).text();
-}
-
 async function open(content: LibraryContentVO | null) {
   setActivePinia(createPinia());
   const wrapper = mount(LibraryContentDialog, {
-    props: { modelValue: false, kolId: "11", content },
+    props: { modelValue: false, kolId: "11", content, canEdit: true },
     global: { plugins: [ElementPlus, i18n] },
     attachTo: document.body
   });
@@ -64,100 +61,57 @@ describe("library content dialog", () => {
     vi.mocked(libraryApi.updateLibraryContent).mockReset();
   });
 
-  it("shows the stored calculated values when editing", async () => {
-    const wrapper = await open(existing);
-    expect(calculated(wrapper, "calculated-commission")).toBe("¥125.00");
-    expect(calculated(wrapper, "calculated-cost")).toBe("¥205.00");
-    expect(calculated(wrapper, "calculated-roi")).toBe("4.88");
-    wrapper.unmount();
-  });
-
-  it("recalculates the three fields while typing, with the backend formulas", async () => {
-    const wrapper = await open(null);
-    await inputOf(wrapper, "content-gmv").setValue("1000");
-    await inputOf(wrapper, "content-sample-cost").setValue("30");
-    await inputOf(wrapper, "content-slot-fee").setValue("50");
-    await inputOf(wrapper, "content-rate").setValue("12.5");
-    await flushPromises();
-    // 1000 × 12.5% = 125.00; 30 + 50 + 125 = 205.00; 1000 / 205 = 4.88
-    expect(calculated(wrapper, "calculated-commission")).toBe("¥125.00");
-    expect(calculated(wrapper, "calculated-cost")).toBe("¥205.00");
-    expect(calculated(wrapper, "calculated-roi")).toBe("4.88");
-
-    // Empty amounts count as 0, so the ROI becomes a dash when nothing is spent.
-    await inputOf(wrapper, "content-gmv").setValue("");
-    await inputOf(wrapper, "content-sample-cost").setValue("");
-    await inputOf(wrapper, "content-slot-fee").setValue("");
-    await inputOf(wrapper, "content-rate").setValue("");
-    await flushPromises();
-    expect(calculated(wrapper, "calculated-commission")).toBe("¥0.00");
-    expect(calculated(wrapper, "calculated-cost")).toBe("¥0.00");
-    expect(calculated(wrapper, "calculated-roi")).toBe("—");
-    wrapper.unmount();
-  });
-
-  it("rounds half up like the backend", async () => {
-    const wrapper = await open(null);
-    // 333.33 × 7.77% = 25.8997… → 25.90
-    await inputOf(wrapper, "content-gmv").setValue("333.33");
-    await inputOf(wrapper, "content-rate").setValue("7.77");
-    await flushPromises();
-    expect(calculated(wrapper, "calculated-commission")).toBe("¥25.90");
-    // 0.05 × 10% = 0.005 → 0.01 (HALF_UP, not banker's rounding)
-    await inputOf(wrapper, "content-gmv").setValue("0.05");
-    await inputOf(wrapper, "content-rate").setValue("10");
-    await flushPromises();
-    expect(calculated(wrapper, "calculated-commission")).toBe("¥0.01");
-    wrapper.unmount();
-  });
-
-  it("sends only the manual fields and lets the API answer win", async () => {
+  it("requires a title and creates with the remaining optional fields blank", async () => {
     vi.mocked(libraryApi.createLibraryContent).mockResolvedValue(existing);
     const wrapper = await open(null);
     await inputOf(wrapper, "content-url").setValue("https://www.tiktok.com/@amy/video/1");
-    // The date picker is a text input with the value format.
-    await inputOf(wrapper, "content-gmv").setValue("1000");
-    await inputOf(wrapper, "content-sample-cost").setValue("30");
-    await inputOf(wrapper, "content-slot-fee").setValue("50");
-    await inputOf(wrapper, "content-rate").setValue("12.5");
-    // The publish date sits in the same form, next to the link: the only date of this dialog.
-    const picker = wrapper.findComponent({ name: "ElDatePicker" });
-    picker.vm.$emit("update:modelValue", "2026-10-01");
+    wrapper.findComponent({ name: "ElDatePicker" }).vm.$emit("update:modelValue", "2026-10-01");
+    await wrapper.get('[data-test="content-save"]').trigger("click");
     await flushPromises();
-    await wrapper.find('[data-test="content-save"]').trigger("click");
-    await vi.waitFor(() => expect(libraryApi.createLibraryContent).toHaveBeenCalled(), {
-      timeout: 3000
-    });
-    const [kolId, payload] = vi.mocked(libraryApi.createLibraryContent).mock.calls[0];
-    expect(kolId).toBe("11");
-    expect(payload).toMatchObject({
-      publishUrl: "https://www.tiktok.com/@amy/video/1",
-      publishDate: "2026-10-01",
-      gmv: "1000",
-      sampleCost: "30",
-      slotFee: "50",
-      commissionRate: "12.5"
-    });
-    // The three calculated values never travel to the API.
-    expect(payload).not.toHaveProperty("estimatedCommission");
-    expect(payload).not.toHaveProperty("totalCost");
-    expect(payload).not.toHaveProperty("actualRoi");
-    expect(wrapper.emitted("saved")).toHaveLength(1);
+    expect(libraryApi.createLibraryContent).not.toHaveBeenCalled();
+    await inputOf(wrapper, "content-title").setValue("Amy video");
+    await wrapper.get('[data-test="content-save"]').trigger("click");
+    await vi.waitFor(
+      () =>
+        expect(libraryApi.createLibraryContent).toHaveBeenCalledWith("11", {
+          publishUrl: "https://www.tiktok.com/@amy/video/1",
+          publishTitle: "Amy video",
+          publishDate: "2026-10-01",
+          contentForm: "SHORT_VIDEO",
+          commissionRate: null,
+          sampleCost: null,
+          sampleStatus: null,
+          slotFee: null,
+          nextAction: null,
+          remark: null
+        }),
+      { timeout: 3000 }
+    );
     wrapper.unmount();
   });
 
-  it("edits an existing record by its id", async () => {
+  it("edits only basic information from the read-only drawer", async () => {
     vi.mocked(libraryApi.updateLibraryContent).mockResolvedValue(existing);
     const wrapper = await open(existing);
-    await inputOf(wrapper, "content-clicks").setValue("5");
-    await wrapper.find('[data-test="content-save"]').trigger("click");
-    await vi.waitFor(() => expect(libraryApi.updateLibraryContent).toHaveBeenCalled(), {
-      timeout: 3000
-    });
-    expect(vi.mocked(libraryApi.updateLibraryContent).mock.calls[0].slice(0, 2)).toEqual([
-      "11",
-      "31"
-    ]);
+    expect(wrapper.find('[data-test="content-url"]').exists()).toBe(false);
+    expect(wrapper.text()).not.toContain("带货GMV");
+    await wrapper.get('[data-test="content-enable-edit"]').trigger("click");
+    expect(wrapper.find('[data-test="content-clicks"]').exists()).toBe(false);
+    await wrapper.get('textarea[data-test="content-remark"]').setValue("Sample received");
+    await wrapper.get('[data-test="content-save"]').trigger("click");
+    await vi.waitFor(
+      () =>
+        expect(libraryApi.updateLibraryContent).toHaveBeenCalledWith(
+          "11",
+          "31",
+          expect.objectContaining({ remark: "Sample received" })
+        ),
+      { timeout: 3000 }
+    );
+    const request = vi.mocked(libraryApi.updateLibraryContent).mock.calls[0][2];
+    expect(request).not.toHaveProperty("clicks");
+    expect(request).not.toHaveProperty("orders");
+    expect(request).not.toHaveProperty("gmv");
     wrapper.unmount();
   });
 });
