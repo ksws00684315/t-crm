@@ -12,6 +12,7 @@ import {
 } from "@/api/kol/promotion";
 import type { KolVO, LinkTemplateVO } from "@/api/types";
 import DataTable, { type DataColumn } from "@/components/DataTable.vue";
+import CopyText from "@/components/CopyText.vue";
 import { formatInstant } from "@/utils/format";
 import { ApiError } from "@/utils/http/error";
 import { validateSheetUrl } from "@/utils/kol-validation";
@@ -66,6 +67,11 @@ const recordsPage = ref(1);
 const recordsSize = ref(10);
 const formRef = ref<FormInstance>();
 const activeTab = ref("config");
+/**
+ * Task 156: once a promotion config has been saved (the creator has a config version), the dialog
+ * reopens read-only and the Edit button switches back to the editable form.
+ */
+const editing = ref(false);
 const incompleteAlert = ref("");
 const incompleteKeys = ref<string[]>([]);
 
@@ -156,6 +162,7 @@ watch(
     incompleteAlert.value = "";
     incompleteKeys.value = [];
     activeTab.value = "config";
+    editing.value = props.kol.configVersion == null;
     formRef.value?.clearValidate();
     void loadAll();
   }
@@ -240,7 +247,11 @@ async function save() {
   if (!id || saving.value) return;
   incompleteAlert.value = "";
   const formValid = formRef.value ? await formRef.value.validate().catch(() => false) : false;
-  if (!formValid) return;
+  if (!formValid) {
+    // The config form owns the rules; saving from the records tab must not hide its errors.
+    activeTab.value = "config";
+    return;
+  }
   const missing = incompletePromotionFields({
     defaultRate: percentToRate(form.percent),
     platforms: form.platforms,
@@ -311,7 +322,41 @@ function onRecordsSize(size: number): void {
             :title="incompleteAlert"
             data-test="incomplete-alert"
           />
-          <el-form ref="formRef" :model="form" :rules="rules" label-position="top" @submit.prevent>
+          <el-descriptions v-if="!editing" :column="1" border data-test="commission-view">
+            <el-descriptions-item :label="t('promotion.field.defaultRate')">
+              <span data-test="rate-view">{{ form.percent ? `${form.percent}%` : "-" }}</span>
+            </el-descriptions-item>
+            <el-descriptions-item :label="t('promotion.platforms')">
+              <div v-if="form.platforms.length" data-test="platforms-view">
+                <div v-for="platform in form.platforms" :key="platform.templateId">
+                  {{ templateName(platform.templateId) }}
+                </div>
+              </div>
+              <span v-else data-test="platforms-view">-</span>
+            </el-descriptions-item>
+            <el-descriptions-item :label="t('promotion.field.sheetUrl')">
+              <span data-test="sheet-url-view">
+                <template v-if="form.sheetUrl">
+                  <a :href="form.sheetUrl" target="_blank" rel="noopener noreferrer">{{
+                    form.sheetUrl
+                  }}</a>
+                  <CopyText class="link-copy" :value="form.sheetUrl" />
+                </template>
+                <template v-else>-</template>
+              </span>
+            </el-descriptions-item>
+            <el-descriptions-item :label="t('promotion.noteLabel')">
+              <span data-test="commission-note-view">{{ form.note || "-" }}</span>
+            </el-descriptions-item>
+          </el-descriptions>
+          <el-form
+            v-else
+            ref="formRef"
+            :model="form"
+            :rules="rules"
+            label-position="top"
+            @submit.prevent
+          >
             <el-form-item :label="t('promotion.field.defaultRate')" prop="percent">
               <el-input
                 v-model="form.percent"
@@ -391,7 +436,14 @@ function onRecordsSize(size: number): void {
     </div>
     <template #footer>
       <el-button @click="emit('update:modelValue', false)">{{ t("common.close") }}</el-button>
-      <el-button type="primary" data-test="commission-save" :loading="saving" @click="save">
+      <el-button
+        v-if="!editing"
+        type="primary"
+        data-test="commission-edit"
+        @click="editing = true"
+        >{{ t("kol.editProfile") }}</el-button
+      >
+      <el-button v-else type="primary" data-test="commission-save" :loading="saving" @click="save">
         {{ t("common.save") }}
       </el-button>
     </template>
@@ -406,5 +458,13 @@ function onRecordsSize(size: number): void {
   display: flex;
   flex-direction: column;
   gap: 2px;
+}
+/* The link already shows the URL; keep only the copy affordance next to it. */
+.link-copy :deep(.copy-text__value) {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip-path: inset(50%);
 }
 </style>

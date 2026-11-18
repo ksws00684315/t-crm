@@ -1,4 +1,5 @@
-# License metadata corrections verified against packaged originals; no vulnerability exemptions.
+# License metadata corrections verified against packaged originals. One temporary vulnerability
+# exemption with an expiry, see the end of this file.
 
 [[PackageOverrides]]
 name = "com.tngtech.archunit:archunit"
@@ -281,3 +282,14 @@ version = "5.0.0"
 ecosystem = "npm"
 license.ignore = true
 reason = "Actual license: BlueOak-1.0.0 (license field of the installed package). Introduction path (devDependencies only, in both admin-ui and kol-portal): generate-license-file > @npmcli/arborist > pacote > tar > yallist. Not in any build artifact: absent from the production dependency tree (`pnpm list --prod`), so it is not bundled into dist/, not listed in THIRD-PARTY-NOTICES, and not copied into the static bundles or images. Basis: spec 07 section 3 build/test tool rule (OSI-approved license, not shipped, unmodified, not linked into business code; ADR-007)."
+
+# ---- temporary vulnerability exemptions ----
+
+# Approved by the project owner on 2026-11-18: no patched picomatch release exists yet, and the
+# package is a dev-only transitive dependency (eslint-plugin-vue, vue-tsc, node-gyp). The same
+# exception is registered for `pnpm audit` in both pnpm-workspace.yaml files. Remove this entry
+# after upgrading picomatch.
+[[IgnoredVulns]]
+id = "GHSA-fc5q-39xc-vjpf"
+ignoreUntil = 2026-12-18
+reason = "picomatch <= 4.0.7 ReDoS; no fixed version as of 2026-11-18. Dev-only chain, not in runtime artifacts."

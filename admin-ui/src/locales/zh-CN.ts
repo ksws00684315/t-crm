@@ -1046,6 +1046,16 @@ const zhCN = {
     disabledNotOwned: "仅负责该达人的商务可操作",
     disabledCommissionApproved: "达人审核通过后才能调整佣金",
     editProfileTitle: "资料编辑 - {code}（{name}）",
+    /** Profile dialog tabs and the read-only / edit switch (task 156). */
+    tabProfile: "达人资料",
+    tabInviter: "邀请人资料",
+    inviterHint: "邀请人由达人所属商务自动带出，不可修改",
+    inviterAccountsHint: "两个账号按达人单独记录，不随邀请人带出；同一商务对不同达人可使用不同账号",
+    bdDiscord: "Discord 账号",
+    bdDiscordPlaceholder: "负责该达人的商务 Discord 账号",
+    bdWhatsapp: "WhatsApp 账号",
+    bdWhatsappPlaceholder: "负责该达人的商务 WhatsApp 账号",
+    editProfile: "编辑",
     /** Super-administrator password reset (task 147); the generated password is shown once. */
     resetPassword: "重置密码",
     resetPasswordTitle: "重置达人密码",

@@ -37,6 +37,10 @@ export interface EditKolRequest {
   remark: string | null;
   whatsapp: string | null;
   phone: string | null;
+  /** Company business Discord account managing the creator (task 156); null clears it. */
+  bdDiscord: string | null;
+  /** Company business WhatsApp account managing the creator (task 156); null clears it. */
+  bdWhatsapp: string | null;
 }
 
 export interface ReviewKolRequest {
