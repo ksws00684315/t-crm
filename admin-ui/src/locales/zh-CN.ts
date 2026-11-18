@@ -179,11 +179,9 @@ const zhCN = {
       refundAmount: "退款金额",
       netTransactionAmount: "净交易额",
       flowTime: "流水号／业务时间",
-      amountType: "金额类型",
+      settlementSpuId: "SPU ID",
       direction: "方向",
       amount: "金额",
-      addedType: "店铺应收增加",
-      deductedType: "店铺应收减少",
       added: "增加",
       deducted: "减少",
       multipleItems: "整单流水 · {count} 项商品",
@@ -201,7 +199,8 @@ const zhCN = {
         spuId:
           "显示该商品在本店的第一条已识别微店链接 ID。同款链接归到同一个 SPU。未识别的链接以订单商品 ID 单独显示。",
         flow: "本系统记录的流水编号和微店实际入账时间，按北京时间归期。",
-        amountType: "微店货款收入计为店铺应收增加，已入账退款计为店铺应收减少。",
+        settlementSpuId:
+          "显示流水对应商品在本店的第一条已识别微店链接 ID。无法确定唯一 SPU 时显示横线。",
         direction: "店铺应收增加或减少的方向。",
         settlement: "已同步的微店货款收入或退款扣减金额，单位为人民币元。排除手续费和分润。"
       }

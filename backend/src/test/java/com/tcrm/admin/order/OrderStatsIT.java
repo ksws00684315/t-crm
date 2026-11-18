@@ -157,13 +157,21 @@ class OrderStatsIT {
                 assertThat(refund.eventTime()).isEqualTo(UNTIL.minusSeconds(1));
                 assertThat(refund.product()).isEqualTo("A");
                 assertThat(refund.sku()).isEqualTo("1");
+                assertThat(refund.spuId()).isEqualTo("A");
               },
               income -> {
                 assertThat(income.amountType()).isEqualTo("INCREASE");
                 assertThat(income.eventTime()).isEqualTo(FROM);
                 assertThat(income.itemCount()).isEqualTo(2);
                 assertThat(income.product()).isNull();
+                assertThat(income.spuId()).isEqualTo("A");
               });
+      jdbc.update("UPDATE crm_order_item SET weidian_item_id = 'B' WHERE id = 2");
+      session.clearCache();
+      assertThat(settlements.pageShopReceivables(4, 1, FROM, UNTIL, 1, 1))
+          .singleElement()
+          .satisfies(flow -> assertThat(flow.spuId()).isNull());
+      jdbc.update("UPDATE crm_order_item SET weidian_item_id = 'A' WHERE id = 2");
       assertThat(settlements.pageShopReceivables(4, 1, FROM, UNTIL, 1, 1))
           .singleElement()
           .satisfies(flow -> assertThat(flow.id()).isEqualTo(1L));

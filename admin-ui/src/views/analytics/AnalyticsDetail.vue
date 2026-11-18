@@ -211,7 +211,7 @@ const shopColumns = computed<DataColumn[]>(() => {
       { key: "flow", label: local("flowTime"), minWidth: 172, align: "left" },
       { ...product, label: t("analytics.product") },
       { key: "orderNo", label: t("analytics.drilldown.orderNo"), minWidth: 150, align: "left" },
-      { key: "amountType", label: local("amountType"), minWidth: 128 },
+      { key: "spuId", label: local("settlementSpuId"), minWidth: 128, align: "left" },
       { key: "direction", label: local("direction"), minWidth: 80 },
       { key: "amount", label: local("amount"), minWidth: 112, amount: true }
     ];
@@ -291,13 +291,15 @@ const detailHeaders = computed(() =>
     const refund = tab.value === "REFUNDS";
     const key = column.key;
     const localKey =
-      tab.value === "settlements" && key === "amount"
-        ? "settlement"
-        : shop.value && key === "orderNo" && tab.value !== "settlements"
-          ? refund
-            ? "orderRefundTime"
-            : "orderPaidTime"
-          : key;
+      tab.value === "settlements" && key === "spuId"
+        ? "settlementSpuId"
+        : tab.value === "settlements" && key === "amount"
+          ? "settlement"
+          : shop.value && key === "orderNo" && tab.value !== "settlements"
+            ? refund
+              ? "orderRefundTime"
+              : "orderPaidTime"
+            : key;
     const evidenceKey =
       key === "amount"
         ? refund
@@ -717,9 +719,6 @@ function changeSize(next: number): void {
             <small>{{ eventTime.format(new Date(entry.eventTime)) }}</small>
           </div>
         </template>
-        <template #cell-amountType="{ row: entry }">{{
-          local(entry.amountType === "REFUND" ? "deductedType" : "addedType")
-        }}</template>
         <template #cell-direction="{ row: entry }">
           <el-tag
             size="small"

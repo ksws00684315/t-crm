@@ -182,11 +182,9 @@ const enUS: MessageSchema = {
       refundAmount: "Refund amount",
       netTransactionAmount: "Net transaction amount",
       flowTime: "Flow no. / posted at",
-      amountType: "Amount type",
+      settlementSpuId: "SPU ID",
       direction: "Direction",
       amount: "Amount",
-      addedType: "Shop receivables added",
-      deductedType: "Shop receivables deducted",
       added: "Increase",
       deducted: "Decrease",
       multipleItems: "Order-level flow · {count} items",
@@ -209,8 +207,8 @@ const enUS: MessageSchema = {
         spuId:
           "Shows the first known Weidian link for the product in this shop. Linked copies share one SPU. Unmapped links keep their order item ID.",
         flow: "CRM flow identifier and the Weidian posting time in Beijing time.",
-        amountType:
-          "Goods revenues increase shop receivables. Posted refunds decrease shop receivables.",
+        settlementSpuId:
+          "The first known Weidian link for the product in this shop. A dash indicates that the flow cannot be matched to a single SPU.",
         direction: "Whether the posting increases or decreases shop receivables.",
         settlement:
           "Synced goods revenue or refunded amount in CNY. Fees and profit shares are excluded."

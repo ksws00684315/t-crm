@@ -55,22 +55,23 @@ public interface OrderSettlementFlowMapper extends BaseMapper<OrderSettlementFlo
   @InterceptorIgnore(tenantLine = "true")
   @Select(
       """
+      <script>
       WITH paged AS (
         SELECT id, weidian_order_id, refund_id, trade_time, trade_sub_type, amount_raw
         FROM crm_order_settlement_flow
-        WHERE
+        WHERE <![CDATA[
       """
           + RECEIVABLES_FILTER
           + """
-        ORDER BY trade_time DESC, id DESC LIMIT #{size} OFFSET #{offset}
+        ]]> ORDER BY trade_time DESC, id DESC LIMIT #{size} OFFSET #{offset}
       )
       SELECT f.id, f.weidian_order_id AS order_no,
              CASE WHEN item.item_count = 1 THEN item.item_name END AS product,
              CASE WHEN item.item_count = 1 THEN item.sku_name END AS sku,
-             CASE WHEN item.item_count = 1 THEN p.image_url END AS image_url,
+             CASE WHEN item.item_count = 1 THEN item.image_url END AS image_url,
              item.item_count,
              CASE WHEN f.trade_sub_type = '退款' THEN 'REFUND' ELSE 'INCREASE' END AS amount_type,
-             ROUND(f.amount_raw, 2) AS amount, f.trade_time AS event_time
+             ROUND(f.amount_raw, 2) AS amount, f.trade_time AS event_time, item.spu_id
       FROM paged f
       LEFT JOIN crm_order o ON o.tenant_id = #{tenantId} AND o.shop_id = #{shopId}
         AND o.weidian_order_id = f.weidian_order_id AND NOT o.is_deleted
@@ -80,14 +81,28 @@ public interface OrderSettlementFlowMapper extends BaseMapper<OrderSettlementFlo
           AND NOT r.is_deleted AND r.weidian_refund_no = f.refund_id
       ) refund ON TRUE
       LEFT JOIN LATERAL (
-        SELECT i.item_name, i.sku_name, i.product_id, COUNT(*) OVER ()::int AS item_count
-        FROM crm_order_item i
-        WHERE i.tenant_id = #{tenantId} AND i.order_id = o.id AND NOT i.is_deleted
-          AND (refund.item_id IS NULL OR i.id = refund.item_id)
-        ORDER BY i.id LIMIT 1
+        SELECT MIN(lines.item_name) AS item_name, MIN(lines.sku_name) AS sku_name,
+               MIN(lines.image_url) AS image_url, COUNT(*)::int AS item_count,
+               CASE WHEN COUNT(spu_id) = COUNT(*) AND MIN(spu_id) = MAX(spu_id)
+                    THEN MIN(spu_id) END AS spu_id
+        FROM (
+          SELECT i.item_name, i.sku_name, catalog_product.image_url,
+      """
+          + OrderProductSql.SPU_ID
+          + """
+                 AS spu_id
+          FROM crm_order_item i
+      """
+          + OrderProductSql.PRODUCT_JOIN
+          + OrderProductSql.FIRST_LINK_JOIN
+          + """
+          WHERE i.tenant_id = #{tenantId} AND i.order_id = o.id AND NOT i.is_deleted
+            AND (refund.item_id IS NULL OR i.id = refund.item_id)
+        ) lines
+        HAVING COUNT(*) &gt; 0
       ) item ON TRUE
-      LEFT JOIN crm_product p ON p.id = item.product_id AND p.tenant_id = #{tenantId}
       ORDER BY f.trade_time DESC, f.id DESC
+      </script>
       """)
   List<SettlementFlowRow> pageShopReceivables(
       @Param("tenantId") long tenantId,

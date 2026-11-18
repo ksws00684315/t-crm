@@ -52,7 +52,8 @@ public interface OrderEvidenceApi {
       Integer itemCount,
       String amountType,
       BigDecimal amount,
-      Instant eventTime) {}
+      Instant eventTime,
+      String spuId) {}
 
   PageResult<SettlementFlowRow> shopSettlementFlows(
       long tenantId, long shopId, Instant from, Instant until, int page, int size);

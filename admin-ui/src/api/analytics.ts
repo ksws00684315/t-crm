@@ -142,6 +142,7 @@ export interface SettlementFlowRow {
   imageUrl?: string;
   itemCount?: number;
   amountType: "INCREASE" | "REFUND";
+  spuId?: string | null;
   amount: Scalar | null;
   eventTime: string;
 }
