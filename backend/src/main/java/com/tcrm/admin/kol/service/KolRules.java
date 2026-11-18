@@ -45,6 +45,12 @@ public final class KolRules {
   public static final int MAX_INVITE_CODE = 64;
   public static final int MAX_SHEET_URL = 512;
 
+  /**
+   * Company business Discord / WhatsApp account (task 156). Free text on purpose: the customer
+   * records whichever account handles the creator, which is not always a phone number.
+   */
+  public static final int MAX_BD_ACCOUNT = 64;
+
   private static final Pattern CODE = Pattern.compile(CODE_PATTERN);
   private static final Pattern EMAIL = Pattern.compile(EMAIL_PATTERN);
   private static final Pattern PERCENT = Pattern.compile("\\d{1,3}(?:\\.\\d{1,2})?");

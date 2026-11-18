@@ -392,7 +392,8 @@ class KolServiceTest {
   }
 
   private static EditKolCommand edit() {
-    return new EditKolCommand("Alice B", null, "gb", List.of(), "VIP", null);
+    return new EditKolCommand(
+        "Alice B", null, "gb", List.of(), "VIP", null, "bd5#0001", "+447700900123");
   }
 
   @Test
@@ -432,7 +433,14 @@ class KolServiceTest {
                 update.getValue())
             .getSqlSet();
     assertThat(sqlSet)
-        .contains("name=", "country=", "social_accounts=", "remark=", "whatsapp=")
+        .contains(
+            "name=",
+            "country=",
+            "social_accounts=",
+            "remark=",
+            "whatsapp=",
+            "bd_discord=",
+            "bd_whatsapp=")
         .doesNotContain("email=")
         .doesNotContain("default_rate=")
         .doesNotContain("link_template_id=")
@@ -698,7 +706,8 @@ class KolServiceTest {
     when(kols.selectById(11L)).thenReturn(kol(BD));
     when(kols.update(isNull(), any())).thenReturn(1);
 
-    service.update(11L, new EditKolCommand("Alice B", null, null, List.of(), "VIP", null));
+    service.update(
+        11L, new EditKolCommand("Alice B", null, null, List.of(), "VIP", null, null, null));
 
     var wrapper = ArgumentCaptor.forClass(Wrapper.class);
     verify(kols).update(isNull(), wrapper.capture());

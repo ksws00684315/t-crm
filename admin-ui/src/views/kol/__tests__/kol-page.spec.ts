@@ -39,6 +39,8 @@ const row: KolVO = {
   ],
   bdUserId: null,
   bdUserName: null,
+  bdDiscord: null,
+  bdWhatsapp: null,
   defaultRate: "0.1550",
   status: 1,
   remark: null,
@@ -466,10 +468,13 @@ describe("creator list page (task 32 §2.2)", () => {
       expect.objectContaining({ name: "Alice" })
     );
 
-    // Reopened after approval, the same entry points at plain editing.
+    // Reopened after approval the profile is read-only until Edit is pressed (task 156).
     await element("action-edit").trigger("click");
     await flushPromises();
     expect(document.body.textContent).toContain("资料编辑 - KOL-ASD001（Alice）");
+    expect(element("profile-edit").text()).toBe("编辑");
+    await element("profile-edit").trigger("click");
+    await flushPromises();
     expect(element("profile-save").text()).toBe("保存");
     wrapper.unmount();
   });

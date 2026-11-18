@@ -23,6 +23,8 @@ const kol: KolVO = {
   ],
   bdUserId: "1",
   bdUserName: "BD Five",
+  bdDiscord: "bd5#0001",
+  bdWhatsapp: "+447700900123",
   defaultRate: "0.1550",
   status: 1,
   remark: null,
@@ -176,5 +178,120 @@ describe("creator profile dialog password reset (task 147)", () => {
     await wrapper.setProps({ modelValue: true });
     await flushPromises();
     expect(document.body.querySelector('[data-test="reset-password-result"]')).toBeNull();
+  });
+});
+
+describe("creator profile dialog read-only switch and inviter tab (task 156)", () => {
+  beforeEach(() => {
+    document.body.innerHTML = "";
+    setActivePinia(createPinia());
+    vi.mocked(kolApi.editKol).mockReset();
+    vi.mocked(notifyError).mockReset();
+    i18n.global.locale.value = "zh-CN";
+  });
+
+  afterEach(() => {
+    document.body.innerHTML = "";
+    vi.restoreAllMocks();
+  });
+
+  function inputOf(testId: string): HTMLInputElement {
+    // Element Plus forwards fallthrough attributes to the inner <input>, so data-test sits on it.
+    const input = document.body.querySelector(`[data-test="${testId}"]`);
+    if (!(input instanceof HTMLInputElement)) throw new Error(`missing input for ${testId}`);
+    return input;
+  }
+
+  async function openInviterTab(wrapper: Awaited<ReturnType<typeof openDialog>>) {
+    const tab = wrapper
+      .findAll(".el-tabs__item")
+      .find(item => item.text() === i18n.global.t("kol.tabInviter"));
+    if (!tab) throw new Error("missing inviter tab");
+    await tab.trigger("click");
+    await flushPromises();
+  }
+
+  it("opens as a detail view, unlocks on Edit, and sends the business accounts", async () => {
+    signIn("STAFF", ["kol:edit"]);
+    const wrapper = await openDialog();
+
+    // Read-only is a label/value view like the creator detail drawer, not a disabled form.
+    expect(document.body.querySelector('[data-test="profile-view"]')).not.toBeNull();
+    expect(document.body.querySelector('[data-test="profile-name"]')).toBeNull();
+    expect(element("profile-view-name").text()).toBe("Alice");
+    expect(document.body.querySelector('[data-test="profile-edit"]')).not.toBeNull();
+    expect(document.body.querySelector('[data-test="profile-save"]')).toBeNull();
+
+    await openInviterTab(wrapper);
+    expect(element("profile-inviter").text()).toBe("BD Five");
+    expect(element("profile-bd-discord-view").text()).toContain("bd5#0001");
+    expect(element("profile-bd-whatsapp-view").text()).toContain("+447700900123");
+    expect(document.body.querySelector('[data-test="profile-bd-discord"]')).toBeNull();
+
+    await element("profile-edit").trigger("click");
+    await flushPromises();
+    expect(inputOf("profile-name").disabled).toBe(false);
+    expect(inputOf("profile-bd-discord").disabled).toBe(false);
+    expect(document.body.querySelector('[data-test="profile-edit"]')).toBeNull();
+
+    await element("profile-bd-discord").setValue("bd9#0001");
+    await element("profile-bd-whatsapp").setValue("+447700900999");
+    vi.mocked(kolApi.editKol).mockResolvedValue(null);
+    await element("profile-save").trigger("click");
+    await flushPromises();
+
+    expect(kolApi.editKol).toHaveBeenCalledWith(
+      "9007199254740993",
+      expect.objectContaining({ bdDiscord: "bd9#0001", bdWhatsapp: "+447700900999" })
+    );
+    expect(wrapper.emitted("update:modelValue")?.at(-1)).toEqual([false]);
+    wrapper.unmount();
+  });
+
+  it("keeps the inviter tab read-only while reviewing", async () => {
+    signIn("SUPER_ADMIN");
+    const wrapper = await openDialog({ reviewStatus: "PENDING" }, true);
+
+    // Review saves through the review endpoint, which carries no inviter accounts.
+    expect(inputOf("profile-name").disabled).toBe(false);
+    await openInviterTab(wrapper);
+    expect(document.body.querySelector('[data-test="profile-bd-discord"]')).toBeNull();
+    expect(element("profile-bd-discord-view").text()).toContain("bd5#0001");
+    expect(document.body.querySelector('[data-test="profile-save"]')).not.toBeNull();
+    wrapper.unmount();
+  });
+
+  it("returns to the profile tab when its validation fails from the inviter tab", async () => {
+    signIn("STAFF", ["kol:edit"]);
+    const wrapper = await openDialog();
+    await element("profile-edit").trigger("click");
+    await flushPromises();
+    await element("profile-name").setValue("");
+    await openInviterTab(wrapper);
+
+    await element("profile-save").trigger("click");
+    await flushPromises();
+
+    expect(wrapper.findComponent({ name: "ElTabs" }).props("modelValue")).toBe("profile");
+    expect(kolApi.editKol).not.toHaveBeenCalled();
+    wrapper.unmount();
+  });
+
+  it("goes back to read-only when an edited profile is reopened", async () => {
+    signIn("STAFF", ["kol:edit"]);
+    const wrapper = await openDialog();
+    await element("profile-edit").trigger("click");
+    await flushPromises();
+    expect(document.body.querySelector('[data-test="profile-save"]')).not.toBeNull();
+
+    await wrapper.setProps({ modelValue: false });
+    await flushPromises();
+    await wrapper.setProps({ modelValue: true });
+    await flushPromises();
+
+    expect(document.body.querySelector('[data-test="profile-save"]')).toBeNull();
+    expect(document.body.querySelector('[data-test="profile-edit"]')).not.toBeNull();
+    expect(document.body.querySelector('[data-test="profile-view"]')).not.toBeNull();
+    wrapper.unmount();
   });
 });

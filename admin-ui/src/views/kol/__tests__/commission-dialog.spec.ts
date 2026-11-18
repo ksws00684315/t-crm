@@ -20,6 +20,8 @@ const kol: KolVO = {
   socialAccounts: [],
   bdUserId: "2",
   bdUserName: "BD",
+  bdDiscord: null,
+  bdWhatsapp: null,
   defaultRate: "0.1500",
   status: 1,
   remark: null,
@@ -89,6 +91,10 @@ describe("commission dialog, 10-20 supplement", () => {
     });
     await wrapper.setProps({ modelValue: true });
     await flushPromises();
+    expect(document.body.querySelector('[data-test="commission-view"]')).not.toBeNull();
+    // A saved config reopens read-only; the Edit button switches back to the form (task 156).
+    await wrapper.find('[data-test="commission-edit"]').trigger("click");
+    await flushPromises();
     const select = wrapper.findComponent({ name: "ElSelect" });
     expect(select.props("modelValue")).toEqual(["7", "8"]);
     select.vm.$emit("update:modelValue", ["8"]);
@@ -127,6 +133,9 @@ describe("commission dialog, 10-20 supplement", () => {
     });
     await wrapper.setProps({ modelValue: true });
     await flushPromises();
+    // The saved config opens as a detail view; Edit brings the form (with its rules) back.
+    await wrapper.find('[data-test="commission-edit"]').trigger("click");
+    await flushPromises();
     // 推广表格地址非必填（issue #256）：只有佣金比例为必填项。
     expect(wrapper.findAll(".el-form-item.is-required").length).toBeGreaterThanOrEqual(1);
     wrapper.unmount();
@@ -160,12 +169,116 @@ describe("commission dialog, 10-20 supplement", () => {
     });
     await wrapper.setProps({ modelValue: true });
     await flushPromises();
+    await wrapper.find('[data-test="commission-edit"]').trigger("click");
+    await flushPromises();
     await wrapper.find('[data-test="commission-save"]').trigger("click");
     await flushPromises();
     expect(promotionApi.savePromotionConfig).toHaveBeenCalledWith(
       "1",
       expect.objectContaining({ sheetUrl: "" })
     );
+    wrapper.unmount();
+  });
+
+  it("opens read-only once a config has been saved (task 156)", async () => {
+    vi.mocked(templateApi.listLinkTemplates).mockResolvedValue(templates);
+    vi.mocked(promotionApi.getPromotionConfig).mockResolvedValue({
+      defaultRate: "0.1500",
+      platforms: [],
+      inviteCode: null,
+      jumpTemplateId: null,
+      sheetUrl: null,
+      remark: null
+    });
+    vi.mocked(promotionApi.listPromotionRecords).mockResolvedValue({
+      items: [],
+      total: "0",
+      page: 1,
+      size: 10
+    });
+
+    const wrapper = mount(CommissionDialog, {
+      props: { modelValue: false, kol },
+      global: { plugins: [ElementPlus, i18n] },
+      attachTo: document.body
+    });
+    await wrapper.setProps({ modelValue: true });
+    await flushPromises();
+
+    // A saved config opens as a detail view, not a disabled form.
+    expect(document.body.querySelector('[data-test="commission-view"]')).not.toBeNull();
+    expect(document.body.querySelector('[data-test="rate-input"]')).toBeNull();
+    expect(document.body.querySelector('[data-test="rate-view"]')?.textContent).toBe("15%");
+    expect(document.body.querySelector('[data-test="commission-edit"]')).not.toBeNull();
+    expect(document.body.querySelector('[data-test="commission-save"]')).toBeNull();
+    wrapper.unmount();
+  });
+
+  it("stays editable on the first fill (task 156)", async () => {
+    vi.mocked(templateApi.listLinkTemplates).mockResolvedValue(templates);
+    vi.mocked(promotionApi.getPromotionConfig).mockResolvedValue({
+      defaultRate: null,
+      platforms: [],
+      inviteCode: null,
+      jumpTemplateId: null,
+      sheetUrl: null,
+      remark: null
+    });
+    vi.mocked(promotionApi.listPromotionRecords).mockResolvedValue({
+      items: [],
+      total: "0",
+      page: 1,
+      size: 10
+    });
+
+    const wrapper = mount(CommissionDialog, {
+      props: { modelValue: false, kol: { ...kol, configVersion: null } },
+      global: { plugins: [ElementPlus, i18n] },
+      attachTo: document.body
+    });
+    await wrapper.setProps({ modelValue: true });
+    await flushPromises();
+
+    expect(document.body.querySelector('[data-test="commission-edit"]')).toBeNull();
+    expect(document.body.querySelector('[data-test="commission-save"]')).not.toBeNull();
+    expect(document.body.querySelector('[data-test="commission-view"]')).toBeNull();
+    expect(document.body.querySelector('[data-test="rate-input"]')).not.toBeNull();
+    wrapper.unmount();
+  });
+
+  it("returns to the config tab when its validation fails from the records tab (task 156)", async () => {
+    vi.mocked(templateApi.listLinkTemplates).mockResolvedValue(templates);
+    vi.mocked(promotionApi.getPromotionConfig).mockResolvedValue({
+      defaultRate: null,
+      platforms: [],
+      inviteCode: null,
+      jumpTemplateId: null,
+      sheetUrl: null,
+      remark: null
+    });
+    vi.mocked(promotionApi.listPromotionRecords).mockResolvedValue({
+      items: [],
+      total: "0",
+      page: 1,
+      size: 10
+    });
+
+    const wrapper = mount(CommissionDialog, {
+      props: { modelValue: false, kol: { ...kol, configVersion: null } },
+      global: { plugins: [ElementPlus, i18n] },
+      attachTo: document.body
+    });
+    await wrapper.setProps({ modelValue: true });
+    await flushPromises();
+    await wrapper.find('[data-test="sheet-url"]').setValue("not-a-url");
+    wrapper.findComponent({ name: "ElTabs" }).vm.$emit("update:modelValue", "records");
+    await flushPromises();
+
+    await wrapper.find('[data-test="commission-save"]').trigger("click");
+    await flushPromises();
+
+    expect(wrapper.findComponent({ name: "ElTabs" }).props("modelValue")).toBe("config");
+    expect(promotionApi.savePromotionConfig).not.toHaveBeenCalled();
     wrapper.unmount();
   });
 
