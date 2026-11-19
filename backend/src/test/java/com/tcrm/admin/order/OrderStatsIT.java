@@ -533,9 +533,31 @@ class OrderStatsIT {
                 assertThat(row.refundAmount()).isEqualByComparingTo("30");
                 assertThat(row.netTransactionAmount()).isEqualByComparingTo("270");
               });
+      assertThat(evidence.refundedProductOrders(selection)).isEqualTo(1);
       assertThat(evidence.page(selection, Kind.REFUNDS, 20, 0))
-          .extracting(row -> row.spuId())
-          .containsExactly("7890");
+          .singleElement()
+          .satisfies(
+              row -> {
+                assertThat(row.spuId()).isEqualTo("7890");
+                assertThat(row.transactionItemId()).isEqualTo("9900");
+                assertThat(row.skuId()).isEqualTo("953");
+                assertThat(row.soldUnits()).isEqualTo(3);
+                assertThat(row.salesAmount()).isEqualByComparingTo("300");
+                assertThat(row.amount()).isEqualByComparingTo("30");
+              });
+      var skus = evidence.productGroups(selection, ProductBreakdown.SKUS, 20, 0);
+      assertThat(skus)
+          .filteredOn(row -> "953".equals(row.skuId()))
+          .singleElement()
+          .satisfies(
+              row -> {
+                assertThat(row.netUnits()).isNull();
+                assertThat(row.netSalesAmount()).isEqualByComparingTo("270");
+              });
+      assertThat(skus)
+          .filteredOn(row -> "954".equals(row.skuId()))
+          .singleElement()
+          .satisfies(row -> assertThat(row.netUnits()).isEqualTo(4));
       var store = new ScopeDTO(4, null, 11L, null, null, java.util.List.of(11L));
       var counts =
           evidence.shopCreatorCounts(new Selection(store, null, null, null, null, FROM, UNTIL));

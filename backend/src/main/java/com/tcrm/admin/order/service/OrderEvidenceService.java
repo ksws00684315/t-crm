@@ -66,6 +66,13 @@ public class OrderEvidenceService implements OrderEvidenceApi {
   }
 
   @Override
+  public long refundedProductOrders(Selection selection) {
+    return selection.scope().visibleShopIds().isEmpty()
+        ? 0
+        : evidence.refundedProductOrders(selection);
+  }
+
+  @Override
   public List<DailyAmount> daily(Selection selection) {
     return selection.scope().visibleShopIds().isEmpty() ? List.of() : evidence.daily(selection);
   }

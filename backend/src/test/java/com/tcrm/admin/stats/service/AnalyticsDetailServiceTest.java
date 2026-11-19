@@ -13,6 +13,8 @@ import com.tcrm.admin.kol.api.KolApi;
 import com.tcrm.admin.kol.api.KolRefDTO;
 import com.tcrm.admin.order.api.OrderEvidenceApi;
 import com.tcrm.admin.order.api.OrderEvidenceApi.Kind;
+import com.tcrm.admin.order.api.OrderEvidenceApi.ProductBreakdown;
+import com.tcrm.admin.order.api.OrderEvidenceApi.ProductGroup;
 import com.tcrm.admin.order.api.OrderEvidenceApi.Selection;
 import com.tcrm.admin.order.api.OrderStatsApi;
 import com.tcrm.admin.order.api.OrderStatsApi.ScopeDTO;
@@ -25,6 +27,7 @@ import com.tcrm.admin.stats.service.AnalyticsDetailService.Board;
 import com.tcrm.admin.stats.service.StatsOverviewService.FilterDTO;
 import com.tcrm.admin.stats.service.StatsOverviewService.ResolvedFilter;
 import com.tcrm.admin.system.api.BdUserApi;
+import com.tcrm.admin.system.api.BdUserDTO;
 import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.util.List;
@@ -37,9 +40,9 @@ class AnalyticsDetailServiceTest {
   private final ShopAccessApi shops = mock(ShopAccessApi.class);
   private final KolApi creators = mock(KolApi.class);
   private final OrderStatsApi orders = mock(OrderStatsApi.class);
+  private final BdUserApi inviters = mock(BdUserApi.class);
   private final AnalyticsDetailService details =
-      new AnalyticsDetailService(
-          overview, evidence, shops, creators, orders, mock(BdUserApi.class));
+      new AnalyticsDetailService(overview, evidence, shops, creators, orders, inviters);
   private final LocalDate day = LocalDate.of(2026, 11, 3);
 
   @Test
@@ -64,6 +67,48 @@ class AnalyticsDetailServiceTest {
         .isEqualTo(new ScopeDTO(4, 9L, 1L, 11L, null, List.of(1L)));
     assertThat(selection.getValue().productCode()).isEqualTo("SPU");
     assertThat(selection.getValue().keyword()).isEqualTo("Sample");
+  }
+
+  @Test
+  void productContributionIncludesCreatorCodeAndCurrentInviter() {
+    var filters = filters(null);
+    when(overview.resolve(filters)).thenReturn(resolved(new ScopeDTO(4, null, null, null, null)));
+    when(shops.listShops()).thenReturn(List.of(new ShopAccessDTO(1L, "Shop", "remote", 1, "S1")));
+    when(evidence.productGroups(any(), eq(ProductBreakdown.CREATORS), eq(1), eq(20)))
+        .thenReturn(
+            new PageResult<>(
+                List.of(
+                    new ProductGroup(
+                        "11",
+                        null,
+                        2,
+                        4,
+                        BigDecimal.TEN,
+                        BigDecimal.ZERO,
+                        BigDecimal.TEN,
+                        null,
+                        null,
+                        null,
+                        null,
+                        null)),
+                1,
+                1,
+                20));
+    when(creators.listByIdsIncludingDeleted(List.of(11L)))
+        .thenReturn(List.of(new KolRefDTO(11L, "C11", "Creator", true, 9L)));
+    when(inviters.listByIds(List.of(9L)))
+        .thenReturn(List.of(new BdUserDTO(9L, "bd", "Inviter", true)));
+
+    assertThat(
+            details
+                .productBreakdown(filters, "product:20", null, ProductBreakdown.CREATORS, 1, 20)
+                .items())
+        .singleElement()
+        .satisfies(
+            row -> {
+              assertThat(row.creatorCode()).isEqualTo("C11");
+              assertThat(row.inviterName()).isEqualTo("Inviter");
+            });
   }
 
   @Test

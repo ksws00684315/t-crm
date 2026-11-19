@@ -162,6 +162,31 @@ const enUS: MessageSchema = {
       sku: "Variant code of the sold item.",
       product: "Product name recorded on the order."
     },
+    productDrawer: {
+      overview: "Overview",
+      refundTime: "Refund time",
+      orders: "Product orders",
+      refunds: "Successful refunds",
+      orderCountSuffix: " ({count} orders)",
+      unitPrice: "Average unit price",
+      unitPriceHint: "Sales divided by the number of paid units.",
+      netUnitsHint:
+        "Paid units minus refunded units in the order cohort. A dash means the refunded quantity is unavailable.",
+      originalSaleHint:
+        "The refund table shows units and sales from the original paid line. The same line may appear for multiple refunds.",
+      sellingShop: "Selling shop",
+      transactionItemId: "Sold Product ID",
+      skuPerformance: "SKU performance",
+      soldSku: "Sold SKU",
+      netUnits: "Net units",
+      gmv: "Trade GMV",
+      succeededRefundAmount: "Successful refunds",
+      netTradeAmount: "Net trade amount",
+      avgTradePrice: "Average unit price",
+      inviter: "Inviter",
+      orderType: "Order type",
+      distributionOrders: "Distribution orders"
+    },
     shopDrawer: {
       viewBestSellers: "View shop best sellers",
       updated: "Updated",

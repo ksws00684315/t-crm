@@ -93,11 +93,15 @@ public class AnalyticsDetailService {
             resolved.period(),
             evidence.daily(selection),
             null,
-            board == Board.SHOP ? shopOverview(resolved, selection) : null)
+            board == Board.SHOP ? shopOverview(resolved, selection) : null,
+            board == Board.PRODUCT && overview.canView("order:view")
+                ? evidence.refundedProductOrders(selection)
+                : null)
         : new Detail(
             resolved.period(),
             null,
             evidence.page(selection, activity, ranking.page(), ranking.size()),
+            null,
             null);
   }
 
@@ -164,23 +168,38 @@ public class AnalyticsDetailService {
     if (group != ProductBreakdown.CREATORS || result.items().isEmpty()) {
       return result;
     }
-    var names =
+    var directory =
         creators
             .listByIdsIncludingDeleted(
                 result.items().stream().map(row -> Long.valueOf(row.code())).toList())
             .stream()
-            .collect(
-                Collectors.toMap(creator -> creator.id().toString(), creator -> creator.name()));
+            .collect(Collectors.toMap(creator -> creator.id().toString(), Function.identity()));
+    var ownerIds =
+        directory.values().stream()
+            .map(KolRefDTO::bdUserId)
+            .filter(Objects::nonNull)
+            .filter(
+                id -> selection.scope().ownerId() == null || id.equals(selection.scope().ownerId()))
+            .distinct()
+            .toList();
+    var owners =
+        ownerIds.isEmpty()
+            ? Map.<Long, String>of()
+            : inviters.listByIds(ownerIds).stream()
+                .collect(
+                    Collectors.toMap(
+                        BdUserDTO::id,
+                        owner ->
+                            owner.nickname() == null || owner.nickname().isBlank()
+                                ? owner.username()
+                                : owner.nickname()));
     return result.map(
-        row ->
-            new ProductGroup(
-                row.code(),
-                names.get(row.code()),
-                row.paidOrderCount(),
-                row.units(),
-                row.salesAmount(),
-                row.completedRefundAmount(),
-                row.netSalesAmount()));
+        row -> {
+          var creator = directory.get(row.code());
+          if (creator == null) return row;
+          String inviter = creator.bdUserId() == null ? null : owners.get(creator.bdUserId());
+          return row.withCreator(creator.name(), creator.kolCode(), inviter);
+        });
   }
 
   private Selection select(
@@ -358,5 +377,6 @@ public class AnalyticsDetailService {
       StatsPeriod period,
       List<DailyAmount> daily,
       PageResult<EvidenceRow> activity,
-      ShopOverview shopOverview) {}
+      ShopOverview shopOverview,
+      Long refundedProductOrderCount) {}
 }

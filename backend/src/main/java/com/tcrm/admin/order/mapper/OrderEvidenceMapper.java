@@ -123,7 +123,8 @@ public interface OrderEvidenceMapper {
              i.item_name AS product, i.sku_name AS sku, i.quantity AS units,
              i.pay_amount AS amount, o.pay_time AS event_time,
              o.shop_id, COALESCE(i.kol_id, o.kol_id) AS creator_id, i.reporting_product_id, i.spu_id,
-             o.id AS order_id, i.weidian_item_id AS transaction_item_id
+             o.id AS order_id, i.weidian_item_id AS transaction_item_id, i.sku_id,
+             i.quantity AS sold_units, i.pay_amount AS sales_amount
       FROM scoped_orders o JOIN
       <choose>
         <when test="kind.name() == 'ORDERS'">distribution_items</when>
@@ -146,7 +147,8 @@ public interface OrderEvidenceMapper {
       SELECT r.id, o.weidian_order_id AS order_no, r.weidian_refund_no AS refund_no,
              i.item_name AS product, i.sku_name AS sku, NULL::integer AS units,
              r.amount, r.finish_time AS event_time,
-             o.shop_id, COALESCE(i.kol_id, o.kol_id) AS creator_id, i.reporting_product_id, i.spu_id, i.weidian_item_id AS transaction_item_id
+             o.shop_id, COALESCE(i.kol_id, o.kol_id) AS creator_id, i.reporting_product_id, i.spu_id, i.weidian_item_id AS transaction_item_id,
+             i.sku_id, i.quantity AS sold_units, i.pay_amount AS sales_amount
       FROM scoped_orders o JOIN crm_refund r ON r.order_id = o.id
       <choose>
         <when test="s.productCode != null or s.scope.productKeyword != null">JOIN</when>
@@ -192,10 +194,11 @@ public interface OrderEvidenceMapper {
                  refunds.amount AS refund_amount, p.amount - refunds.amount AS net_transaction_amount
                </when>
                <otherwise>NULL::numeric AS refund_amount, NULL::numeric AS net_transaction_amount</otherwise>
-             </choose>, p.transaction_item_id
+             </choose>, p.transaction_item_id, shop.shop_name, p.sku_id, p.sold_units, p.sales_amount
       FROM paged p
       LEFT JOIN crm_product product ON product.id = p.reporting_product_id AND product.tenant_id = #{s.scope.tenantId}
       LEFT JOIN crm_kol k ON k.id = p.creator_id AND k.tenant_id = #{s.scope.tenantId}
+      LEFT JOIN crm_shop shop ON shop.id = p.shop_id AND shop.tenant_id = #{s.scope.tenantId}
       <if test="kind.name() == 'ORDERS'">
         LEFT JOIN LATERAL (
           SELECT COALESCE(SUM(r.amount), 0) AS amount
@@ -306,6 +309,22 @@ public interface OrderEvidenceMapper {
       """)
   List<DailyAmount> daily(@Param("s") Selection selection);
 
+  @InterceptorIgnore(tenantLine = "true")
+  @Select(
+      SCOPED
+          + """
+      refunds AS (
+        SELECT DISTINCT o.id FROM scoped_orders o
+        JOIN crm_refund r ON r.order_id = o.id
+        JOIN distribution_items i ON i.id = r.order_item_id AND i.order_id = o.id
+        WHERE r.tenant_id = #{s.scope.tenantId} AND NOT r.is_deleted AND r.refund_status = 'SUCCESS'
+          AND r.finish_time &gt;= #{s.from} AND r.finish_time &lt; #{s.until}
+      )
+      SELECT COUNT(*) FROM refunds
+      </script>
+      """)
+  long refundedProductOrders(@Param("s") Selection selection);
+
   String PRODUCT_GROUPS =
       SCOPED
           + """
@@ -314,7 +333,7 @@ public interface OrderEvidenceMapper {
           <choose>
             <when test="group.name() == 'SKUS'">
               CONCAT(i.shop_id, ':', i.weidian_item_id, ':', i.sku_id) AS code,
-              CONCAT_WS(' · ', i.sku_name, i.weidian_item_id) AS label
+              COALESCE(NULLIF(i.sku_name, ''), NULLIF(i.sku_id, '')) AS label
             </when>
             <when test="group.name() == 'SHOPS'">
               i.shop_id::text AS code, shop.shop_name AS label
@@ -332,17 +351,18 @@ public interface OrderEvidenceMapper {
         WHERE o.pay_time &gt;= #{s.from} AND o.pay_time &lt; #{s.until}
       ), transactions AS (
         SELECT code, label, order_id, quantity, pay_amount AS sales,
-               0::numeric AS cohort, 0::numeric AS completed
+               0::numeric AS cohort, 0::numeric AS completed, FALSE AS refunded_cohort,
+               sku_id, reporting_product_id
         FROM paid_items
         UNION ALL
-        SELECT p.code, p.label, NULL::bigint, 0, 0, r.amount, 0
+        SELECT p.code, p.label, NULL::bigint, 0, 0, r.amount, 0, TRUE, p.sku_id, p.reporting_product_id
         FROM crm_refund r JOIN paid_items p ON p.id = r.order_item_id AND p.order_id = r.order_id
         WHERE r.tenant_id = #{s.scope.tenantId} AND NOT r.is_deleted AND r.refund_status = 'SUCCESS'
       """
           + OrderStatsMapper.COHORT_REFUND_WINDOW
           + """
         UNION ALL
-        SELECT i.code, i.label, NULL::bigint, 0, 0, 0, r.amount
+        SELECT i.code, i.label, NULL::bigint, 0, 0, 0, r.amount, FALSE, i.sku_id, i.reporting_product_id
         FROM scoped_orders o JOIN crm_refund r ON r.order_id = o.id
         JOIN item_groups i ON i.id = r.order_item_id AND i.order_id = o.id
         WHERE r.tenant_id = #{s.scope.tenantId} AND NOT r.is_deleted AND r.refund_status = 'SUCCESS'
@@ -356,8 +376,20 @@ public interface OrderEvidenceMapper {
           + """
       SELECT code, MAX(label) AS name, COUNT(DISTINCT order_id) AS paid_order_count,
              SUM(quantity) AS units, SUM(sales) AS sales_amount,
-             SUM(completed) AS completed_refund_amount, SUM(sales) - SUM(cohort) AS net_sales_amount
-      FROM transactions GROUP BY code
+             SUM(completed) AS completed_refund_amount, SUM(sales) - SUM(cohort) AS net_sales_amount,
+             NULL::text AS creator_code, NULL::text AS inviter_name,
+             <choose>
+               <when test="group.name() == 'SKUS'">
+                 MAX(NULLIF(t.sku_id, '')) AS sku_id, MAX(p.image_url) AS image_url,
+                 CASE WHEN NOT BOOL_OR(t.refunded_cohort) THEN SUM(t.quantity) END AS net_units
+               </when>
+               <otherwise>NULL::text AS sku_id, NULL::text AS image_url, NULL::bigint AS net_units</otherwise>
+             </choose>
+      FROM transactions t
+      <if test="group.name() == 'SKUS'">
+        LEFT JOIN crm_product p ON p.id = t.reporting_product_id AND p.tenant_id = #{s.scope.tenantId}
+      </if>
+      GROUP BY code
       ORDER BY net_sales_amount DESC, code
       LIMIT #{size} OFFSET #{offset}
       </script>

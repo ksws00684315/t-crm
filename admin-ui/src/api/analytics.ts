@@ -136,6 +136,10 @@ export interface EvidenceRow {
   creatorName?: string;
   spuId?: string;
   transactionItemId?: string;
+  shopName?: string;
+  skuId?: string;
+  soldUnits?: Scalar;
+  salesAmount?: Scalar;
   imageUrl?: string;
 }
 export interface SettlementFlowRow {
@@ -170,6 +174,7 @@ interface DetailResult {
   daily: DailyAmount[] | null;
   activity: { items: EvidenceRow[]; total: Scalar; page: number; size: number } | null;
   shopOverview?: ShopDetailOverview | null;
+  refundedProductOrderCount?: Scalar | null;
 }
 export function queryAnalyticsDetail(
   board: Board,
@@ -186,6 +191,11 @@ export interface ProductGroup {
   salesAmount: Scalar;
   completedRefundAmount: Scalar;
   netSalesAmount: Scalar;
+  creatorCode?: string;
+  inviterName?: string;
+  skuId?: string;
+  imageUrl?: string;
+  netUnits?: Scalar;
 }
 export function queryProductBreakdown(
   params: DetailQuery & { group: ProductBreakdown; page: number; size: number }

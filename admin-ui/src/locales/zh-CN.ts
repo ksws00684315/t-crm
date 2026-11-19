@@ -160,6 +160,30 @@ const zhCN = {
       sku: "成交订单商品的规格编码。",
       product: "订单中的商品名称。"
     },
+    productDrawer: {
+      overview: "经营概览",
+      refundTime: "退款时间",
+      orders: "商品订单",
+      refunds: "成功退款",
+      orderCountSuffix: "（{count}单）",
+      unitPrice: "件均价",
+      unitPriceHint: "销售额除以支付商品件数。",
+      netUnitsHint: "支付件数扣除同批成功退款件数。缺少可靠退款件数时显示「—」。",
+      originalSaleHint:
+        "成功退款表中的销量和销售额取原支付商品行。同一订单行的多笔退款可重复列示。",
+      sellingShop: "成交店铺",
+      transactionItemId: "成交商品ID",
+      skuPerformance: "SKU表现",
+      soldSku: "成交 SKU",
+      netUnits: "净销量",
+      gmv: "交易 GMV",
+      succeededRefundAmount: "成功退款",
+      netTradeAmount: "净交易额",
+      avgTradePrice: "件均成交价",
+      inviter: "邀请人",
+      orderType: "订单类型",
+      distributionOrders: "分销订单"
+    },
     shopDrawer: {
       viewBestSellers: "查看店铺畅销商品",
       updated: "更新于",

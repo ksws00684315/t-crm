@@ -40,7 +40,11 @@ public interface OrderEvidenceApi {
       String imageUrl,
       BigDecimal refundAmount,
       BigDecimal netTransactionAmount,
-      String transactionItemId) {}
+      String transactionItemId,
+      String shopName,
+      String skuId,
+      Integer soldUnits,
+      BigDecimal salesAmount) {}
 
   record ShopCreatorCounts(long selling, long total) {}
 
@@ -74,13 +78,36 @@ public interface OrderEvidenceApi {
       long units,
       BigDecimal salesAmount,
       BigDecimal completedRefundAmount,
-      BigDecimal netSalesAmount) {}
+      BigDecimal netSalesAmount,
+      String creatorCode,
+      String inviterName,
+      String skuId,
+      String imageUrl,
+      Long netUnits) {
+    public ProductGroup withCreator(String creatorName, String creatorCode, String inviterName) {
+      return new ProductGroup(
+          code,
+          creatorName,
+          paidOrderCount,
+          units,
+          salesAmount,
+          completedRefundAmount,
+          netSalesAmount,
+          creatorCode,
+          inviterName,
+          skuId,
+          imageUrl,
+          netUnits);
+    }
+  }
 
   record DailyAmount(LocalDate day, BigDecimal sales, BigDecimal refunds) {}
 
   PageResult<EvidenceRow> page(Selection selection, Kind kind, int page, int size);
 
   List<DailyAmount> daily(Selection selection);
+
+  long refundedProductOrders(Selection selection);
 
   PageResult<ProductGroup> productGroups(
       Selection selection, ProductBreakdown group, int page, int size);
