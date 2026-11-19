@@ -232,6 +232,7 @@ class AnalyticsRankingServiceTest {
         .satisfies(
             row -> {
               assertThat(row.bestCreator().name()).isEqualTo("Alice");
+              assertThat(row.bestCreator().code()).isEqualTo("K1");
               assertThat(row.bestCreator().netSalesAmount()).isEqualByComparingTo("10");
               assertThat(row.totalEstimatedCommission()).isEqualByComparingTo("8");
             });

@@ -59,7 +59,8 @@ class ShopPerformanceExportTest {
             2L,
             new BigDecimal("0.15"),
             "PROMOTING",
-            new AnalyticsRankingService.BestCreator(901L, "Best example", new BigDecimal("80")),
+            new AnalyticsRankingService.BestCreator(
+                901L, "Best example", new BigDecimal("80"), "KOL-EXAMPLE"),
             new BigDecimal("8.25"),
             3L,
             4L);

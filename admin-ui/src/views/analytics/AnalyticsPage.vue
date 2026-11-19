@@ -1160,6 +1160,10 @@ onUnmounted(stop);
           }}</span>
           <div class="analytics-identity__text">
             <strong>{{ row.bestCreator.name || row.bestCreator.id }}</strong>
+            <CopyText
+              v-if="row.bestCreator.name"
+              :value="row.bestCreator.code || row.bestCreator.id"
+            />
             <el-tooltip
               :content="inviterTerm('netSalesAmount').hint"
               :trigger="['hover', 'focus']"

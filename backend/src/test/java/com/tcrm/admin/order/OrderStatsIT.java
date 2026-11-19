@@ -446,7 +446,11 @@ class OrderStatsIT {
       assertThat(rows)
           .filteredOn(row -> row.id() == 954)
           .singleElement()
-          .satisfies(row -> assertThat(row.creatorName()).isEqualTo("t144_inventory"));
+          .satisfies(
+              row -> {
+                assertThat(row.creatorName()).isEqualTo("t144_inventory");
+                assertThat(row.creatorCode()).startsWith("KOL-INV");
+              });
       var selected =
           new com.tcrm.admin.product.api.ProductAccessApi.RankingInventoryScope(
               4, java.util.List.of(12L), 9L, null, null, "7890", java.util.List.of(91L));

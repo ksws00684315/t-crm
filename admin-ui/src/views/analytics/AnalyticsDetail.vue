@@ -113,9 +113,11 @@ function termHint(key: string): string {
   return te(path) ? t(path) : "";
 }
 const heading = computed(() => t(`analytics.${props.board}.detailTitle`));
-const identityCode = computed(() =>
-  props.board === "best-sellers" ? props.row.sourceItemId : props.row.shopCode || props.row.code
-);
+const identityCode = computed(() => {
+  if (props.board === "best-sellers") return props.row.sourceItemId;
+  if (shop.value) return props.row.shopCode || props.row.code;
+  return props.row.code;
+});
 const eventTime = computed(
   () =>
     new Intl.DateTimeFormat(locale.value, {
@@ -263,7 +265,7 @@ const productOrderColumns = computed<DataColumn[]>(() => [
     minWidth: 156
   },
   { key: "shopName", label: productText("sellingShop"), minWidth: 110 },
-  { key: "creatorName", label: t("analytics.creator"), minWidth: 100 },
+  { key: "creatorName", label: t("analytics.creator"), minWidth: 144 },
   { key: "spuId", label: local("spuId"), minWidth: 120 },
   { key: "transactionItemId", label: productText("transactionItemId"), minWidth: 120 },
   { key: "soldUnits", label: t("analytics.units"), minWidth: 72 },
@@ -277,6 +279,9 @@ const columns = computed<DataColumn[]>(() => [
     : []),
   { key: "product", label: t("analytics.drilldown.product"), minWidth: 185, align: "left" },
   { key: "sku", label: "SKU", minWidth: 104 },
+  ...(props.board === "inviter-performance"
+    ? [{ key: "creatorName", label: t("analytics.creator"), minWidth: 144 }]
+    : []),
   ...(tab.value !== "REFUNDS" ? [{ key: "units", label: t("analytics.units"), minWidth: 76 }] : []),
   {
     key: "amount",
@@ -320,7 +325,7 @@ const shopColumns = computed<DataColumn[]>(() => {
       minWidth: 188,
       align: "left"
     },
-    { key: "creatorName", label: t("analytics.creator"), minWidth: 120, align: "left" },
+    { key: "creatorName", label: t("analytics.creator"), minWidth: 144, align: "left" },
     { key: "spuId", label: local("spuId"), minWidth: 122, align: "left" },
     { key: "transactionItemId", label: local("transactionItemId"), minWidth: 145 },
     ...(refund
@@ -875,7 +880,12 @@ function changeSize(next: number): void {
             }}</small>
           </div>
         </template>
-        <template #cell-creatorName="{ row: entry }">{{ entry.creatorName || "—" }}</template>
+        <template #cell-creatorName="{ row: entry }">
+          <div class="analytics-detail__stack">
+            <span>{{ entry.creatorName || "—" }}</span>
+            <CopyText v-if="entry.creatorCode" :value="entry.creatorCode" />
+          </div>
+        </template>
         <template #cell-spuId="{ row: entry }">
           <CopyText v-if="entry.spuId" :value="entry.spuId" />
           <span v-else>—</span>

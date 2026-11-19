@@ -456,7 +456,8 @@ public class AnalyticsRankingService {
                             : new BestCreator(
                                 best.creatorId(),
                                 creator == null ? null : creator.name(),
-                                best.netSalesAmount()),
+                                best.netSalesAmount(),
+                                creator == null ? null : creator.kolCode()),
                         commission == null
                             ? null
                             : commission.estimated().add(commission.actual()));
@@ -808,7 +809,7 @@ public class AnalyticsRankingService {
       BigDecimal estimatedCommission,
       BigDecimal actualCommission) {}
 
-  public record BestCreator(Long id, String name, BigDecimal netSalesAmount) {}
+  public record BestCreator(Long id, String name, BigDecimal netSalesAmount, String code) {}
 
   public record CreatorCards(
       Long periodEffectiveCount,

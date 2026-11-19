@@ -102,7 +102,7 @@ export interface RankRow {
   linkCount?: Scalar;
   commissionRate?: Scalar;
   imageUrl?: string;
-  bestCreator?: { id: string; name: string | null; netSalesAmount: Scalar };
+  bestCreator?: { id: string; name: string | null; netSalesAmount: Scalar; code?: string | null };
   metrics?: Metrics;
   [key: string]: unknown;
 }
@@ -134,6 +134,7 @@ export interface EvidenceRow {
   netTransactionAmount?: Scalar;
   eventTime: string;
   creatorName?: string;
+  creatorCode?: string | null;
   spuId?: string;
   transactionItemId?: string;
   shopName?: string;
