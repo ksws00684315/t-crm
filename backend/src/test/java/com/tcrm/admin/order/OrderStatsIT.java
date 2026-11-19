@@ -462,7 +462,11 @@ class OrderStatsIT {
       assertThat(rows)
           .filteredOn(row -> row.id() == 954)
           .singleElement()
-          .satisfies(row -> assertThat(row.creatorName()).isEqualTo("t144_inventory"));
+          .satisfies(
+              row -> {
+                assertThat(row.creatorName()).isEqualTo("t144_inventory");
+                assertThat(row.creatorCode()).startsWith("KOL-INV");
+              });
       var selected =
           new com.tcrm.admin.product.api.ProductAccessApi.RankingInventoryScope(
               4, java.util.List.of(12L), 9L, null, null, "7890", java.util.List.of(91L));
@@ -714,6 +718,10 @@ class OrderStatsIT {
       session.clearCache();
       assertThat(orders.unsettledCommission(affiliate, FROM, UNTIL)).isEqualByComparingTo("8");
       jdbc.update(
+          "UPDATE crm_commission_item_state SET released_commission_cny = 9 WHERE id = 701");
+      session.clearCache();
+      assertThat(orders.creatorCommission(scoped, FROM, UNTIL).total()).isEqualByComparingTo("9");
+      jdbc.update(
           "UPDATE crm_commission_item_state SET released_commission_cny = 8 WHERE id = 701");
       session.clearCache();
       assertThat(orders.unsettledCommission(affiliate, FROM, UNTIL)).isZero();
@@ -789,6 +797,7 @@ class OrderStatsIT {
           """);
       session.clearCache();
       assertThat(orders.inviterCommissions(productScope, FROM, UNTIL)).isEmpty();
+      assertThat(orders.creatorCommission(productScope, FROM, UNTIL)).isNull();
       assertThat(orders.creatorCommission(new ScopeDTO(4, 10L, null, null, null), FROM, UNTIL))
           .isNull();
     }

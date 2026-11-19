@@ -25,6 +25,9 @@ const emit = defineEmits<{
   refresh: [];
 }>();
 const { t } = useI18n();
+const selectedShopName = computed(
+  () => props.options?.shops.find(shop => shop.id === filters.value.shopId)?.name
+);
 
 const mode = ref<PeriodMode>(props.initialMode ?? "sevenDays");
 const picker = ref<{ handleOpen: () => void }>();
@@ -90,11 +93,6 @@ function reset(): void {
     @search="emit('search', mode === 'live')"
     @reset="reset"
   >
-    <template #actions>
-      <el-button :loading="loading" @click="emit('refresh')">{{
-        t("analytics.refresh")
-      }}</el-button>
-    </template>
     <template #primary>
       <div class="analytics-filter__time">
         <span class="analytics-filter__label">{{ t("analytics.period") }}</span>
@@ -170,6 +168,13 @@ function reset(): void {
             >
           </span>
         </div>
+        <el-button
+          class="analytics-filter__refresh"
+          native-type="button"
+          :loading="loading"
+          @click="emit('refresh')"
+          >{{ t("analytics.refresh") }}</el-button
+        >
       </div>
       <div class="analytics-filter__fields">
         <span class="analytics-filter__label">{{ t("analytics.conditions") }}</span>
@@ -183,6 +188,9 @@ function reset(): void {
         >
           <template #prefix>
             <span class="analytics-filter__caption">{{ t("analytics.shop") }}</span>
+          </template>
+          <template #label="{ label }">
+            <span :title="label">{{ selectedShopName ?? label }}</span>
           </template>
           <el-option
             v-for="option in options?.shops"
@@ -256,13 +264,13 @@ function reset(): void {
 </template>
 
 <style scoped>
+.analytics-filter {
+  container: analytics-filter / inline-size;
+}
 .analytics-filter :deep(.list-search__row) {
   display: grid;
-  grid-template-columns: minmax(0, 790px) max-content;
+  grid-template-columns: minmax(0, 1fr) max-content;
   row-gap: var(--tcrm-space-4);
-}
-.analytics-filter--four-fields :deep(.list-search__row) {
-  grid-template-columns: minmax(0, 1030px) max-content;
 }
 .analytics-filter__time {
   display: flex;
@@ -271,18 +279,19 @@ function reset(): void {
   gap: var(--tcrm-space-2);
   min-width: 0;
 }
-.analytics-filter--four-fields .analytics-filter__time {
-  contain: inline-size;
+.analytics-filter__refresh {
+  margin-inline-start: auto;
 }
 .analytics-filter__fields {
+  --analytics-filter-columns: 3;
   display: grid;
-  grid-template-columns: 5em repeat(3, minmax(0, 1fr));
+  grid-template-columns: 5em repeat(var(--analytics-filter-columns), minmax(0, 1fr));
   align-items: center;
   gap: var(--tcrm-space-2);
   min-width: 0;
 }
 .analytics-filter--four-fields .analytics-filter__fields {
-  grid-template-columns: 5em repeat(4, minmax(0, 1fr));
+  --analytics-filter-columns: 4;
 }
 .analytics-filter__period {
   display: flex;
@@ -342,17 +351,34 @@ function reset(): void {
 .analytics-filter :deep(.list-search__actions) {
   min-width: 0;
 }
-@media (max-width: 767px) {
+@container analytics-filter (max-width: 1370px) {
+  .analytics-filter--four-fields .analytics-filter__fields {
+    --analytics-filter-columns: 2;
+  }
+  .analytics-filter--four-fields .analytics-filter__fields > .analytics-filter__label {
+    grid-row: span 2;
+  }
+}
+@container analytics-filter (max-width: 1100px) {
+  .analytics-filter__fields {
+    --analytics-filter-columns: 2;
+  }
+  .analytics-filter__fields > .analytics-filter__label {
+    grid-row: span 2;
+  }
+}
+@container analytics-filter (max-width: 620px) {
   .analytics-filter :deep(.list-search__row),
-  .analytics-filter--four-fields :deep(.list-search__row) {
+  .analytics-filter__fields,
+  .analytics-filter--four-fields .analytics-filter__fields {
     grid-template-columns: minmax(0, 1fr);
   }
   .analytics-filter__time {
     flex-wrap: wrap;
   }
-  .analytics-filter__fields,
-  .analytics-filter--four-fields .analytics-filter__fields {
-    grid-template-columns: minmax(0, 1fr);
+  .analytics-filter__fields > .analytics-filter__label,
+  .analytics-filter--four-fields .analytics-filter__fields > .analytics-filter__label {
+    grid-row: auto;
   }
   .analytics-filter__label {
     flex-basis: 100%;

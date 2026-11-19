@@ -192,7 +192,8 @@ public interface OrderEvidenceMapper {
                  refunds.amount AS refund_amount, p.amount - refunds.amount AS net_transaction_amount
                </when>
                <otherwise>NULL::numeric AS refund_amount, NULL::numeric AS net_transaction_amount</otherwise>
-             </choose>, p.transaction_item_id, shop.shop_name, p.sku_id, p.sold_units, p.sales_amount
+             </choose>, p.transaction_item_id, shop.shop_name, p.sku_id, p.sold_units, p.sales_amount,
+             k.kol_code AS creator_code
       FROM paged p
       LEFT JOIN crm_product product ON product.id = p.reporting_product_id AND product.tenant_id = #{s.scope.tenantId}
       LEFT JOIN crm_kol k ON k.id = p.creator_id AND k.tenant_id = #{s.scope.tenantId}

@@ -42,7 +42,8 @@ public interface OrderEvidenceApi {
       String shopName,
       String skuId,
       Integer soldUnits,
-      BigDecimal salesAmount) {}
+      BigDecimal salesAmount,
+      String creatorCode) {}
 
   record ShopCreatorCounts(long selling, long total) {}
 

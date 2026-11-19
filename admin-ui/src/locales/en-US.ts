@@ -61,10 +61,15 @@ const enUS: MessageSchema = {
     remaining: "{number} item slots left"
   },
   analytics: {
+    detailHeader: {
+      totalInvited: "Total invited creators",
+      totalInvitedHint:
+        "Distinct creators first assigned to this inviter, including creators later transferred or disabled."
+    },
     creatorCards: {
       selling: "Creators with sales",
       sellingHint: "Distinct creators with paid orders during the selected period.",
-      effective: "Active creators",
+      effective: "Creators active in period",
       effectiveHint: "Distinct creators who were enabled at any point during the selected period.",
       effectiveUnavailableHint:
         "Counts creators enabled during the period. A dash indicates incomplete status history.",
@@ -127,7 +132,7 @@ const enUS: MessageSchema = {
     beijing: "Beijing time",
     all: "All",
     updated: "Data updated {time}",
-    paidOrderCount: "Paid orders",
+    paidOrderCount: "Orders",
     units: "Units sold",
     unitsValue: "Units sold {value}",
     netSalesAmount: "Net sales",
@@ -236,7 +241,8 @@ const enUS: MessageSchema = {
       viewBestSellers: "View shop best sellers",
       updated: "Updated",
       countedTab: "{label} ({count} orders)",
-      averageOrderAmount: "Average order value",
+      averageOrderAmount: "Average order amount",
+      paidOrderCount: "Orders",
       soldProducts: "Products sold",
       soldProductCounts: "{spu} SPU / {sku} SKU",
       settlement: "Settlement flows",
@@ -245,16 +251,17 @@ const enUS: MessageSchema = {
       settlementScope:
         "Shop settlement flows are available in company shop scope. Clear creator or inviter filters to view them.",
       orderPaidTime: "Order no. / paid at",
-      orderRefundTime: "Order no. / refund completed",
+      orderRefundTime: "Order no. / refund time",
       spuId: "Original Product ID",
       shopContribution: "Shop contribution",
       multipleShops: "Multiple shops",
-      transactionItemId: "Transaction Item ID",
+      transactionItemId: "Sold Product ID",
       quantity: "Quantity",
-      orderPaidAmount: "Paid amount",
-      refundAmount: "Refund amount",
-      netTransactionAmount: "Net transaction amount",
-      flowTime: "Flow no. / posted at",
+      orderPaidAmount: "Sales",
+      refundAmount: "Cohort refund amount",
+      netTransactionAmount: "Net sales",
+      flowNo: "Flow no.",
+      settlementTime: "Settlement time",
       settlementSpuId: "Original Product ID",
       direction: "Direction",
       amount: "Amount",
@@ -270,6 +277,7 @@ const enUS: MessageSchema = {
           "The amount paid for this item line. Other items in the order appear on their own lines.",
         refundAmount:
           "Successful refunds tied to this item line and completed within 30 calendar days of payment.",
+        refundUnits: "A dash indicates that the Weidian refund record has no verified quantity.",
         netTransactionAmount: "The amount paid for this item line less its successful refunds.",
         soldProducts:
           "Distinct SPUs and distinct SKUs with paid sales at this shop in the selected period.",
@@ -279,7 +287,9 @@ const enUS: MessageSchema = {
           "Weidian order number and refund completion time in Beijing time. An order may have multiple refunds.",
         spuId:
           "Weidian item ID of the original link. A dash indicates that the original product cannot be confirmed.",
-        flow: "CRM flow identifier and the Weidian posting time in Beijing time.",
+        transactionItemId: "Weidian item ID of the link used for the order.",
+        flow: "Settlement flow identifier recorded by the CRM.",
+        settlementTime: "Weidian posting time in Beijing time.",
         settlementSpuId:
           "Weidian item ID of the original link. A dash indicates that the original product cannot be confirmed.",
         direction: "Whether the posting increases or decreases shop receivables.",
@@ -292,7 +302,7 @@ const enUS: MessageSchema = {
       selling: "Shops with sales",
       total: "Total shops",
       totalIncludesDisabled: "Total includes disabled shops",
-      paidOrderCount: "Paid orders",
+      paidOrderCount: "Orders",
       units: "Units sold",
       spuCount: "SPUs sold",
       netSalesAmount: "Net sales",
@@ -348,12 +358,12 @@ const enUS: MessageSchema = {
       shop: "Shops selling",
       channelCode: "Original Product ID",
       kolCount: "Selling / linked creators",
-      paidOrderCount: "Order count",
+      paidOrderCount: "Orders",
       netSalesAmount: "Net sales",
       settlementAmount: "Settlement amount",
       ranking: "Product ranking",
       rankingCount: "{count} product | {count} products",
-      net: "Product net sales",
+      net: "Net sales",
       keyword: "Product name / Original Product ID",
       definitions: {
         selling:
@@ -395,7 +405,7 @@ const enUS: MessageSchema = {
       identity: "Creator / social / ID",
       nameWithPlatform: "{name} ({platform})",
       relationship: "Inviter / relationship",
-      paidOrderCount: "Order count",
+      paidOrderCount: "Orders",
       linkCount: "Links with sales",
       commissionRate: "Commission rate",
       estimatedCommission: "Estimated commission",
@@ -439,7 +449,7 @@ const enUS: MessageSchema = {
       selling: "Inviters with sales",
       active: "Active inviters {value}",
       identity: "Inviter",
-      creatorCounts: "Active / total creators",
+      creatorCounts: "Currently active / total creators",
       prepayExpense: "Prepayments paid out",
       totalEstimatedCommission: "Total estimated commission",
       totalExpense: "Total paid out",
@@ -455,7 +465,7 @@ const enUS: MessageSchema = {
       terms: {
         activeInviters: "Active inviters",
         totalInviters: "Total inviters",
-        paidOrderCount: "Paid orders",
+        paidOrderCount: "Orders",
         newInvitations: "New creators invited",
         pendingCreators: "Pending review now",
         estimatedPart: "Unsettled",
