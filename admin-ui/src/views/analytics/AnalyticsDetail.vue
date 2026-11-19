@@ -129,7 +129,7 @@ const salesMetrics: Metric[] = ["salesAmount", "completedRefundAmount", "netSale
 const orderMetrics: Metric[] = ["paidOrderCount", "units", "averageOrderAmount"];
 const metricKeys = computed<Metric[]>(() =>
   shop.value
-    ? [...salesMetrics, "amountRefundRate", ...orderMetrics]
+    ? [...salesMetrics, ...orderMetrics]
     : [...salesMetrics, ...orderMetrics, "amountRefundRate"]
 );
 function formatCount(value: unknown): string {
@@ -230,30 +230,27 @@ const cards = computed(() => {
           : formatAmountWithCurrency(String(value));
     }
     const hint = termHint(key);
-    const label = shop.value && key === "averageOrderAmount" ? local(key) : t(`analytics.${key}`);
+    const label =
+      shop.value && (key === "averageOrderAmount" || key === "paidOrderCount")
+        ? local(key)
+        : t(`analytics.${key}`);
     return [{ key, label, value: formatted, hint }];
   });
   if (!shop.value) return metrics;
-  const counts = shopOverview.value?.creatorCounts;
   return [
+    ...metrics.slice(0, salesMetrics.length),
     {
       key: "settlementAmount",
       label: local("settlementAmount"),
       value: formatMoney(shopOverview.value?.settlementAmount),
       hint: termHint("settlementAmount")
     },
-    ...metrics,
+    ...metrics.slice(salesMetrics.length),
     {
       key: "soldProducts",
       label: local("soldProducts"),
       value: t("analytics.shopDrawer.soldProductCounts", soldProductCounts.value),
       hint: termHint("soldProducts")
-    },
-    {
-      key: "creatorCounts",
-      label: local("creatorCounts"),
-      value: counts ? `${formatCount(counts.selling)} / ${formatCount(counts.total)}` : "—",
-      hint: termHint("creatorCounts")
     }
   ];
 });
@@ -307,10 +304,10 @@ const shopColumns = computed<DataColumn[]>(() => {
   } as const;
   if (tab.value === "settlements")
     return [
-      { key: "flow", label: local("flowTime"), minWidth: 172, align: "left" },
-      { ...product, label: t("analytics.product") },
+      product,
       { key: "orderNo", label: t("analytics.drilldown.orderNo"), minWidth: 150, align: "left" },
-      { key: "spuId", label: local("settlementSpuId"), minWidth: 128, align: "left" },
+      { key: "flow", label: local("flowNo"), minWidth: 130, align: "left" },
+      { key: "eventTime", label: local("settlementTime"), minWidth: 176 },
       { key: "direction", label: local("direction"), minWidth: 80 },
       { key: "amount", label: local("amount"), minWidth: 112, amount: true }
     ];
@@ -328,6 +325,7 @@ const shopColumns = computed<DataColumn[]>(() => {
     { key: "transactionItemId", label: local("transactionItemId"), minWidth: 145 },
     ...(refund
       ? [
+          { key: "refundUnits", label: t("analytics.refundUnits"), minWidth: 90 },
           {
             key: "amount",
             label: t("analytics.completedRefundAmount"),
@@ -336,7 +334,7 @@ const shopColumns = computed<DataColumn[]>(() => {
           }
         ]
       : [
-          { key: "units", label: local("quantity"), minWidth: 72 },
+          { key: "units", label: t("analytics.units"), minWidth: 72 },
           ...["orderPaidAmount", "refundAmount", "netTransactionAmount"].map(key => ({
             key,
             label: local(key),
@@ -405,8 +403,8 @@ const detailHeaders = computed(() =>
     const refund = tab.value === "REFUNDS";
     const key = column.key;
     const localKey =
-      tab.value === "settlements" && key === "spuId"
-        ? "settlementSpuId"
+      tab.value === "settlements" && key === "eventTime"
+        ? "settlementTime"
         : tab.value === "settlements" && key === "amount"
           ? "settlement"
           : shop.value && key === "orderNo" && tab.value !== "settlements"
@@ -685,7 +683,7 @@ function changeSize(next: number): void {
         />
       </el-tabs>
       <template v-if="tab === 'overview'">
-        <div class="analytics-detail__cards" :class="{ 'analytics-detail__cards--shop': shop }">
+        <div class="analytics-detail__cards">
           <MetricCard
             v-for="card in cards"
             :key="card.key"
@@ -708,6 +706,11 @@ function changeSize(next: number): void {
                   ><span>{{ soldProductCounts.sku }}</span></template
                 >
               </i18n-t>
+            </template>
+            <template v-else-if="shop && card.value.includes('¥')" #value>
+              <span v-for="(part, index) in card.value.split('¥')" :key="index">
+                <span v-if="index" class="analytics-detail__currency">¥</span>{{ part }}
+              </span>
             </template>
           </MetricCard>
         </div>
@@ -820,6 +823,7 @@ function changeSize(next: number): void {
           entry.metrics?.paidOrderCount ?? entry.paidOrderCount
         }}</template>
         <template #cell-units="{ row: entry }">{{ entry.metrics?.units ?? entry.units }}</template>
+        <template #cell-refundUnits>—</template>
         <template #cell-salesAmount="{ row: entry }">{{
           tab === "SKUS" ? skuMoney(entry.salesAmount) : formatMoney(entry.salesAmount)
         }}</template>
@@ -852,7 +856,9 @@ function changeSize(next: number): void {
             ></span>
             <div class="analytics-detail__stack">
               <strong :title="entry.product">{{ entry.product }}</strong>
-              <small v-if="entry.sku" :title="entry.sku">{{ entry.sku }}</small>
+              <small v-if="entry.sku || entry.skuId" :title="entry.sku || entry.skuId">
+                {{ entry.sku || entry.skuId }}
+              </small>
             </div>
           </div>
           <span v-else>{{
@@ -879,10 +885,7 @@ function changeSize(next: number): void {
           <span v-else>—</span>
         </template>
         <template #cell-flow="{ row: entry }">
-          <div class="analytics-detail__stack">
-            <CopyText :value="entry.id" />
-            <small>{{ eventTime.format(new Date(entry.eventTime)) }}</small>
-          </div>
+          <CopyText :value="entry.id" />
         </template>
         <template #cell-direction="{ row: entry }">
           <el-tag
@@ -1068,8 +1071,8 @@ function changeSize(next: number): void {
   grid-template-columns: repeat(4, minmax(0, 1fr));
   gap: var(--tcrm-space-3);
 }
-.analytics-detail__cards--shop {
-  grid-template-columns: repeat(5, minmax(0, 1fr));
+.analytics-detail__currency {
+  font-size: 0.8em;
 }
 .analytics-detail__cards :deep(.metric-card) {
   border-inline-start: 3px solid var(--drawer-metric-accent, var(--tcrm-color-primary));
@@ -1088,11 +1091,6 @@ function changeSize(next: number): void {
 }
 .analytics-detail__orders :deep(.el-table__cell.tcrm-amount) {
   text-align: right;
-}
-@media (max-width: 1000px) {
-  .analytics-detail__cards--shop {
-    grid-template-columns: repeat(3, minmax(0, 1fr));
-  }
 }
 @media (max-width: 860px) {
   .analytics-detail__cards {
