@@ -148,6 +148,13 @@ class OrderStatsIT {
       assertThat(settlement.increase()).isEqualByComparingTo("100.75");
       assertThat(settlement.decrease()).isEqualByComparingTo("20.25");
       assertThat(settlement.net()).isEqualByComparingTo("80.50");
+      assertThat(settlements.dailyShopReceivables(4, 1, FROM, UNTIL))
+          .singleElement()
+          .satisfies(
+              day -> {
+                assertThat(day.day()).isEqualTo(LocalDate.of(2026, 11, 3));
+                assertThat(day.amount()).isEqualByComparingTo("80.50");
+              });
       assertThat(settlements.countShopReceivables(4, 1, FROM, UNTIL)).isEqualTo(2);
       var flows = settlements.pageShopReceivables(4, 1, FROM, UNTIL, 20, 0);
       assertThat(flows)
@@ -229,6 +236,9 @@ class OrderStatsIT {
               day -> {
                 assertThat(day.sales()).isEqualByComparingTo(own.sales());
                 assertThat(day.refunds()).isEqualByComparingTo(own.completedRefunds());
+                assertThat(day.cohortRefunds()).isEqualByComparingTo(own.cohortRefunds());
+                assertThat(day.paidOrders()).isEqualTo(own.paidOrders());
+                assertThat(day.units()).isEqualTo(own.units());
               });
       var otherInviter = new Selection(scope, null, 10L, null, null, FROM, UNTIL);
       assertThat(evidence.daily(otherInviter)).isEmpty();

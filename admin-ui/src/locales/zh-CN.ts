@@ -139,7 +139,7 @@ const zhCN = {
       creatorName: "达人",
       orders: "订单商品",
       refunds: "成功退款",
-      daily: "每日销售与退款",
+      metricTrend: "{metric}趋势",
       clocks: "销售额按支付时间统计，退款金额按退款完结时间统计。",
       orderNo: "订单号",
       refundNo: "退款单号",

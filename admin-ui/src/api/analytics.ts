@@ -161,6 +161,13 @@ export interface DailyAmount {
   day: string;
   sales: Scalar;
   refunds: Scalar;
+  cohortRefunds: Scalar;
+  paidOrders: Scalar;
+  units: Scalar;
+}
+export interface DailySettlement {
+  day: string;
+  amount: Scalar;
 }
 export interface ShopDetailOverview {
   settlementAmount: Scalar | null;
@@ -170,6 +177,7 @@ interface DetailResult {
   daily: DailyAmount[] | null;
   activity: { items: EvidenceRow[]; total: Scalar; page: number; size: number } | null;
   shopOverview?: ShopDetailOverview | null;
+  dailySettlement?: DailySettlement[] | null;
 }
 export function queryAnalyticsDetail(
   board: Board,

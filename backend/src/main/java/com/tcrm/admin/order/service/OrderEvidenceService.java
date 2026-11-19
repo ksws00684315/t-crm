@@ -61,6 +61,12 @@ public class OrderEvidenceService implements OrderEvidenceApi {
   }
 
   @Override
+  public List<DailySettlement> dailyShopSettlement(
+      long tenantId, long shopId, Instant from, Instant until) {
+    return settlements.dailyShopReceivables(tenantId, shopId, from, until);
+  }
+
+  @Override
   public ShopCreatorCounts shopCreatorCounts(Selection selection) {
     return evidence.shopCreatorCounts(selection);
   }

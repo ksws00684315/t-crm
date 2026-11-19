@@ -141,7 +141,7 @@ const enUS: MessageSchema = {
       creatorName: "Creator",
       orders: "Order items",
       refunds: "Successful refunds",
-      daily: "Daily sales and refunds",
+      metricTrend: "{metric} trend",
       clocks: "Sales use payment time. Refunds use refund completion time.",
       orderNo: "Order number",
       refundNo: "Refund number",

@@ -7,18 +7,23 @@ interface Term {
   value?: string;
 }
 
-const props = defineProps<{
-  label: string;
-  value: string;
-  detail?: string;
-  hint?: string;
-  labelTerms?: Term[];
-  detailTerms?: Term[];
-  comparison?: string;
-  unavailable?: boolean;
-  icon?: Component;
-  tone?: "neutral" | "blue" | "green" | "amber" | "red" | "purple";
-}>();
+const props = withDefaults(
+  defineProps<{
+    label: string;
+    value: string;
+    detail?: string;
+    hint?: string;
+    labelTerms?: Term[];
+    detailTerms?: Term[];
+    comparison?: string;
+    unavailable?: boolean;
+    selected?: boolean;
+    icon?: Component;
+    tone?: "neutral" | "blue" | "green" | "amber" | "red" | "purple";
+  }>(),
+  { selected: undefined }
+);
+const emit = defineEmits<{ select: [] }>();
 
 const note = computed(() => [props.detail, props.comparison].filter(Boolean).join(" · "));
 </script>
@@ -26,9 +31,23 @@ const note = computed(() => [props.detail, props.comparison].filter(Boolean).joi
 <template>
   <article
     class="metric-card"
-    :class="[tone && `metric-card--${tone}`, { 'metric-card--with-terms': labelTerms && icon }]"
+    :class="[
+      tone && `metric-card--${tone}`,
+      {
+        'metric-card--with-terms': labelTerms && icon,
+        'metric-card--selectable': selected !== undefined
+      }
+    ]"
     :aria-label="label"
+    @click="selected !== undefined && emit('select')"
   >
+    <button
+      v-if="selected !== undefined"
+      type="button"
+      class="metric-card__select"
+      :aria-label="label"
+      :aria-pressed="selected"
+    />
     <el-icon v-if="icon" class="metric-card__icon" aria-hidden="true">
       <component :is="icon" />
     </el-icon>
@@ -98,6 +117,23 @@ const note = computed(() => [props.detail, props.comparison].filter(Boolean).joi
   min-width: 0;
   display: grid;
   gap: var(--tcrm-space-1);
+}
+.metric-card--selectable {
+  position: relative;
+}
+.metric-card__select {
+  position: absolute;
+  inset: 0;
+  border: 0;
+  background: transparent;
+  cursor: pointer;
+}
+.metric-card__select:focus-visible {
+  outline: var(--tcrm-focus-width) solid var(--tcrm-color-primary);
+  outline-offset: calc(-1 * var(--tcrm-focus-width));
+}
+.metric-card--selectable .metric-card__term {
+  position: relative;
 }
 .metric-card__icon {
   flex: 0 0 var(--metric-icon-box, var(--tcrm-control-height-large));
