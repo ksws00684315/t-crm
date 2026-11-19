@@ -3,6 +3,8 @@ package com.tcrm.admin.order;
 import static org.assertj.core.api.Assertions.assertThat;
 
 import com.tcrm.admin.kol.mapper.KolMapper;
+import com.tcrm.admin.order.api.OrderEvidenceApi.DetailSort;
+import com.tcrm.admin.order.api.OrderEvidenceApi.EvidenceRow;
 import com.tcrm.admin.order.api.OrderEvidenceApi.Kind;
 import com.tcrm.admin.order.api.OrderEvidenceApi.ProductBreakdown;
 import com.tcrm.admin.order.api.OrderEvidenceApi.Selection;
@@ -195,6 +197,39 @@ class OrderStatsIT {
       assertThat(evidence.page(shopEvidence, Kind.ORDERS, 1, 1))
           .singleElement()
           .satisfies(row -> assertThat(row.units()).isEqualTo(2));
+      for (var sort :
+          java.util.List.of(
+              DetailSort.UNITS,
+              DetailSort.SALES_AMOUNT,
+              DetailSort.REFUND_AMOUNT,
+              DetailSort.NET_SALES_AMOUNT)) {
+        long first = sort == DetailSort.NET_SALES_AMOUNT ? 2L : 1L;
+        long second = first == 1L ? 2L : 1L;
+        assertThat(evidence.pageWithSort(shopEvidence, Kind.ORDERS, 1, 0, sort, false))
+            .extracting(EvidenceRow::id)
+            .containsExactly(first);
+        assertThat(evidence.pageWithSort(shopEvidence, Kind.ORDERS, 1, 1, sort, false))
+            .extracting(EvidenceRow::id)
+            .containsExactly(second);
+        assertThat(evidence.pageWithSort(shopEvidence, Kind.ORDERS, 1, 0, sort, true))
+            .extracting(EvidenceRow::id)
+            .containsExactly(second);
+      }
+      assertThat(
+              evidence.pageWithSort(
+                  shopEvidence, Kind.ORDERS, 1, 0, DetailSort.REFUND_AMOUNT, false))
+          .singleElement()
+          .satisfies(row -> assertThat(row.refundAmount()).isEqualByComparingTo("32"));
+      assertThat(
+              evidence.pageWithSort(
+                  shopEvidence, Kind.REFUNDS, 1, 0, DetailSort.REFUND_AMOUNT, false))
+          .extracting(EvidenceRow::refundNo)
+          .containsExactly("t144-r3");
+      assertThat(
+              evidence.productGroupsWithSort(
+                  productEvidence, ProductBreakdown.SKUS, 1, 0, DetailSort.SALES_AMOUNT, true))
+          .singleElement()
+          .satisfies(row -> assertThat(row.salesAmount()).isEqualByComparingTo("40"));
       assertThat(evidence.page(shopEvidence, Kind.REFUNDS, 20, 0))
           .extracting(row -> row.refundNo())
           .containsExactly("t144-r4", "t144-r3");

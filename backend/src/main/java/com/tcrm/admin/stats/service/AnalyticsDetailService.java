@@ -4,6 +4,7 @@ import com.tcrm.admin.kol.api.KolApi;
 import com.tcrm.admin.kol.api.KolRefDTO;
 import com.tcrm.admin.order.api.OrderEvidenceApi;
 import com.tcrm.admin.order.api.OrderEvidenceApi.DailyAmount;
+import com.tcrm.admin.order.api.OrderEvidenceApi.DetailSort;
 import com.tcrm.admin.order.api.OrderEvidenceApi.EvidenceRow;
 import com.tcrm.admin.order.api.OrderEvidenceApi.Kind;
 import com.tcrm.admin.order.api.OrderEvidenceApi.ProductBreakdown;
@@ -79,10 +80,29 @@ public class AnalyticsDetailService {
       Kind activity,
       Integer page,
       Integer size) {
+    return detail(board, filters, entityId, productCode, keyword, activity, page, size, null, null);
+  }
+
+  @Transactional(readOnly = true, isolation = Isolation.REPEATABLE_READ)
+  public Detail detail(
+      Board board,
+      FilterDTO filters,
+      Long entityId,
+      String productCode,
+      String keyword,
+      Kind activity,
+      Integer page,
+      Integer size,
+      DetailSort sortBy,
+      String sortDirection) {
     if (activity != null && !overview.canView("order:view")) {
       throw new BusinessException(ErrorCode.AUTH_FORBIDDEN);
     }
-    var ranking = StatsRanking.resolve(page, size, null);
+    var ranking = StatsRanking.resolve(page, size, sortDirection);
+    if (sortBy == DetailSort.PAID_ORDER_COUNT
+        || (activity == Kind.REFUNDS && sortBy == DetailSort.NET_SALES_AMOUNT)) {
+      throw new BusinessException(ErrorCode.COMMON_VALIDATION_FAILED);
+    }
     var resolved = overview.resolve(filters);
     var selection = select(resolved, board, entityId, productCode, keyword);
     return activity == null
@@ -97,7 +117,15 @@ public class AnalyticsDetailService {
         : new Detail(
             resolved.period(),
             null,
-            evidence.page(selection, activity, ranking.page(), ranking.size()),
+            sortBy != null
+                ? evidence.sortedActivity(
+                    selection,
+                    activity,
+                    ranking.page(),
+                    ranking.size(),
+                    sortBy,
+                    !ranking.descending())
+                : evidence.page(selection, activity, ranking.page(), ranking.size()),
             null,
             null);
   }
@@ -159,9 +187,26 @@ public class AnalyticsDetailService {
       ProductBreakdown group,
       Integer page,
       Integer size) {
-    var ranking = StatsRanking.resolve(page, size, null);
+    return productBreakdown(filters, productCode, keyword, group, page, size, null, null);
+  }
+
+  @Transactional(readOnly = true, isolation = Isolation.REPEATABLE_READ)
+  public PageResult<ProductGroup> productBreakdown(
+      FilterDTO filters,
+      String productCode,
+      String keyword,
+      ProductBreakdown group,
+      Integer page,
+      Integer size,
+      DetailSort sortBy,
+      String sortDirection) {
+    var ranking = StatsRanking.resolve(page, size, sortDirection);
     var selection = select(overview.resolve(filters), Board.PRODUCT, null, productCode, keyword);
-    var result = evidence.productGroups(selection, group, ranking.page(), ranking.size());
+    var result =
+        sortBy == null
+            ? evidence.productGroups(selection, group, ranking.page(), ranking.size())
+            : evidence.sortedProductGroups(
+                selection, group, ranking.page(), ranking.size(), sortBy, !ranking.descending());
     if (group != ProductBreakdown.CREATORS || result.items().isEmpty()) {
       return result;
     }
@@ -238,10 +283,22 @@ public class AnalyticsDetailService {
   @Transactional(readOnly = true, isolation = Isolation.REPEATABLE_READ)
   public PageResult<CreatorRow> inviterCreators(
       FilterDTO filters, long inviterId, Integer page, Integer size, boolean currentTeam) {
+    return inviterCreators(filters, inviterId, page, size, currentTeam, null, null);
+  }
+
+  @Transactional(readOnly = true, isolation = Isolation.REPEATABLE_READ)
+  public PageResult<CreatorRow> inviterCreators(
+      FilterDTO filters,
+      long inviterId,
+      Integer page,
+      Integer size,
+      boolean currentTeam,
+      DetailSort sortBy,
+      String sortDirection) {
     if (!overview.canView("kol:view")) {
       throw new BusinessException(ErrorCode.AUTH_FORBIDDEN);
     }
-    var ranking = StatsRanking.resolve(page, size, null);
+    var ranking = StatsRanking.resolve(page, size, sortDirection);
     var resolved = overview.resolve(filters);
     var original = resolved.scope();
     if ((original.ownerId() != null && original.ownerId() != inviterId)
@@ -320,11 +377,15 @@ public class AnalyticsDetailService {
                               : owner.nickname());
                 })
             .toList();
-    return ranking.slice(
-        rows,
-        ranking
-            .compare((CreatorRow row) -> row.metrics().netSalesAmount())
-            .thenComparing(CreatorRow::id, Comparator.naturalOrder()));
+    Comparator<CreatorRow> sort =
+        switch (sortBy == null ? DetailSort.NET_SALES_AMOUNT : sortBy) {
+          case PAID_ORDER_COUNT -> ranking.compare(row -> row.metrics().paidOrderCount());
+          case UNITS -> ranking.compare(row -> row.metrics().units());
+          case SALES_AMOUNT -> ranking.compare(row -> row.metrics().salesAmount());
+          case REFUND_AMOUNT -> ranking.compare(row -> row.metrics().completedRefundAmount());
+          case NET_SALES_AMOUNT -> ranking.compare(row -> row.metrics().netSalesAmount());
+        };
+    return ranking.slice(rows, sort.thenComparing(CreatorRow::id));
   }
 
   private static MetricsDTO creatorMetrics(RankFactsDTO fact) {

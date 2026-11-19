@@ -16,6 +16,8 @@ import {
   type Board,
   type DailyAmount,
   type DetailQuery,
+  type DetailSort,
+  type DetailSortQuery,
   type EvidenceRow,
   type InviterCreatorRow,
   type Metric,
@@ -53,6 +55,20 @@ const isBreakdown = computed(
 );
 const page = ref(1);
 const size = ref(20);
+const tabSorts = ref<Partial<Record<typeof tab.value, DetailSortQuery>>>({});
+const detailSort = computed(() => tabSorts.value[tab.value]);
+const salesSorts: Partial<Record<string, DetailSort>> = {
+  paidOrderCount: "PAID_ORDER_COUNT",
+  units: "UNITS",
+  soldUnits: "UNITS",
+  salesAmount: "SALES_AMOUNT",
+  orderPaidAmount: "SALES_AMOUNT",
+  refundAmount: "REFUND_AMOUNT",
+  completedRefundAmount: "REFUND_AMOUNT",
+  net: "NET_SALES_AMOUNT",
+  netSalesAmount: "NET_SALES_AMOUNT",
+  netTransactionAmount: "NET_SALES_AMOUNT"
+};
 const tableId = computed(() => `analytics-detail-${shop.value ? "shop-" : ""}${tab.value}`);
 const daily = ref<DailyAmount[]>([]);
 const shopOverview = ref<ShopDetailOverview | null>(null);
@@ -258,21 +274,29 @@ const cards = computed(() => {
     }
   ];
 });
-const productOrderColumns = computed<DataColumn[]>(() => [
-  { key: "orderNo", label: t("analytics.drilldown.orderNo"), minWidth: 150, align: "left" },
-  { key: "sku", label: "SKU", minWidth: 125, align: "left" },
-  {
-    key: "eventTime",
-    label: tab.value === "REFUNDS" ? productText("refundTime") : t("analytics.drilldown.payTime"),
-    minWidth: 156
-  },
-  { key: "shopName", label: productText("sellingShop"), minWidth: 110 },
-  { key: "creatorName", label: t("analytics.creator"), minWidth: 144 },
-  { key: "spuId", label: local("spuId"), minWidth: 120 },
-  { key: "transactionItemId", label: productText("transactionItemId"), minWidth: 120 },
-  { key: "soldUnits", label: t("analytics.units"), minWidth: 72 },
-  { key: "salesAmount", label: t("analytics.salesAmount"), minWidth: 106, amount: true }
-]);
+const productOrderColumns = computed<DataColumn[]>(() => {
+  const refund = tab.value === "REFUNDS";
+  return [
+    {
+      key: "orderNo",
+      label: refund ? t("analytics.drilldown.orderNo") : local("orderPaidTime"),
+      minWidth: refund ? 150 : 176,
+      align: "left"
+    },
+    { key: "sku", label: "SKU", minWidth: 125, align: "left" },
+    ...(refund ? [{ key: "eventTime", label: productText("refundTime"), minWidth: 156 }] : []),
+    {
+      key: "shopName",
+      label: refund ? productText("sellingShop") : t("analytics.shop"),
+      minWidth: 110
+    },
+    { key: "creatorName", label: t("analytics.creator"), minWidth: 144 },
+    ...(refund ? [{ key: "spuId", label: local("spuId"), minWidth: 120 }] : []),
+    { key: "transactionItemId", label: productText("transactionItemId"), minWidth: 120 },
+    { key: "soldUnits", label: t("analytics.units"), minWidth: 72 },
+    { key: "salesAmount", label: t("analytics.salesAmount"), minWidth: 106, amount: true }
+  ];
+});
 
 const columns = computed<DataColumn[]>(() => [
   { key: "orderNo", label: t("analytics.drilldown.orderNo"), minWidth: 160, align: "left" },
@@ -414,7 +438,8 @@ const detailHeaders = computed(() =>
         ? "settlementTime"
         : tab.value === "settlements" && key === "amount"
           ? "settlement"
-          : shop.value && key === "orderNo" && tab.value !== "settlements"
+          : key === "orderNo" &&
+              ((shop.value && tab.value !== "settlements") || (product.value && !refund))
             ? refund
               ? "orderRefundTime"
               : "orderPaidTime"
@@ -434,14 +459,25 @@ const detailHeaders = computed(() =>
     const hint =
       product.value && tab.value === "REFUNDS" && ["soldUnits", "salesAmount"].includes(key)
         ? productText("originalSaleHint")
-        : shop.value && te(`analytics.shopDrawer.definitions.${localKey}`)
-          ? termHint(localKey)
+        : (shop.value ||
+              (product.value && key === "orderNo" && !refund) ||
+              key === "refundAmount") &&
+            te(`analytics.shopDrawer.definitions.${localKey}`)
+          ? t(`analytics.shopDrawer.definitions.${localKey}`)
           : evidenceKey
             ? t(`analytics.evidenceDefinitions.${evidenceKey}`)
             : termHint(
                 key === "amount" ? "completedRefundAmount" : key === "net" ? "netSalesAmount" : key
               );
-    return hint ? [{ ...column, hint }] : [];
+    const sortBy =
+      key === "amount" && tab.value === "ORDERS"
+        ? "SALES_AMOUNT"
+        : key === "amount" && refund
+          ? "REFUND_AMOUNT"
+          : salesSorts[key];
+    const direction =
+      sortBy && detailSort.value?.sortBy === sortBy ? detailSort.value.sortDirection : undefined;
+    return hint || sortBy ? [{ ...column, hint, sortBy, direction }] : [];
   })
 );
 
@@ -502,7 +538,8 @@ async function load(): Promise<void> {
         ...props.filters,
         group: section,
         page: page.value,
-        size: size.value
+        size: size.value,
+        ...detailSort.value
       });
       if (id === request) {
         productGroups.value = result.items;
@@ -515,7 +552,8 @@ async function load(): Promise<void> {
         ...props.filters,
         currentTeam: section === "currentTeam",
         page: page.value,
-        size: size.value
+        size: size.value,
+        ...detailSort.value
       });
       if (id === request) {
         creatorRows.value = result.items;
@@ -527,7 +565,8 @@ async function load(): Promise<void> {
       ...props.filters,
       kind,
       page: kind ? page.value : undefined,
-      size: kind ? size.value : undefined
+      size: kind ? size.value : undefined,
+      ...(kind ? detailSort.value : undefined)
     });
     if (id !== request) return;
     daily.value = result.daily ?? [];
@@ -575,6 +614,16 @@ watch(
   },
   { immediate: true }
 );
+
+function sortDetail(sortBy: DetailSort): void {
+  const next =
+    detailSort.value?.sortBy === sortBy && detailSort.value.sortDirection === "desc"
+      ? "asc"
+      : "desc";
+  tabSorts.value[tab.value] = { sortBy, sortDirection: next };
+  page.value = 1;
+  void load();
+}
 
 function changePage(next: number): void {
   if (page.value === next) return;
@@ -769,11 +818,30 @@ function changeSize(next: number): void {
       >
         <template v-for="column in detailHeaders" :key="column.key" #[`header-${column.key}`]>
           <el-tooltip
+            :disabled="!column.hint"
             :content="column.hint"
             :trigger="['hover', 'focus']"
             popper-class="analytics-metric-definition"
           >
-            <span tabindex="0" class="analytics-detail__term">{{ column.label }}</span>
+            <button
+              v-if="column.sortBy"
+              type="button"
+              class="analytics-detail__sort"
+              :class="{ 'is-sorted': column.direction }"
+              :aria-label="
+                t('analytics.sortLabel', {
+                  label: column.label,
+                  direction: t(`analytics.${column.direction ?? 'unsorted'}`)
+                })
+              "
+              @click="sortDetail(column.sortBy)"
+            >
+              {{ column.label }}
+              <span aria-hidden="true">{{
+                column.direction === "asc" ? "↑" : column.direction === "desc" ? "↓" : "↕"
+              }}</span>
+            </button>
+            <span v-else tabindex="0" class="analytics-detail__term">{{ column.label }}</span>
           </el-tooltip>
         </template>
         <template #cell-name="{ row: entry }">
@@ -866,7 +934,7 @@ function changeSize(next: number): void {
         <template #cell-orderNo="{ row: entry }">
           <div class="analytics-detail__stack">
             <CopyText :value="entry.orderNo" />
-            <small v-if="shop && tab !== 'settlements'">{{
+            <small v-if="(shop && tab !== 'settlements') || (product && tab === 'ORDERS')">{{
               eventTime.format(new Date(entry.eventTime))
             }}</small>
           </div>
@@ -930,6 +998,19 @@ function changeSize(next: number): void {
 }
 .analytics-detail__term {
   cursor: help;
+}
+.analytics-detail__sort {
+  border: 0;
+  background: none;
+  color: inherit;
+  font: inherit;
+  cursor: pointer;
+  padding: 0;
+  white-space: nowrap;
+}
+.analytics-detail__sort.is-sorted,
+.analytics-detail__sort:hover {
+  color: var(--tcrm-color-primary-text);
 }
 .analytics-detail__body {
   display: grid;

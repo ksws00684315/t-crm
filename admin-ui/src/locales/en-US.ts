@@ -204,7 +204,7 @@ const enUS: MessageSchema = {
       transactionItemId: "Sold Product ID",
       quantity: "Quantity",
       orderPaidAmount: "Sales",
-      refundAmount: "Cohort refund amount",
+      refundAmount: "Refund amount",
       netTransactionAmount: "Net sales",
       flowNo: "Flow no.",
       settlementTime: "Settlement time",
@@ -222,7 +222,7 @@ const enUS: MessageSchema = {
         orderPaidAmount:
           "The amount paid for this item line. Other items in the order appear on their own lines.",
         refundAmount:
-          "Successful refunds tied to this item line and completed within 30 calendar days of payment.",
+          "Cohort refund amount: successful refunds for this item line completed within 30 Beijing calendar days of payment. The payment date is day 1.",
         refundUnits: "A dash indicates that the Weidian refund record has no verified quantity.",
         netTransactionAmount: "The amount paid for this item line less its successful refunds.",
         soldProducts:

@@ -2,6 +2,7 @@ package com.tcrm.admin.order.mapper;
 
 import com.baomidou.mybatisplus.annotation.InterceptorIgnore;
 import com.tcrm.admin.order.api.OrderEvidenceApi.DailyAmount;
+import com.tcrm.admin.order.api.OrderEvidenceApi.DetailSort;
 import com.tcrm.admin.order.api.OrderEvidenceApi.EvidenceRow;
 import com.tcrm.admin.order.api.OrderEvidenceApi.Kind;
 import com.tcrm.admin.order.api.OrderEvidenceApi.ProductBreakdown;
@@ -176,18 +177,69 @@ public interface OrderEvidenceMapper {
       )
       """;
 
+  String ORDER_REFUNDS =
+      """
+      LEFT JOIN LATERAL (
+        SELECT COALESCE(SUM(r.amount), 0) AS amount
+        FROM crm_refund r WHERE r.tenant_id = #{s.scope.tenantId} AND NOT r.is_deleted
+          AND r.order_id = p.order_id AND r.order_item_id = p.id AND r.refund_status = 'SUCCESS'
+      """
+          + OrderStatsMapper.COHORT_REFUND_WINDOW
+          + """
+      ) refunds ON TRUE
+      """;
+
+  String EVIDENCE_ORDER =
+      """
+      ORDER BY
+      <if test="sortBy != null">
+        <choose>
+          <when test="sortBy.name() == 'UNITS'">p.sold_units</when>
+          <when test="sortBy.name() == 'SALES_AMOUNT'">p.sales_amount</when>
+          <when test="sortBy.name() == 'REFUND_AMOUNT' and kind.name() == 'REFUNDS'">p.amount</when>
+          <when test="sortBy.name() == 'REFUND_AMOUNT'">p.refund_amount</when>
+          <otherwise>p.net_transaction_amount</otherwise>
+        </choose>
+        <choose><when test="ascending">ASC</when><otherwise>DESC</otherwise></choose>
+        NULLS LAST,
+      </if>
+      p.event_time DESC, p.id DESC
+      """;
+
+  default List<EvidenceRow> page(Selection selection, Kind kind, int size, long offset) {
+    return pageWithSort(selection, kind, size, offset, null, false);
+  }
+
   @InterceptorIgnore(tenantLine = "true")
   @Select(
       EVIDENCE
           + """
-      , paged AS (
+      <bind name="sortRefunds" value="kind.name() == 'ORDERS' and sortBy != null and (sortBy.name() == 'REFUND_AMOUNT' or sortBy.name() == 'NET_SALES_AMOUNT')"/>
+      , candidates AS (
         SELECT evidence.*, event_time AS pay_time FROM evidence
-        ORDER BY event_time DESC, id DESC LIMIT #{size} OFFSET #{offset}
+      )
+      <if test="sortRefunds">
+      , ranked AS (
+        SELECT p.*, refunds.amount AS refund_amount, p.amount - refunds.amount AS net_transaction_amount
+        FROM candidates p
+      """
+          + ORDER_REFUNDS
+          + """
+      )
+      </if>
+      , paged AS (
+        SELECT p.* FROM
+        <choose><when test="sortRefunds">ranked</when><otherwise>candidates</otherwise></choose> p
+      """
+          + EVIDENCE_ORDER
+          + """
+        LIMIT #{size} OFFSET #{offset}
       )
       SELECT p.id, p.order_no, p.refund_no, p.product, p.sku, p.units, p.amount, p.event_time,
              p.shop_id, k.name AS creator_name, p.spu_id,
              product.image_url,
              <choose>
+               <when test="sortRefunds">p.refund_amount, p.net_transaction_amount</when>
                <when test="kind.name() == 'ORDERS'">
                  refunds.amount AS refund_amount, p.amount - refunds.amount AS net_transaction_amount
                </when>
@@ -198,24 +250,23 @@ public interface OrderEvidenceMapper {
       LEFT JOIN crm_product product ON product.id = p.reporting_product_id AND product.tenant_id = #{s.scope.tenantId}
       LEFT JOIN crm_kol k ON k.id = p.creator_id AND k.tenant_id = #{s.scope.tenantId}
       LEFT JOIN crm_shop shop ON shop.id = p.shop_id AND shop.tenant_id = #{s.scope.tenantId}
-      <if test="kind.name() == 'ORDERS'">
-        LEFT JOIN LATERAL (
-          SELECT COALESCE(SUM(r.amount), 0) AS amount
-          FROM crm_refund r WHERE r.tenant_id = #{s.scope.tenantId} AND NOT r.is_deleted
-            AND r.order_id = p.order_id AND r.order_item_id = p.id AND r.refund_status = 'SUCCESS'
+      <if test="kind.name() == 'ORDERS' and !sortRefunds">
       """
-          + OrderStatsMapper.COHORT_REFUND_WINDOW
+          + ORDER_REFUNDS
           + """
-        ) refunds ON TRUE
       </if>
-      ORDER BY p.event_time DESC, p.id DESC
+      """
+          + EVIDENCE_ORDER
+          + """
       </script>
       """)
-  List<EvidenceRow> page(
+  List<EvidenceRow> pageWithSort(
       @Param("s") Selection selection,
       @Param("kind") Kind kind,
       @Param("size") int size,
-      @Param("offset") long offset);
+      @Param("offset") long offset,
+      @Param("sortBy") DetailSort sortBy,
+      @Param("ascending") boolean ascending);
 
   @InterceptorIgnore(tenantLine = "true")
   @Select(EVIDENCE + "SELECT COUNT(*) FROM evidence </script>")
@@ -372,6 +423,11 @@ public interface OrderEvidenceMapper {
       )
       """;
 
+  default List<ProductGroup> productGroups(
+      Selection selection, ProductBreakdown group, int size, long offset) {
+    return productGroupsWithSort(selection, group, size, offset, null, false);
+  }
+
   @InterceptorIgnore(tenantLine = "true")
   @Select(
       PRODUCT_GROUPS
@@ -391,15 +447,31 @@ public interface OrderEvidenceMapper {
         LEFT JOIN crm_product p ON p.id = t.reporting_product_id AND p.tenant_id = #{s.scope.tenantId}
       </if>
       GROUP BY code
-      ORDER BY net_sales_amount DESC, code
+      ORDER BY
+      <choose>
+        <when test="sortBy != null">
+          <choose>
+            <when test="sortBy.name() == 'PAID_ORDER_COUNT'">paid_order_count</when>
+            <when test="sortBy.name() == 'UNITS'">units</when>
+            <when test="sortBy.name() == 'SALES_AMOUNT'">sales_amount</when>
+            <when test="sortBy.name() == 'REFUND_AMOUNT'">completed_refund_amount</when>
+            <otherwise>net_sales_amount</otherwise>
+          </choose>
+          <choose><when test="ascending">ASC</when><otherwise>DESC</otherwise></choose> NULLS LAST
+        </when>
+        <otherwise>net_sales_amount DESC</otherwise>
+      </choose>
+      , code
       LIMIT #{size} OFFSET #{offset}
       </script>
       """)
-  List<ProductGroup> productGroups(
+  List<ProductGroup> productGroupsWithSort(
       @Param("s") Selection selection,
       @Param("group") ProductBreakdown group,
       @Param("size") int size,
-      @Param("offset") long offset);
+      @Param("offset") long offset,
+      @Param("sortBy") DetailSort sortBy,
+      @Param("ascending") boolean ascending);
 
   @InterceptorIgnore(tenantLine = "true")
   @Select(PRODUCT_GROUPS + "SELECT COUNT(DISTINCT code) FROM transactions </script>")

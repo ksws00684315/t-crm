@@ -200,7 +200,7 @@ const zhCN = {
       transactionItemId: "成交商品ID",
       quantity: "数量",
       orderPaidAmount: "销售额",
-      refundAmount: "同批退款金额",
+      refundAmount: "退款金额",
       netTransactionAmount: "净销售额",
       flowNo: "流水号",
       settlementTime: "结算时间",
@@ -216,7 +216,8 @@ const zhCN = {
         creatorCounts:
           "有成交达人数按所选期间本店支付订单的归属达人去重。总达人数包含这些达人和期间内有本店专属商品链接的达人。",
         orderPaidAmount: "该订单商品行分摊到的实付金额，同一订单的其他商品行分别显示。",
-        refundAmount: "该商品行在支付日起 30 个自然日内完结的成功退款金额。",
+        refundAmount:
+          "同批退款口径：该商品行支付日起 30 个北京时间自然日内完结的成功退款金额，支付日计第 1 天。",
         refundUnits: "当前微店退款记录未提供可核实的退款件数时显示「—」。",
         netTransactionAmount: "该订单商品行的实付金额扣除该行的成功退款。",
         soldProducts: "所选期间内，在该店铺产生支付成交的 SPU 数与 SKU 数，按各自口径去重。",
