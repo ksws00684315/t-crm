@@ -138,6 +138,7 @@ class OrderStatsIT {
     configuration.addMapper(KolMapper.class);
     configuration.addMapper(SysUserTenantMapper.class);
     configuration.addMapper(StatsRollupMapper.class);
+    configuration.addMapper(com.tcrm.admin.product.mapper.ProductMapper.class);
     var factory = new SqlSessionFactoryBuilder().build(configuration);
 
     try (var session = factory.openSession()) {
@@ -381,6 +382,60 @@ class OrderStatsIT {
     checkCreatorCards(jdbc, factory);
     checkInviterSearch(jdbc, factory);
     checkFirstShopSpu(jdbc, factory);
+    checkRankingInventory(jdbc, factory);
+  }
+
+  private static void checkRankingInventory(JdbcTemplate jdbc, SqlSessionFactory factory) {
+    jdbc.execute(
+        """
+        INSERT INTO crm_shop (id, tenant_id, shop_name, weidian_shop_id, shop_code, status, create_time, update_time)
+        VALUES (11, 4, 't144_XD', '14411', 'SHOP-014411', 1, now(), now()),
+               (12, 4, 't144_ZD', '14412', 'SHOP-014412', 1, now(), now())
+        """);
+    jdbc.execute(
+        """
+        INSERT INTO crm_kol (id, tenant_id, kol_code, name, email, status, bd_user_id, create_time, update_time)
+        SELECT id, 4, 'KOL-INV' || id, 't144_inventory', 't144_inventory' || id || '@example.test',
+               1, 9, now(), now()
+        FROM (VALUES (951),(952),(953),(954),(956)) AS creators(id)
+        """);
+    jdbc.execute(
+        """
+        INSERT INTO crm_product (id, product_code, shop_id, tenant_id, weidian_item_id, name,
+          price, status, create_time, update_time)
+        VALUES (92, 'T144-UNSOLD', 12, 4, '7789', 't144 unsold', 100, 0, now(), now())
+        """);
+    jdbc.update("UPDATE crm_kol_item SET valid_to = CURRENT_TIMESTAMP WHERE id = 956");
+    try (var session = factory.openSession()) {
+      var products = session.getMapper(com.tcrm.admin.product.mapper.ProductMapper.class);
+      var scope =
+          new com.tcrm.admin.product.api.ProductAccessApi.RankingInventoryScope(
+              4, java.util.List.of(11L, 12L), null, null, null, null, java.util.List.of(91L));
+      var result = products.rankingInventory(scope);
+      assertThat(result)
+          .filteredOn(p -> p.productId() == null)
+          .singleElement()
+          .satisfies(p -> assertThat(p.totalSpuCount()).isEqualTo(2));
+      assertThat(result)
+          .filteredOn(p -> p.productId() != null)
+          .singleElement()
+          .satisfies(
+              p -> {
+                assertThat(p.onSaleShopCount()).isEqualTo(2);
+                assertThat(p.linkedCreatorCount()).isEqualTo(4);
+              });
+      var selected =
+          new com.tcrm.admin.product.api.ProductAccessApi.RankingInventoryScope(
+              4, java.util.List.of(12L), 9L, null, null, "7890", java.util.List.of(91L));
+      assertThat(products.rankingInventory(selected))
+          .filteredOn(p -> p.productId() != null)
+          .singleElement()
+          .satisfies(
+              p -> {
+                assertThat(p.onSaleShopCount()).isEqualTo(1);
+                assertThat(p.linkedCreatorCount()).isEqualTo(2);
+              });
+    }
   }
 
   private static void checkFirstShopSpu(JdbcTemplate jdbc, SqlSessionFactory factory) {

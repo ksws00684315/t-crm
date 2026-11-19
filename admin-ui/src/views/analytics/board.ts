@@ -74,7 +74,6 @@ export const sortable = new Set([
   ...trade,
   "spuCount",
   "kolCount",
-  "rank",
   "linkCount",
   "commissionRate",
   "totalEstimatedCommission",

@@ -158,11 +158,13 @@ const columns = computed<DataColumn[]>(() =>
         : (product || creator) && key === "identity"
           ? "left"
           : undefined,
-    highlighted: sortBy.value === key,
+    highlighted: product ? key === "netSalesAmount" : sortBy.value === key,
     minWidth:
-      shop && locale.value === "zh-CN" && shopColumnWidths[key]
-        ? shopColumnWidths[key]
-        : (columnWidths[key] ?? { "zh-CN": 108, "en-US": 136 })
+      product && key === "kolCount"
+        ? { "zh-CN": 178, "en-US": 214 }
+        : shop && locale.value === "zh-CN" && shopColumnWidths[key]
+          ? shopColumnWidths[key]
+          : (columnWidths[key] ?? { "zh-CN": 108, "en-US": 136 })
   }))
 );
 const customHeaders = computed(() =>
@@ -171,7 +173,10 @@ const customHeaders = computed(() =>
     .map(key => ({ key, help: t(`analytics.${board}.definitions.${key}`) }))
 );
 const cellKeys = columnsByBoard[board].filter(
-  key => key !== "rank" && (sortable.has(key) || pendingColumns.has(key))
+  key =>
+    key !== "rank" &&
+    !(product && key === "kolCount") &&
+    (sortable.has(key) || pendingColumns.has(key))
 );
 const selectedDetail = ref<{ row: RankRow; filters: DetailQuery }>();
 
@@ -241,9 +246,15 @@ function label(key: string): string {
   }
   if (
     product &&
-    ["channelCode", "kolCount", "paidOrderCount", "netSalesAmount", "settlementAmount"].includes(
-      key
-    )
+    [
+      "identity",
+      "channelCode",
+      "shop",
+      "kolCount",
+      "paidOrderCount",
+      "netSalesAmount",
+      "settlementAmount"
+    ].includes(key)
   ) {
     return t(`analytics.best-sellers.${key}`);
   }
@@ -276,6 +287,10 @@ function label(key: string): string {
     return t(`analytics.inviter-performance.${key}`);
   }
   return t(`analytics.${key}`);
+}
+
+function pair(left: Scalar | null | undefined, right: Scalar | null | undefined): string {
+  return `${display("", left)} / ${display("", right)}`;
 }
 
 function display(key: string, value: Scalar | null | undefined): string {
@@ -328,8 +343,6 @@ const cards = computed(() => {
       hint: translate(hintKey),
       value
     });
-    const pair = (left: Scalar | null | undefined, right: Scalar | null | undefined) =>
-      `${display("", left)} / ${display("", right)}`;
     const formatMoney = (value: Scalar | null | undefined) => {
       if (value == null) return "—";
       const [whole, fraction = ""] = String(value).split(".");
@@ -528,7 +541,7 @@ const cards = computed(() => {
       tone: "neutral" as const,
       icon: DataBoard,
       label: t("analytics.best-sellers.selling"),
-      value: display("", summary?.sellingCount),
+      value: pair(summary?.sellingCount, summary?.totalSpuCount),
       hint: hint("selling")
     },
     {
@@ -1037,7 +1050,7 @@ onUnmounted(stop);
                   : undefined
               "
               class="analytics-column-heading"
-              :class="{ selected: displayedSort.sortBy === key }"
+              :class="{ selected: !product && displayedSort.sortBy === key }"
               @click="sortable.has(key) && sort(key)"
             >
               {{ label(key) }}
@@ -1099,8 +1112,9 @@ onUnmounted(stop);
         <CopyText v-if="row.sourceItemId" :value="row.sourceItemId" />
         <span v-else>—</span>
       </template>
-      <template #cell-shop="{ row }">{{
-        row.related || t("analytics.shopDrawer.multipleShops")
+      <template #cell-shop="{ row }">{{ display("", row.onSaleShopCount) }}</template>
+      <template v-if="product" #cell-kolCount="{ row }">{{
+        pair(valueOf(row, "kolCount"), row.linkedCreatorCount)
       }}</template>
       <template #cell-relationship="{ row }">
         <div>{{ row.related || t("analytics.unassigned") }}</div>

@@ -12,6 +12,8 @@ import com.tcrm.admin.order.api.OrderStatsApi.ScopeDTO;
 import com.tcrm.admin.order.api.OrderStatsApi.TotalsDTO;
 import com.tcrm.admin.product.api.ProductAccessApi;
 import com.tcrm.admin.product.api.ProductAccessApi.ProductRefDTO;
+import com.tcrm.admin.product.api.ProductAccessApi.RankingInventory;
+import com.tcrm.admin.product.api.ProductAccessApi.RankingInventoryScope;
 import com.tcrm.admin.product.api.ShopAccessApi;
 import com.tcrm.admin.shared.BusinessException;
 import com.tcrm.admin.shared.ErrorCode;
@@ -148,16 +150,36 @@ public class AnalyticsRankingService {
                     .toList())
             .stream()
             .collect(Collectors.toMap(ProductRefDTO::id, Function.identity()));
+    var inventory =
+        catalog.rankingInventory(
+            new RankingInventoryScope(
+                scope.tenantId(),
+                scope.visibleShopIds().stream()
+                    .filter(id -> scope.shopId() == null || scope.shopId().equals(id))
+                    .toList(),
+                scope.ownerId(),
+                scope.kolId() == null ? scope.matchedKolIds() : List.of(scope.kolId()),
+                scope.matchedInviterIds(),
+                keyword,
+                products.keySet()));
+    long totalSpuCount =
+        inventory.stream()
+            .filter(row -> row.productId() == null)
+            .mapToLong(RankingInventory::totalSpuCount)
+            .findFirst()
+            .orElse(0L);
+    var availability =
+        inventory.stream()
+            .filter(row -> row.productId() != null)
+            .collect(Collectors.toMap(RankingInventory::productId, Function.identity()));
     var now = productRows(current, shopNames, products);
     var before = productRows(previous, shopNames, Map.of());
     var rows = new ArrayList<Row>();
     int rank = 0;
     for (var row : now) {
-      if (row.metrics().paidOrderCount() > 0) {
-        rows.add(row.withRank(++rank));
-      } else {
-        rows.add(row);
-      }
+      var counts = row.entityId() == null ? null : availability.get(row.entityId());
+      Integer businessRank = row.metrics().paidOrderCount() > 0 ? ++rank : null;
+      rows.add(row.withProductCounts(businessRank, counts));
     }
     var metrics = StatsOverviewService.metrics(productTotals(totals));
     var priorMetrics = StatsOverviewService.metrics(productTotals(previousTotals));
@@ -171,7 +193,8 @@ public class AnalyticsRankingService {
             totals.updatedAt());
     return new Data(
         meta,
-        new Summary(metrics, sellingProducts(now), null, null, null, null),
+        new Summary(
+            metrics, sellingProducts(now), null, null, null, null, null, null, totalSpuCount),
         new Summary(priorMetrics, sellingProducts(before), null, null, null, null),
         StatsOverviewService.changes(metrics, priorMetrics),
         rows,
@@ -483,7 +506,8 @@ public class AnalyticsRankingService {
             effectiveCount,
             sellingCreators,
             creatorCards,
-            inviterCards),
+            inviterCards,
+            null),
         new Summary(total.previous(), selling(previous), null, null, null, null),
         total.change(),
         rows,
@@ -681,7 +705,7 @@ public class AnalyticsRankingService {
   static Comparator<Row> comparator(Board board, StatsRanking sorting, String key) {
     boolean valid =
         switch (key) {
-          case "rank", "refundedOrderCount" -> board == Board.PRODUCT;
+          case "refundedOrderCount" -> board == Board.PRODUCT;
           case "invitedCount", "effectiveCount", "totalEstimatedCommission" ->
               board == Board.INVITER;
           case "kolCount" -> board != Board.CREATOR;
@@ -701,7 +725,6 @@ public class AnalyticsRankingService {
     }
     Comparator<Row> primary =
         switch (key) {
-          case "rank" -> sorting.compare(Row::rank);
           case "invitedCount" -> sorting.compare(Row::invitedCount);
           case "totalEstimatedCommission" -> sorting.compare(Row::totalEstimatedCommission);
           case "effectiveCount" -> sorting.compare(Row::effectiveCount);
@@ -755,7 +778,8 @@ public class AnalyticsRankingService {
       Long effectiveCount,
       Long sellingCreatorCount,
       CreatorCards creatorCards,
-      InviterCards inviterCards) {
+      InviterCards inviterCards,
+      Long totalSpuCount) {
     public Summary(
         MetricsDTO metrics,
         long sellingCount,
@@ -770,6 +794,7 @@ public class AnalyticsRankingService {
           invitedCount,
           effectiveCount,
           sellingCreatorCount,
+          null,
           null,
           null);
     }
@@ -817,7 +842,9 @@ public class AnalyticsRankingService {
       BigDecimal commissionRate,
       String relationStatus,
       BestCreator bestCreator,
-      BigDecimal totalEstimatedCommission) {
+      BigDecimal totalEstimatedCommission,
+      Long onSaleShopCount,
+      Long linkedCreatorCount) {
     public Row(
         String id,
         String name,
@@ -865,6 +892,8 @@ public class AnalyticsRankingService {
           commissionRate,
           relationStatus,
           null,
+          null,
+          null,
           null);
     }
 
@@ -893,10 +922,12 @@ public class AnalyticsRankingService {
           commissionRate,
           relationStatus,
           best,
-          commission);
+          commission,
+          onSaleShopCount,
+          linkedCreatorCount);
     }
 
-    Row withRank(int nextRank) {
+    Row withProductCounts(Integer nextRank, RankingInventory counts) {
       return new Row(
           id,
           name,
@@ -919,7 +950,11 @@ public class AnalyticsRankingService {
           primaryPlatform,
           linkCount,
           commissionRate,
-          relationStatus);
+          relationStatus,
+          null,
+          null,
+          counts == null ? null : counts.onSaleShopCount(),
+          counts == null ? null : counts.linkedCreatorCount());
     }
   }
 

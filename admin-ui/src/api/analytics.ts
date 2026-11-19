@@ -50,6 +50,7 @@ export interface Summary {
   spuCount?: Scalar;
   settlement?: { increase: Scalar; decrease: Scalar; net: Scalar } | null;
   sellingCount?: Scalar;
+  totalSpuCount?: Scalar;
   activeCount?: Scalar;
   invitedCount?: Scalar;
   effectiveCount?: Scalar;
@@ -91,6 +92,8 @@ export interface RankRow {
   name?: string;
   code?: string;
   sourceItemId?: string;
+  onSaleShopCount?: Scalar;
+  linkedCreatorCount?: Scalar;
   related?: string;
   enabled?: boolean;
   social?: string[];

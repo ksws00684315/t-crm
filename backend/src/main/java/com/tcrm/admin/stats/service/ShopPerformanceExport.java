@@ -244,10 +244,10 @@ public class ShopPerformanceExport {
     var headers =
         List.of(
             label("rank"),
-            label("productName"),
+            label("rankingProduct"),
             label("channelItemId"),
-            label("shop"),
-            label("sellingCreators"),
+            label("onSaleShops"),
+            label("sellingLinkedCreators"),
             label("units"),
             label("orderCount"),
             label("refundUnits"),
@@ -264,8 +264,12 @@ public class ShopPerformanceExport {
                       text(row.rank()),
                       text(row.name()),
                       row.sourceItemId() == null ? "—" : row.sourceItemId(),
-                      row.shopId() == null ? label("multipleShops") : text(row.related()),
-                      text(row.kolCount()),
+                      row.onSaleShopCount() == null ? "—" : text(row.onSaleShopCount()),
+                      text(row.kolCount())
+                          + " / "
+                          + (row.linkedCreatorCount() == null
+                              ? "—"
+                              : text(row.linkedCreatorCount())),
                       text(m.units()),
                       text(m.paidOrderCount()),
                       "",

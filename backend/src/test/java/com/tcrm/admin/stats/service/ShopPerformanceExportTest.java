@@ -60,7 +60,9 @@ class ShopPerformanceExportTest {
             new BigDecimal("0.15"),
             "PROMOTING",
             new AnalyticsRankingService.BestCreator(901L, "Best example", new BigDecimal("80")),
-            new BigDecimal("8.25"));
+            new BigDecimal("8.25"),
+            3L,
+            4L);
     var result =
         new AnalyticsRankingService.Result(
             meta,
@@ -93,10 +95,10 @@ class ShopPerformanceExportTest {
             assertThat(labels)
                 .containsExactly(
                     "Rank",
-                    "Order product",
+                    "Product",
                     "Original Product ID",
-                    "Shop",
-                    "Creators with sales",
+                    "Shops selling",
+                    "Selling / linked creators",
                     "Units",
                     "Order count",
                     "Refunded units",
@@ -106,7 +108,8 @@ class ShopPerformanceExportTest {
                     "Settlement amount (CNY)");
             assertThat(data.getCell(0).getStringCellValue()).isEqualTo("1");
             assertThat(data.getCell(2).getStringCellValue()).isEqualTo("source-1");
-            assertThat(data.getCell(3).getStringCellValue()).isEqualTo("Shop");
+            assertThat(data.getCell(3).getStringCellValue()).isEqualTo("3");
+            assertThat(data.getCell(4).getStringCellValue()).isEqualTo("0 / 4");
             assertThat(data.getCell(7).getStringCellValue()).isEmpty();
             assertThat(data.getCell(11).getStringCellValue()).isEmpty();
           } else if (board == AnalyticsRankingService.Board.CREATOR) {

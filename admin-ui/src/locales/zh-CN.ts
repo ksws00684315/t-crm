@@ -259,10 +259,11 @@ const zhCN = {
     },
     "best-sellers": {
       detailTitle: "商品经营详情",
-      selling: "成交 SPU 数",
-      identity: "订单商品",
+      selling: "成交SPU数/总SPU数",
+      identity: "商品",
+      shop: "在售店铺数",
       channelCode: "原商品ID",
-      kolCount: "成交达人数",
+      kolCount: "成交达人数/关联达人数",
       paidOrderCount: "订单数",
       netSalesAmount: "净销售额",
       settlementAmount: "结算金额",
@@ -271,7 +272,8 @@ const zhCN = {
       net: "商品净销售额",
       keyword: "商品名称／原商品ID",
       definitions: {
-        selling: "所选期间有支付成交的商品 SPU 数，同一原商品跨店只计一次。",
+        selling:
+          "所选期间有分销成交的原商品数 / 当前筛选范围内登记的原商品总数。复制品按来源归并。",
         cohortRefundAmount:
           "该批已支付商品行在支付日起 30 个北京时间自然日内完结且能关联到商品行的成功退款。",
         averageOrderAmount: "所选期间匹配商品行的销售额除以包含该商品的支付订单数。",
@@ -279,8 +281,8 @@ const zhCN = {
         rank: "按同一筛选条件下的分销销售额从高到低计算名次。切换表头排序时，原名次保留。",
         identity: "展示订单商品名称和已关联源商品的主图。主图缺失时显示占位图标。",
         channelCode: "来源商品的微店原链接商品 ID。无法确认唯一来源时显示「—」。",
-        shop: "展示筛选范围内实际成交店铺，可在详情查看店铺贡献。",
-        kolCount: "所选期间内，该商品有支付成交的达人数。同一达人只计一次。",
+        shop: "当前启用店铺中有在售原商品或有效复制链接的店铺数。复制链接按 CRM 的有效绑定判定。",
+        kolCount: "所选期间成交达人数 / 当前有效绑定的关联达人数。同一达人在各自范围内只计一次。",
         units: "累计所选期间内已支付订单下该商品各 SKU 的购买数量。",
         paidOrderCount: "所选期间内包含该商品的已支付订单数。同一订单在同一商品行中只计一次。",
         refundUnits: "按退款完结时间累计成功退款的商品件数。退款件数数据待接入。",

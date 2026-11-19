@@ -275,10 +275,11 @@ const enUS: MessageSchema = {
     },
     "best-sellers": {
       detailTitle: "Product performance details",
-      selling: "SPUs with sales",
-      identity: "Order product",
+      selling: "SPUs sold / total SPUs",
+      identity: "Product",
+      shop: "Shops selling",
       channelCode: "Original Product ID",
-      kolCount: "Creators with sales",
+      kolCount: "Selling / linked creators",
       paidOrderCount: "Order count",
       netSalesAmount: "Net sales",
       settlementAmount: "Settlement amount",
@@ -288,7 +289,7 @@ const enUS: MessageSchema = {
       keyword: "Product name / Original Product ID",
       definitions: {
         selling:
-          "SPUs with sales in the selected period. The same original product counts once across shops.",
+          "Distinct originals with distribution sales in the period / current original products in scope. Copies count under their original product.",
         cohortRefundAmount:
           "Successful line-linked refunds for these paid items completed within 30 Beijing calendar days from payment.",
         averageOrderAmount:
@@ -300,8 +301,9 @@ const enUS: MessageSchema = {
           "The name from the order and the linked source product image. A placeholder appears if the image is unavailable.",
         channelCode:
           "Weidian item ID of the original link. A dash indicates that the original product cannot be confirmed.",
-        shop: "Selling shops under the current filters. Open details to see their contributions.",
-        kolCount: "Distinct creators with a paid sale of this product during the selected period.",
+        shop: "Enabled shops with the original on sale or an effective copy link. Copy availability uses the current CRM binding.",
+        kolCount:
+          "Creators with a sale in the period / creators with an effective link today. Each creator counts once per measure.",
         units:
           "Total units purchased across all SKUs of this product in orders paid during the selected period.",
         paidOrderCount:

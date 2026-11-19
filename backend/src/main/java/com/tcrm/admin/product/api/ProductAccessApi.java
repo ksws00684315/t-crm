@@ -21,6 +21,22 @@ public interface ProductAccessApi {
    */
   List<ProductRefDTO> listProducts(Collection<Long> productIds);
 
+  /** Current original products and effective creator links in the ranking's visible scope. */
+  List<RankingInventory> rankingInventory(RankingInventoryScope scope);
+
+  record RankingInventoryScope(
+      long tenantId,
+      List<Long> shopIds,
+      Long ownerId,
+      List<Long> creatorIds,
+      List<Long> inviterIds,
+      String keyword,
+      Collection<Long> rankedProductIds) {}
+
+  /** A null product ID denotes the total; per-product rows carry the two current counts. */
+  record RankingInventory(
+      Long productId, long totalSpuCount, long onSaleShopCount, long linkedCreatorCount) {}
+
   /**
    * Identity, display fields and main image of an original product.
    *

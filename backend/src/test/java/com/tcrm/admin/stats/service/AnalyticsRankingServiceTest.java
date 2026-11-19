@@ -84,8 +84,18 @@ class AnalyticsRankingServiceTest {
             List.of(
                 new ProductRefDTO(
                     50L, "P1", "Item", "https://example.test/a", 1, "Category", "source-50")));
-    var result = service.query(Board.PRODUCT, FILTER, "item", 1, 20, "rank", "desc");
+    when(catalog.rankingInventory(any()))
+        .thenReturn(
+            List.of(
+                new com.tcrm.admin.product.api.ProductAccessApi.RankingInventory(null, 5, 0, 0),
+                new com.tcrm.admin.product.api.ProductAccessApi.RankingInventory(50L, 0, 3, 4)));
+    var result = service.query(Board.PRODUCT, FILTER, "item", 1, 20, "salesAmount", "asc");
     assertThat(result.summary().metrics().paidOrderCount()).isEqualTo(3);
+    assertThat(result.summary().totalSpuCount()).isEqualTo(5);
+    assertThat(result.ranking().items().getFirst().onSaleShopCount()).isEqualTo(3);
+    assertThat(result.ranking().items().getFirst().linkedCreatorCount()).isEqualTo(4);
+    assertThatThrownBy(() -> service.query(Board.PRODUCT, FILTER, null, 1, 20, "rank", "desc"))
+        .isInstanceOf(BusinessException.class);
     assertThat(result.ranking().items()).extracting(Row::rank).containsExactly(2, 1);
     assertThat(result.ranking().items().getLast().metrics().periodRefundedOrderRate())
         .isEqualByComparingTo("0.5");
@@ -93,7 +103,6 @@ class AnalyticsRankingServiceTest {
     assertThat(result.ranking().items().getFirst().code()).isEqualTo("B");
     for (String key :
         List.of(
-            "rank",
             "refundedOrderCount",
             "kolCount",
             "paidOrderCount",
