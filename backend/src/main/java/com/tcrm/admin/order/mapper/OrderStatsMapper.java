@@ -163,19 +163,49 @@ public interface OrderStatsMapper {
   long creatorSpuCount(
       @Param("scope") ScopeDTO scope, @Param("from") Instant from, @Param("until") Instant until);
 
+  /**
+   * Current verified snapshots; released means posted to the wallet, independent of withdrawals.
+   */
+  String COMMISSION_ORDERS =
+      SCOPED_ORDERS
+          + """
+      , states AS (
+        SELECT p.bd_user_id AS inviter_id, p.kol_id AS creator_id,
+               p.id AS order_id, s.id AS item_state_id, s.accrued_commission_cny AS accrued,
+               COALESCE(s.released_commission_cny, 0) AS released,
+               (s.verified AND s.kol_id IS NOT DISTINCT FROM p.kol_id
+                 AND i.kol_id IS NOT DISTINCT FROM p.kol_id) AS verified,
+        <choose>
+          <when test="scope.productKeyword != null">
+            EXISTS (SELECT 1 FROM product_items matched WHERE matched.id = i.id)
+          </when>
+          <otherwise>TRUE</otherwise>
+        </choose> AS included
+        FROM scoped_orders p
+        JOIN crm_commission_item_state s ON s.order_id = p.id
+          AND s.tenant_id = #{scope.tenantId} AND NOT s.is_deleted
+        JOIN crm_order_item i ON i.id = s.order_item_id AND i.order_id = p.id
+          AND i.tenant_id = #{scope.tenantId} AND NOT i.is_deleted
+        WHERE p.kol_id IS NOT NULL
+          AND p.pay_time &gt;= #{from} AND p.pay_time &lt; #{until}
+      ), commission_orders AS (
+        SELECT inviter_id, creator_id, order_id, SUM(accrued) FILTER (WHERE included) AS accrued,
+          SUM(released) FILTER (WHERE included) AS released,
+          BOOL_OR(accrued &gt; released) AS unsettled
+        FROM states GROUP BY inviter_id, creator_id, order_id
+        HAVING BOOL_AND(verified) AND BOOL_OR(included)
+      )
+      """;
+
   // This read model uses wallet postings, not mutable release balances, for confirmed deductions.
   @InterceptorIgnore(tenantLine = "true")
   @Select(
-      SCOPED_ORDERS
+      COMMISSION_ORDERS
           + """
       , verified AS MATERIALIZED (
-        SELECT s.id, s.kol_id, s.accrued_commission_cny AS total
-        FROM scoped_orders p
-        JOIN crm_commission_item_state s ON s.order_id = p.id AND s.kol_id = p.kol_id
-          AND s.tenant_id = #{scope.tenantId} AND s.verified AND NOT s.is_deleted
-        JOIN crm_order_item i ON i.id = s.order_item_id AND i.order_id = p.id
-          AND i.kol_id = s.kol_id AND i.tenant_id = #{scope.tenantId} AND NOT i.is_deleted
-        WHERE p.pay_time &gt;= #{from} AND p.pay_time &lt; #{until}
+        SELECT s.item_state_id AS id, s.creator_id AS kol_id
+        FROM states s JOIN commission_orders o ON o.order_id = s.order_id
+        WHERE s.included
       ), adjustments AS (
         SELECT -l.amount_cny AS amount,
           CASE
@@ -204,7 +234,7 @@ public interface OrderStatsMapper {
         ) prior ON TRUE
         WHERE l.source_key !~ ':K[0-9]+$'
       )
-      SELECT (SELECT SUM(total) FROM verified) AS total,
+      SELECT (SELECT SUM(CASE WHEN unsettled THEN accrued ELSE released END) FROM commission_orders) AS total,
              CASE WHEN EXISTS (SELECT 1 FROM verified)
                AND NOT EXISTS (SELECT 1 FROM adjustments WHERE refund IS NULL)
                THEN (SELECT COALESCE(SUM(amount) FILTER (WHERE refund), 0) FROM adjustments)
@@ -214,42 +244,14 @@ public interface OrderStatsMapper {
   CreatorCommissionDTO creatorCommission(
       @Param("scope") ScopeDTO scope, @Param("from") Instant from, @Param("until") Instant until);
 
-  /**
-   * Current verified snapshots; released means posted to the wallet, independent of withdrawals.
-   */
   @InterceptorIgnore(tenantLine = "true")
   @Select(
-      SCOPED_ORDERS
+      COMMISSION_ORDERS
           + """
-      , states AS (
-        SELECT p.bd_user_id AS inviter_id, p.id AS order_id, s.accrued_commission_cny AS accrued,
-               COALESCE(s.released_commission_cny, 0) AS released,
-               (s.verified AND s.kol_id IS NOT DISTINCT FROM p.kol_id
-                 AND i.kol_id IS NOT DISTINCT FROM p.kol_id) AS verified,
-        <choose>
-          <when test="scope.productKeyword != null">
-            EXISTS (SELECT 1 FROM product_items matched WHERE matched.id = i.id)
-          </when>
-          <otherwise>TRUE</otherwise>
-        </choose> AS included
-        FROM scoped_orders p
-        JOIN crm_commission_item_state s ON s.order_id = p.id
-          AND s.tenant_id = #{scope.tenantId} AND NOT s.is_deleted
-        JOIN crm_order_item i ON i.id = s.order_item_id AND i.order_id = p.id
-          AND i.tenant_id = #{scope.tenantId} AND NOT i.is_deleted
-        WHERE p.bd_user_id IS NOT NULL AND p.kol_id IS NOT NULL
-          AND p.pay_time &gt;= #{from} AND p.pay_time &lt; #{until}
-      ), commission_orders AS (
-        SELECT inviter_id, order_id, SUM(accrued) FILTER (WHERE included) AS accrued,
-          SUM(released) FILTER (WHERE included) AS released,
-          BOOL_OR(accrued &gt; released) AS unsettled
-        FROM states GROUP BY inviter_id, order_id
-        HAVING BOOL_AND(verified) AND BOOL_OR(included)
-      )
       SELECT inviter_id,
         COALESCE(SUM(accrued) FILTER (WHERE unsettled), 0) AS estimated,
         COALESCE(SUM(released) FILTER (WHERE NOT unsettled), 0) AS actual
-      FROM commission_orders GROUP BY inviter_id
+      FROM commission_orders WHERE inviter_id IS NOT NULL GROUP BY inviter_id
       </script>
       """)
   List<InviterCommissionDTO> inviterCommissions(

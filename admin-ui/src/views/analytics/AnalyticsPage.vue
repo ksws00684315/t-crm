@@ -35,6 +35,7 @@ import type {
   Scalar
 } from "@/api/analytics";
 import CopyText from "@/components/CopyText.vue";
+import CreatorIdentity from "./CreatorIdentity.vue";
 import DataTable from "@/components/DataTable.vue";
 import type { DataColumn } from "@/components/DataTable.vue";
 import RowActions from "@/components/RowActions.vue";
@@ -1071,7 +1072,11 @@ onUnmounted(stop);
         </span>
       </template>
       <template #cell-identity="{ row }">
-        <div class="analytics-identity">
+        <div v-if="creator" class="analytics-identity__text">
+          <CreatorIdentity :name="identity(row)" :code="row.code" />
+          <small v-if="row.social?.length">{{ row.social.join(" · ") }}</small>
+        </div>
+        <div v-else class="analytics-identity">
           <img
             v-if="product && row.imageUrl"
             class="product-thumb"
@@ -1154,27 +1159,21 @@ onUnmounted(stop);
       </template>
 
       <template #cell-bestCreator="{ row }">
-        <div v-if="row.bestCreator" class="analytics-identity">
-          <span class="analytics-identity__avatar" aria-hidden="true">{{
-            Array.from(row.bestCreator.name || row.bestCreator.id)[0]
-          }}</span>
-          <div class="analytics-identity__text">
-            <strong>{{ row.bestCreator.name || row.bestCreator.id }}</strong>
-            <CopyText
-              v-if="row.bestCreator.name"
-              :value="row.bestCreator.code || row.bestCreator.id"
-            />
-            <el-tooltip
-              :content="inviterTerm('netSalesAmount').hint"
-              :trigger="['hover', 'focus']"
-              popper-class="analytics-metric-definition"
+        <div v-if="row.bestCreator" class="analytics-identity__text">
+          <CreatorIdentity
+            :name="row.bestCreator.name"
+            :code="row.bestCreator.code || row.bestCreator.id"
+          />
+          <el-tooltip
+            :content="inviterTerm('netSalesAmount').hint"
+            :trigger="['hover', 'focus']"
+            popper-class="analytics-metric-definition"
+          >
+            <small tabindex="0" class="conversion-chain__term"
+              >{{ label("netSalesAmount") }}
+              {{ display("netSalesAmount", row.bestCreator.netSalesAmount) }}</small
             >
-              <small tabindex="0" class="conversion-chain__term"
-                >{{ label("netSalesAmount") }}
-                {{ display("netSalesAmount", row.bestCreator.netSalesAmount) }}</small
-              >
-            </el-tooltip>
-          </div>
+          </el-tooltip>
         </div>
         <span v-else>—</span>
       </template>

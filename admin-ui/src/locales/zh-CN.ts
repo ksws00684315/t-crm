@@ -13,7 +13,7 @@ const zhCN = {
     creatorCards: {
       selling: "有销售达人",
       sellingHint: "所选期间内有已支付订单的达人，按达人去重。",
-      effective: "有效达人",
+      effective: "期间有效达人",
       effectiveHint: "所选期间内曾处于有效状态的达人数量，按达人去重。",
       effectiveUnavailableHint:
         "所选期间内曾处于有效状态的达人数量。启用状态历史未覆盖整个所选期间，暂显示横线。",
@@ -73,7 +73,7 @@ const zhCN = {
     beijing: "北京时间",
     all: "全部",
     updated: "数据更新于 {time}",
-    paidOrderCount: "支付订单数",
+    paidOrderCount: "订单数",
     units: "销量",
     unitsValue: "销量 {value}",
     netSalesAmount: "净销售额",
@@ -180,7 +180,7 @@ const zhCN = {
       viewBestSellers: "查看店铺畅销商品",
       updated: "更新于",
       countedTab: "{label}（{count} 单）",
-      averageOrderAmount: "客单价",
+      averageOrderAmount: "平均订单价",
       paidOrderCount: "订单数",
       soldProducts: "成交商品",
       soldProductCounts: "{spu} SPU / {sku} SKU",
@@ -196,7 +196,7 @@ const zhCN = {
       transactionItemId: "成交商品ID",
       quantity: "数量",
       orderPaidAmount: "销售额",
-      refundAmount: "退款金额",
+      refundAmount: "同批退款金额",
       netTransactionAmount: "净销售额",
       flowNo: "流水号",
       settlementTime: "结算时间",
@@ -232,7 +232,7 @@ const zhCN = {
       selling: "有成交店铺数",
       total: "总店铺数",
       totalIncludesDisabled: "总数含未启用店铺",
-      paidOrderCount: "支付订单数",
+      paidOrderCount: "订单数",
       units: "销量",
       spuCount: "成交 SPU",
       netSalesAmount: "净销售额",
@@ -259,7 +259,7 @@ const zhCN = {
           "所选期间内产生支付订单的 SPU 数。同一个 SPU 在同一家店铺内只计一次，跨店分别统计。",
         coverage: "所选期间内有成交的 SPU 数与 SKU 数，同一店铺内分别去重。",
         kolCount: "所选期间内在该店铺有支付订单的达人数量，按达人去重。",
-        salesAmount: "按订单支付时间归期，汇总所选期间内的支付销售额。",
+        salesAmount: "按订单支付时间汇总所选期间的订单实付金额，含运费。",
         cohortRefundAmount:
           "所选期间支付的这一批订单中，从支付日（第 1 天）起 30 个北京时间自然日内完结的成功退款金额。",
         completedRefundAmount:
@@ -288,7 +288,7 @@ const zhCN = {
       settlementAmount: "结算金额",
       ranking: "商品排行",
       rankingCount: "共 {count} 个商品",
-      net: "商品净销售额",
+      net: "净销售额",
       keyword: "商品名称／原商品ID",
       definitions: {
         selling:
@@ -354,7 +354,7 @@ const zhCN = {
       selling: "有销售邀请人",
       active: "当前有效邀请人 {value}",
       identity: "邀请人",
-      creatorCounts: "有效达人/累计达人",
+      creatorCounts: "当前有效达人/累计达人",
       prepayExpense: "预付支出",
       totalEstimatedCommission: "预估总佣金",
       totalExpense: "总支出",

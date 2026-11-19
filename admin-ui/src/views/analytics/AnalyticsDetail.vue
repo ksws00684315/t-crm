@@ -4,6 +4,7 @@ import { Goods } from "@element-plus/icons-vue";
 import { useI18n } from "vue-i18n";
 import DataTable, { type DataColumn } from "@/components/DataTable.vue";
 import CopyText from "@/components/CopyText.vue";
+import CreatorIdentity from "./CreatorIdentity.vue";
 import ChartPanel from "@/components/dashboard/ChartPanel.vue";
 import {
   queryAnalyticsDetail,
@@ -641,9 +642,10 @@ function changeSize(next: number): void {
       <section v-else class="analytics-detail__identity">
         <img v-if="row.imageUrl" :src="row.imageUrl" alt="" class="analytics-detail__image" />
         <div>
-          <h2>{{ name }}</h2>
+          <CreatorIdentity v-if="board === 'kol-ranking'" :name="name" :code="identityCode" heading />
+          <h2 v-else>{{ name }}</h2>
           <div class="analytics-detail__metadata">
-            <CopyText v-if="identityCode" :value="identityCode" />
+            <CopyText v-if="board !== 'kol-ranking' && identityCode" :value="identityCode" />
             <span v-if="row.related">{{ row.related }}</span>
           </div>
         </div>
@@ -798,17 +800,19 @@ function changeSize(next: number): void {
               <small v-if="entry.skuId">SKU <CopyText :value="entry.skuId" /></small>
             </div>
           </div>
+          <CreatorIdentity
+            v-else-if="tab === 'CREATORS'"
+            :name="entry.name"
+            :code="entry.creatorCode || entry.code"
+          />
+          <CreatorIdentity
+            v-else-if="isCreatorList"
+            :name="entry.name || (entry.id === '0' ? t('analytics.unassigned') : undefined)"
+            :code="entry.id === '0' ? undefined : entry.code || entry.id"
+          />
           <template v-else>
-            <div>
-              {{
-                entry.name || (isCreatorList && entry.id === "0" ? t("analytics.unassigned") : "—")
-              }}
-            </div>
-            <CopyText
-              v-if="tab === 'CREATORS' && (entry.creatorCode || entry.code)"
-              :value="entry.creatorCode || entry.code"
-            />
-            <CopyText v-else-if="entry.code" :value="entry.code" />
+            <div>{{ entry.name || "—" }}</div>
+            <CopyText v-if="entry.code" :value="entry.code" />
           </template>
           <div v-if="tab === 'creators' && (entry.currentInviter || entry.transferred)">
             {{
@@ -881,10 +885,7 @@ function changeSize(next: number): void {
           </div>
         </template>
         <template #cell-creatorName="{ row: entry }">
-          <div class="analytics-detail__stack">
-            <span>{{ entry.creatorName || "—" }}</span>
-            <CopyText v-if="entry.creatorCode" :value="entry.creatorCode" />
-          </div>
+          <CreatorIdentity :name="entry.creatorName" :code="entry.creatorCode" />
         </template>
         <template #cell-spuId="{ row: entry }">
           <CopyText v-if="entry.spuId" :value="entry.spuId" />

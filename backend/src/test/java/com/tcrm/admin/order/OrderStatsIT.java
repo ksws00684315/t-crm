@@ -698,6 +698,10 @@ class OrderStatsIT {
                 assertThat(value.actual()).isZero();
               });
       jdbc.update(
+          "UPDATE crm_commission_item_state SET released_commission_cny = 9 WHERE id = 701");
+      session.clearCache();
+      assertThat(orders.creatorCommission(scoped, FROM, UNTIL).total()).isEqualByComparingTo("9");
+      jdbc.update(
           "UPDATE crm_commission_item_state SET released_commission_cny = 8 WHERE id = 701");
       jdbc.update(
           "UPDATE crm_order_item SET item_name = 'Other', weidian_item_id = 'B', product_id = NULL WHERE id = 2");
@@ -744,6 +748,7 @@ class OrderStatsIT {
           """);
       session.clearCache();
       assertThat(orders.inviterCommissions(productScope, FROM, UNTIL)).isEmpty();
+      assertThat(orders.creatorCommission(productScope, FROM, UNTIL)).isNull();
       assertThat(orders.creatorCommission(new ScopeDTO(4, 10L, null, null, null), FROM, UNTIL))
           .isNull();
     }
