@@ -66,10 +66,10 @@ public class OrderEvidenceService implements OrderEvidenceApi {
   }
 
   @Override
-  public long refundedProductOrders(Selection selection) {
+  public ProductOrderCounts productOrderCounts(Selection selection) {
     return selection.scope().visibleShopIds().isEmpty()
-        ? 0
-        : evidence.refundedProductOrders(selection);
+        ? new ProductOrderCounts(0, 0)
+        : evidence.productOrderCounts(selection);
   }
 
   @Override

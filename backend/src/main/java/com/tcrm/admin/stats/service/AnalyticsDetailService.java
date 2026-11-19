@@ -8,6 +8,7 @@ import com.tcrm.admin.order.api.OrderEvidenceApi.EvidenceRow;
 import com.tcrm.admin.order.api.OrderEvidenceApi.Kind;
 import com.tcrm.admin.order.api.OrderEvidenceApi.ProductBreakdown;
 import com.tcrm.admin.order.api.OrderEvidenceApi.ProductGroup;
+import com.tcrm.admin.order.api.OrderEvidenceApi.ProductOrderCounts;
 import com.tcrm.admin.order.api.OrderEvidenceApi.Selection;
 import com.tcrm.admin.order.api.OrderEvidenceApi.SettlementFlowRow;
 import com.tcrm.admin.order.api.OrderEvidenceApi.ShopCreatorCounts;
@@ -83,10 +84,6 @@ public class AnalyticsDetailService {
     }
     var ranking = StatsRanking.resolve(page, size, null);
     var resolved = overview.resolve(filters);
-    if ((activity == Kind.DIRECT_ORDERS || activity == Kind.UNCONFIRMED_ORDERS)
-        && board != Board.PRODUCT) {
-      throw new BusinessException(ErrorCode.COMMON_VALIDATION_FAILED);
-    }
     var selection = select(resolved, board, entityId, productCode, keyword);
     return activity == null
         ? new Detail(
@@ -95,7 +92,7 @@ public class AnalyticsDetailService {
             null,
             board == Board.SHOP ? shopOverview(resolved, selection) : null,
             board == Board.PRODUCT && overview.canView("order:view")
-                ? evidence.refundedProductOrders(selection)
+                ? evidence.productOrderCounts(selection)
                 : null)
         : new Detail(
             resolved.period(),
@@ -378,5 +375,5 @@ public class AnalyticsDetailService {
       List<DailyAmount> daily,
       PageResult<EvidenceRow> activity,
       ShopOverview shopOverview,
-      Long refundedProductOrderCount) {}
+      ProductOrderCounts productOrderCounts) {}
 }

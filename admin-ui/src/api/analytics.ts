@@ -121,7 +121,7 @@ export interface DetailQuery extends Filters {
   entityId?: string;
   productCode?: string;
 }
-export type ActivityKind = "ORDERS" | "REFUNDS" | "DIRECT_ORDERS" | "UNCONFIRMED_ORDERS";
+export type ActivityKind = "ORDERS" | "REFUNDS";
 export interface EvidenceRow {
   id: string;
   orderNo: string;
@@ -174,7 +174,7 @@ interface DetailResult {
   daily: DailyAmount[] | null;
   activity: { items: EvidenceRow[]; total: Scalar; page: number; size: number } | null;
   shopOverview?: ShopDetailOverview | null;
-  refundedProductOrderCount?: Scalar | null;
+  productOrderCounts?: { paidOrders: Scalar; refundedOrders: Scalar } | null;
 }
 export function queryAnalyticsDetail(
   board: Board,
@@ -195,7 +195,6 @@ export interface ProductGroup {
   inviterName?: string;
   skuId?: string;
   imageUrl?: string;
-  netUnits?: Scalar;
 }
 export function queryProductBreakdown(
   params: DetailQuery & { group: ProductBreakdown; page: number; size: number }

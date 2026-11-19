@@ -170,22 +170,13 @@ const enUS: MessageSchema = {
       orderCountSuffix: " ({count} orders)",
       unitPrice: "Average unit price",
       unitPriceHint: "Sales divided by the number of paid units.",
-      netUnitsHint:
-        "Paid units minus refunded units in the order cohort. A dash means the refunded quantity is unavailable.",
       originalSaleHint:
         "The refund table shows units and sales from the original paid line. The same line may appear for multiple refunds.",
       sellingShop: "Selling shop",
       transactionItemId: "Sold Product ID",
       skuPerformance: "SKU performance",
       soldSku: "Sold SKU",
-      netUnits: "Net units",
-      gmv: "Trade GMV",
-      succeededRefundAmount: "Successful refunds",
-      netTradeAmount: "Net trade amount",
-      avgTradePrice: "Average unit price",
-      inviter: "Inviter",
-      orderType: "Order type",
-      distributionOrders: "Distribution orders"
+      inviter: "Inviter"
     },
     shopDrawer: {
       viewBestSellers: "View shop best sellers",
@@ -203,8 +194,6 @@ const enUS: MessageSchema = {
       orderRefundTime: "Order no. / refund completed",
       spuId: "Original Product ID",
       shopContribution: "Shop contribution",
-      unconfirmedOrders: "Unconfirmed attribution",
-      directOrders: "Direct original-link orders",
       multipleShops: "Multiple shops",
       transactionItemId: "Transaction Item ID",
       quantity: "Quantity",

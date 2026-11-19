@@ -424,6 +424,29 @@ class OrderStatsIT {
                 assertThat(p.onSaleShopCount()).isEqualTo(2);
                 assertThat(p.linkedCreatorCount()).isEqualTo(4);
               });
+      var evidence = session.getMapper(OrderEvidenceMapper.class);
+      var selection =
+          new Selection(
+              new ScopeDTO(4, null, 12L, null, null, java.util.List.of(12L)),
+              null,
+              null,
+              "product:91",
+              null,
+              FROM,
+              UNTIL);
+      var rows = evidence.page(selection, Kind.ORDERS, 20, 0);
+      assertThat(rows)
+          .filteredOn(row -> row.id() == 957)
+          .singleElement()
+          .satisfies(
+              row -> {
+                assertThat(row.creatorName()).isNull();
+                assertThat(row.shopName()).isEqualTo("t144_ZD");
+              });
+      assertThat(rows)
+          .filteredOn(row -> row.id() == 954)
+          .singleElement()
+          .satisfies(row -> assertThat(row.creatorName()).isEqualTo("t144_inventory"));
       var selected =
           new com.tcrm.admin.product.api.ProductAccessApi.RankingInventoryScope(
               4, java.util.List.of(12L), 9L, null, null, "7890", java.util.List.of(91L));
@@ -466,7 +489,7 @@ class OrderStatsIT {
           'PAID', '1', '2026-11-03T00:00:00Z', '2026-11-03T00:00:00Z',
           amount, amount, 0, 0, 1, now(), now(), now()
         FROM (VALUES (951,11,NULL,100), (952,11,951,200), (953,11,952,300),
-                     (954,12,954,400), (955,11,NULL,50)) orders(id,shop,kol,amount)
+                     (954,12,954,400), (955,11,NULL,50), (957,12,956,25)) orders(id,shop,kol,amount)
         """);
     jdbc.update(
         """
@@ -476,9 +499,11 @@ class OrderStatsIT {
         SELECT id, 4, id, 't144-spu-line-' || id, item, id::text, 'Product A', 'SKU', units, amount, 0,
           kol, product, CASE WHEN kol IS NULL THEN 3 ELSE 1 END, now(), now()
         FROM (VALUES (951,'7890',1,100,NULL,NULL), (952,'8800',2,200,951,91),
-          (953,'9900',3,300,952,NULL), (954,'9300',4,400,954,91), (955,'9999',1,50,NULL,NULL))
+          (953,'9900',3,300,952,NULL), (954,'9300',4,400,954,91), (955,'9999',1,50,NULL,NULL),
+          (957,'9350',1,25,956,91))
           lines(id,item,units,amount,kol,product)
         """);
+    jdbc.update("UPDATE crm_order SET attribution_status = 'UNMATCHED' WHERE id = 957");
     jdbc.update(
         """
         INSERT INTO crm_refund (id, tenant_id, order_id, order_item_id, weidian_refund_no, amount,
@@ -513,14 +538,19 @@ class OrderStatsIT {
       var selection = new Selection(scope, null, null, "product:91", null, FROM, UNTIL);
       var evidence = session.getMapper(OrderEvidenceMapper.class);
       assertThat(evidence.page(selection, Kind.ORDERS, 20, 0))
-          .extracting(row -> row.spuId())
-          .containsExactly("7890", "7890", "7890");
-      assertThat(evidence.page(selection, Kind.DIRECT_ORDERS, 20, 0))
-          .singleElement()
-          .satisfies(row -> assertThat(row.amount()).isEqualByComparingTo("100"));
-      assertThat(evidence.page(selection, Kind.ORDERS, 20, 0))
           .extracting(row -> row.transactionItemId())
-          .containsExactlyInAnyOrder("8800", "9900", "9300");
+          .containsExactlyInAnyOrder("7890", "8800", "9900", "9300", "9350");
+      assertThat(evidence.page(selection, Kind.ORDERS, 20, 0))
+          .filteredOn(row -> row.id() == 951)
+          .singleElement()
+          .satisfies(
+              row -> {
+                assertThat(row.spuId()).isEqualTo("7890");
+                assertThat(row.transactionItemId()).isEqualTo(row.spuId());
+                assertThat(row.creatorName()).isNull();
+                assertThat(row.amount()).isEqualByComparingTo("100");
+              });
+      assertThat(evidence.count(selection, Kind.ORDERS)).isEqualTo(5);
       assertThat(evidence.productGroups(selection, ProductBreakdown.SHOPS, 20, 0))
           .extracting(row -> row.code())
           .containsExactlyInAnyOrder("11", "12");
@@ -533,7 +563,9 @@ class OrderStatsIT {
                 assertThat(row.refundAmount()).isEqualByComparingTo("30");
                 assertThat(row.netTransactionAmount()).isEqualByComparingTo("270");
               });
-      assertThat(evidence.refundedProductOrders(selection)).isEqualTo(1);
+      var productCounts = evidence.productOrderCounts(selection);
+      assertThat(productCounts.paidOrders()).isEqualTo(5);
+      assertThat(productCounts.refundedOrders()).isEqualTo(1);
       assertThat(evidence.page(selection, Kind.REFUNDS, 20, 0))
           .singleElement()
           .satisfies(
@@ -551,13 +583,16 @@ class OrderStatsIT {
           .singleElement()
           .satisfies(
               row -> {
-                assertThat(row.netUnits()).isNull();
+                assertThat(row.paidOrderCount()).isEqualTo(1);
+                assertThat(row.units()).isEqualTo(3);
+                assertThat(row.salesAmount()).isEqualByComparingTo("300");
+                assertThat(row.completedRefundAmount()).isEqualByComparingTo("30");
                 assertThat(row.netSalesAmount()).isEqualByComparingTo("270");
               });
       assertThat(skus)
           .filteredOn(row -> "954".equals(row.skuId()))
           .singleElement()
-          .satisfies(row -> assertThat(row.netUnits()).isEqualTo(4));
+          .satisfies(row -> assertThat(row.units()).isEqualTo(4));
       var store = new ScopeDTO(4, null, 11L, null, null, java.util.List.of(11L));
       var counts =
           evidence.shopCreatorCounts(new Selection(store, null, null, null, null, FROM, UNTIL));

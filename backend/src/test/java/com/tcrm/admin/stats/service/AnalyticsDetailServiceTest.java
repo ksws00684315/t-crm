@@ -89,7 +89,6 @@ class AnalyticsDetailServiceTest {
                         null,
                         null,
                         null,
-                        null,
                         null)),
                 1,
                 1,

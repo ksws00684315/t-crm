@@ -65,8 +65,7 @@ let request = 0;
 
 const shop = computed(() => props.board === "shop-performance");
 const product = computed(() => props.board === "best-sellers");
-const productOrderKind = ref<Exclude<ActivityKind, "REFUNDS">>("ORDERS");
-const refundedProductOrderCount = ref<Scalar | null>(null);
+const productOrderCounts = ref<{ paidOrders: Scalar; refundedOrders: Scalar } | null>(null);
 const productText = (key: string) => t(`analytics.productDrawer.${key}`);
 const settlementAllowed = computed(() => {
   const { kolId, creatorKeyword, inviterId, inviterKeyword, productKeyword } = props.filters;
@@ -91,14 +90,13 @@ const shopShortcut = computed(() => ({
 function tabTitle(kind: ActivityKind): string {
   if (product.value) {
     const order = kind === "ORDERS";
-    return (
-      productText(order ? "orders" : "refunds") +
-      t("analytics.productDrawer.orderCountSuffix", {
-        count: formatCount(
-          order ? props.row.metrics?.paidOrderCount : refundedProductOrderCount.value
-        )
-      })
-    );
+    const label = productText(order ? "orders" : "refunds");
+    const count = order
+      ? productOrderCounts.value?.paidOrders
+      : productOrderCounts.value?.refundedOrders;
+    return count == null
+      ? label
+      : label + t("analytics.productDrawer.orderCountSuffix", { count: formatCount(count) });
   }
   const label = t(`analytics.drilldown.${kind === "ORDERS" ? "orders" : "refunds"}`);
   if (!shop.value) return label;
@@ -153,13 +151,11 @@ function skuMoney(value: Scalar | null | undefined): string {
 }
 function formatRate(
   numerator: Scalar | null | undefined,
-  denominator: Scalar | null | undefined,
-  fixedDecimals = false
+  denominator: Scalar | null | undefined
 ): string {
   if (numerator == null || denominator == null || Number(denominator) <= 0) return "—";
   return new Intl.NumberFormat(locale.value, {
     style: "percent",
-    minimumFractionDigits: fixedDecimals ? 2 : 0,
     maximumFractionDigits: 2
   }).format(Number(numerator) / Number(denominator));
 }
@@ -364,37 +360,26 @@ const creatorColumns = computed<DataColumn[]>(() => [
   { key: "net", label: t("analytics.netSalesAmount"), amount: true, minWidth: 130 }
 ]);
 
-const skuColumns = computed<DataColumn[]>(() => [
-  { key: "name", label: productText("soldSku"), minWidth: 200, align: "left" },
-  { key: "netUnits", label: productText("netUnits"), minWidth: 82 },
-  { key: "salesAmount", label: productText("gmv"), minWidth: 125, amount: true },
-  {
-    key: "completedRefundAmount",
-    label: productText("succeededRefundAmount"),
-    minWidth: 115,
-    amount: true
-  },
-  { key: "netSalesAmount", label: productText("netTradeAmount"), minWidth: 125, amount: true },
-  { key: "unitPrice", label: productText("avgTradePrice"), minWidth: 120, amount: true },
-  { key: "refundRate", label: t("analytics.amountRefundRate"), minWidth: 114 }
-]);
 const groupColumns = computed<DataColumn[]>(() => [
   {
     key: "name",
-    label: t(
+    label:
       tab.value === "SKUS"
-        ? "analytics.skuCount"
-        : tab.value === "SHOPS"
-          ? "analytics.shop"
-          : "analytics.drilldown.creatorName"
-    ),
+        ? productText("soldSku")
+        : t(tab.value === "SHOPS" ? "analytics.shop" : "analytics.drilldown.creatorName"),
     minWidth: 180,
     align: "left"
   },
   ...(tab.value === "CREATORS"
     ? [{ key: "inviterName", label: productText("inviter"), minWidth: 130 }]
     : []),
-  { key: "paidOrderCount", label: t("analytics.paidOrderCount"), minWidth: 115 },
+  {
+    key: "paidOrderCount",
+    label: t(
+      tab.value === "SKUS" ? "analytics.best-sellers.paidOrderCount" : "analytics.paidOrderCount"
+    ),
+    minWidth: 115
+  },
   { key: "units", label: t("analytics.units"), minWidth: 90 },
   ...(["salesAmount", "completedRefundAmount", "netSalesAmount"] as const).map(key => ({
     key,
@@ -406,9 +391,7 @@ const groupColumns = computed<DataColumn[]>(() => [
 
 const tableColumns = computed(() =>
   isBreakdown.value
-    ? tab.value === "SKUS"
-      ? skuColumns.value
-      : groupColumns.value
+    ? groupColumns.value
     : isCreatorList.value
       ? creatorColumns.value
       : shop.value
@@ -444,21 +427,15 @@ const detailHeaders = computed(() =>
             ? key
             : null;
     const hint =
-      tab.value === "SKUS" && key === "netUnits"
-        ? productText("netUnitsHint")
-        : product.value && tab.value === "REFUNDS" && ["soldUnits", "salesAmount"].includes(key)
-          ? productText("originalSaleHint")
-          : shop.value && te(`analytics.shopDrawer.definitions.${localKey}`)
-            ? termHint(localKey)
-            : evidenceKey
-              ? t(`analytics.evidenceDefinitions.${evidenceKey}`)
-              : termHint(
-                  key === "amount"
-                    ? "completedRefundAmount"
-                    : key === "net"
-                      ? "netSalesAmount"
-                      : key
-                );
+      product.value && tab.value === "REFUNDS" && ["soldUnits", "salesAmount"].includes(key)
+        ? productText("originalSaleHint")
+        : shop.value && te(`analytics.shopDrawer.definitions.${localKey}`)
+          ? termHint(localKey)
+          : evidenceKey
+            ? t(`analytics.evidenceDefinitions.${evidenceKey}`)
+            : termHint(
+                key === "amount" ? "completedRefundAmount" : key === "net" ? "netSalesAmount" : key
+              );
     return hint ? [{ ...column, hint }] : [];
   })
 );
@@ -498,15 +475,7 @@ const chart = computed(() => {
 async function load(): Promise<void> {
   const id = ++request;
   const section = tab.value;
-  const kind =
-    product.value && section === "ORDERS"
-      ? productOrderKind.value
-      : section === "ORDERS" ||
-          section === "REFUNDS" ||
-          section === "DIRECT_ORDERS" ||
-          section === "UNCONFIRMED_ORDERS"
-        ? section
-        : undefined;
+  const kind = section === "ORDERS" || section === "REFUNDS" ? section : undefined;
   loading.value = true;
   failed.value = false;
   try {
@@ -558,7 +527,7 @@ async function load(): Promise<void> {
     if (id !== request) return;
     daily.value = result.daily ?? [];
     if (product.value && section === "overview") {
-      refundedProductOrderCount.value = result.refundedProductOrderCount ?? null;
+      productOrderCounts.value = result.productOrderCounts ?? null;
     }
     shopOverview.value = result.shopOverview ?? null;
     rows.value = result.activity?.items ?? [];
@@ -580,14 +549,13 @@ watch(
   () => props.filters,
   () => {
     if (!product.value) return;
-    refundedProductOrderCount.value = null;
+    productOrderCounts.value = null;
     tab.value = "overview";
-    productOrderKind.value = "ORDERS";
   }
 );
 
 watch(
-  [tab, productOrderKind, () => props.filters],
+  [tab, () => props.filters],
   () => {
     page.value = 1;
     size.value = readPageSize(tableId.value, 20);
@@ -716,18 +684,6 @@ function changeSize(next: number): void {
           name="settlements"
         />
       </el-tabs>
-      <el-radio-group
-        v-if="product && tab === 'ORDERS'"
-        v-model="productOrderKind"
-        size="small"
-        :aria-label="productText('orderType')"
-      >
-        <el-radio-button value="ORDERS">{{ productText("distributionOrders") }}</el-radio-button>
-        <el-radio-button value="DIRECT_ORDERS">{{ local("directOrders") }}</el-radio-button>
-        <el-radio-button value="UNCONFIRMED_ORDERS">{{
-          local("unconfirmedOrders")
-        }}</el-radio-button>
-      </el-radio-group>
       <template v-if="tab === 'overview'">
         <div class="analytics-detail__cards" :class="{ 'analytics-detail__cards--shop': shop }">
           <MetricCard
@@ -879,19 +835,6 @@ function changeSize(next: number): void {
             tab === "SKUS" ? skuMoney(entry.netSalesAmount) : formatMoney(entry.netSalesAmount)
           }}</span>
         </template>
-        <template #cell-netUnits="{ row: entry }">{{ formatCount(entry.netUnits) }}</template>
-        <template #cell-unitPrice="{ row: entry }">{{
-          unitPrice(entry.salesAmount, entry.units)
-        }}</template>
-        <template #cell-refundRate="{ row: entry }">
-          <span
-            :class="{
-              'analytics-detail__sku-no-refunds': Number(entry.completedRefundAmount) === 0
-            }"
-          >
-            {{ formatRate(entry.completedRefundAmount, entry.salesAmount, true) }}
-          </span>
-        </template>
         <template #cell-inviterName="{ row: entry }">{{ entry.inviterName || "—" }}</template>
         <template #cell-shopName="{ row: entry }">{{ entry.shopName || "—" }}</template>
         <template #cell-soldUnits="{ row: entry }">{{ formatCount(entry.soldUnits) }}</template>
@@ -983,9 +926,6 @@ function changeSize(next: number): void {
 .analytics-detail__sku-net {
   color: var(--tcrm-color-primary);
   font-weight: 600;
-}
-.analytics-detail__sku-no-refunds {
-  color: var(--tcrm-color-success);
 }
 .analytics-detail__term {
   cursor: help;

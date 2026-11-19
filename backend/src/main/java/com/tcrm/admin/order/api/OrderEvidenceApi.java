@@ -11,9 +11,7 @@ import java.util.List;
 public interface OrderEvidenceApi {
   enum Kind {
     ORDERS,
-    REFUNDS,
-    DIRECT_ORDERS,
-    UNCONFIRMED_ORDERS
+    REFUNDS
   }
 
   record Selection(
@@ -82,8 +80,7 @@ public interface OrderEvidenceApi {
       String creatorCode,
       String inviterName,
       String skuId,
-      String imageUrl,
-      Long netUnits) {
+      String imageUrl) {
     public ProductGroup withCreator(String creatorName, String creatorCode, String inviterName) {
       return new ProductGroup(
           code,
@@ -96,8 +93,7 @@ public interface OrderEvidenceApi {
           creatorCode,
           inviterName,
           skuId,
-          imageUrl,
-          netUnits);
+          imageUrl);
     }
   }
 
@@ -107,7 +103,9 @@ public interface OrderEvidenceApi {
 
   List<DailyAmount> daily(Selection selection);
 
-  long refundedProductOrders(Selection selection);
+  record ProductOrderCounts(long paidOrders, long refundedOrders) {}
+
+  ProductOrderCounts productOrderCounts(Selection selection);
 
   PageResult<ProductGroup> productGroups(
       Selection selection, ProductBreakdown group, int page, int size);
