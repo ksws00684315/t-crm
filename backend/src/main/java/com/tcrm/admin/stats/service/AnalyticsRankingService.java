@@ -83,7 +83,7 @@ public class AnalyticsRankingService {
       String sortBy,
       String direction) {
     var sorting = StatsRanking.resolve(page, size, direction);
-    String key = sortBy == null ? NET : sortBy;
+    String key = sortBy == null ? (board == Board.PRODUCT ? "salesAmount" : NET) : sortBy;
     var comparator = comparator(board, sorting, key);
     var scope = overview.resolve(filters);
     String productKeyword = scope.scope().productKeyword();
@@ -136,9 +136,8 @@ public class AnalyticsRankingService {
             original.matchedInviterIds());
     var current = orders.productFacts(scope, keyword, period.from(), period.until());
     var previous = orders.productFacts(scope, keyword, prior.from(), prior.until());
-    var totals = current.stream().filter(p -> p.shopId() == null).findFirst().orElseThrow();
-    var previousTotals =
-        previous.stream().filter(p -> p.shopId() == null).findFirst().orElseThrow();
+    var totals = current.stream().filter(p -> p.spu() == null).findFirst().orElseThrow();
+    var previousTotals = previous.stream().filter(p -> p.spu() == null).findFirst().orElseThrow();
     var products =
         catalog
             .listProducts(
@@ -152,8 +151,13 @@ public class AnalyticsRankingService {
     var now = productRows(current, shopNames, products);
     var before = productRows(previous, shopNames, Map.of());
     var rows = new ArrayList<Row>();
-    for (int i = 0; i < now.size(); i++) {
-      rows.add(now.get(i).withRank(i + 1));
+    int rank = 0;
+    for (var row : now) {
+      if (row.metrics().paidOrderCount() > 0) {
+        rows.add(row.withRank(++rank));
+      } else {
+        rows.add(row);
+      }
     }
     var metrics = StatsOverviewService.metrics(productTotals(totals));
     var priorMetrics = StatsOverviewService.metrics(productTotals(previousTotals));
@@ -167,8 +171,8 @@ public class AnalyticsRankingService {
             totals.updatedAt());
     return new Data(
         meta,
-        new Summary(metrics, selling(now), null, null, null, null),
-        new Summary(priorMetrics, selling(before), null, null, null, null),
+        new Summary(metrics, sellingProducts(now), null, null, null, null),
+        new Summary(priorMetrics, sellingProducts(before), null, null, null, null),
         StatsOverviewService.changes(metrics, priorMetrics),
         rows,
         List.of(
@@ -179,15 +183,15 @@ public class AnalyticsRankingService {
   private static List<Row> productRows(
       List<ProductFactsDTO> facts, Map<Long, String> shops, Map<Long, ProductRefDTO> products) {
     return facts.stream()
-        .filter(p -> p.shopId() != null)
+        .filter(p -> p.spu() != null)
         .map(
             p -> {
               var product = p.productId() == null ? null : products.get(p.productId());
               return new Row(
-                  p.shopId() + ":" + p.spu(),
-                  p.name(),
                   p.spu(),
-                  shops.get(p.shopId()),
+                  product == null ? p.name() : product.name(),
+                  p.spu(),
+                  p.shopId() == null ? null : shops.get(p.shopId()),
                   null,
                   null,
                   p.productId(),
@@ -207,7 +211,7 @@ public class AnalyticsRankingService {
                   null,
                   null);
             })
-        .sorted(comparator(Board.PRODUCT, new StatsRanking(1, 20, true), NET))
+        .sorted(comparator(Board.PRODUCT, new StatsRanking(1, 20, true), "salesAmount"))
         .toList();
   }
 
@@ -645,6 +649,12 @@ public class AnalyticsRankingService {
                   identity == null ? null : identity.relationStatus());
             })
         .toList();
+  }
+
+  private static long sellingProducts(List<Row> rows) {
+    return rows.stream()
+        .filter(row -> row.sourceItemId() != null && row.metrics().paidOrderCount() > 0)
+        .count();
   }
 
   private static long selling(List<Row> rows) {

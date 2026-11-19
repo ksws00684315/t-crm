@@ -94,7 +94,7 @@ public interface OrderSettlementFlowMapper extends BaseMapper<OrderSettlementFlo
           FROM crm_order_item i
       """
           + OrderProductSql.PRODUCT_JOIN
-          + OrderProductSql.FIRST_LINK_JOIN
+          + OrderProductSql.CATALOG_JOIN
           + """
           WHERE i.tenant_id = #{tenantId} AND i.order_id = o.id AND NOT i.is_deleted
             AND (refund.item_id IS NULL OR i.id = refund.item_id)

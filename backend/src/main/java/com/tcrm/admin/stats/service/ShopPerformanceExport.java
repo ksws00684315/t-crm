@@ -263,10 +263,8 @@ public class ShopPerformanceExport {
                   return List.of(
                       text(row.rank()),
                       text(row.name()),
-                      row.sourceItemId() == null
-                          ? label("weidian")
-                          : label("weidian") + " / " + row.sourceItemId(),
-                      text(row.related()),
+                      row.sourceItemId() == null ? "—" : row.sourceItemId(),
+                      row.shopId() == null ? label("multipleShops") : text(row.related()),
                       text(row.kolCount()),
                       text(m.units()),
                       text(m.paidOrderCount()),

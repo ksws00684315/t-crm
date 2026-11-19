@@ -118,7 +118,7 @@ export interface DetailQuery extends Filters {
   entityId?: string;
   productCode?: string;
 }
-export type ActivityKind = "ORDERS" | "REFUNDS";
+export type ActivityKind = "ORDERS" | "REFUNDS" | "DIRECT_ORDERS" | "UNCONFIRMED_ORDERS";
 export interface EvidenceRow {
   id: string;
   orderNo: string;
@@ -132,6 +132,7 @@ export interface EvidenceRow {
   eventTime: string;
   creatorName?: string;
   spuId?: string;
+  transactionItemId?: string;
   imageUrl?: string;
 }
 export interface SettlementFlowRow {
@@ -173,7 +174,7 @@ export function queryAnalyticsDetail(
 ) {
   return http.request<DetailResult>({ method: "get", url: `/stats/${board}/details`, params });
 }
-export type ProductBreakdown = "SKUS" | "CREATORS";
+export type ProductBreakdown = "SKUS" | "CREATORS" | "SHOPS";
 export interface ProductGroup {
   code: string;
   name?: string;

@@ -21,7 +21,7 @@ public interface OrderEvidenceMapper {
       <script>
       <bind name="productSearch" value="s.scope.productKeyword"/>
       WITH scoped_orders AS NOT MATERIALIZED (
-        SELECT o.id, o.weidian_order_id, o.shop_id, o.kol_id, o.pay_time, o.pay_amount
+        SELECT o.id, o.weidian_order_id, o.shop_id, o.kol_id, o.pay_time, o.pay_amount, o.attribution_status
         FROM crm_order o
         WHERE o.tenant_id = #{s.scope.tenantId} AND NOT o.is_deleted AND o.pay_time IS NOT NULL
         <if test="s.scope.shopId != null">AND o.shop_id = #{s.scope.shopId}</if>
@@ -58,7 +58,7 @@ public interface OrderEvidenceMapper {
         </foreach>
       ), visible_items AS NOT MATERIALIZED (
         SELECT i.id, i.order_id, i.tenant_id, i.item_name, i.sku_id, i.sku_name, i.kol_id,
-               i.quantity, i.pay_amount, i.weidian_item_id, o.shop_id, reporting_product.id AS reporting_product_id,
+               i.quantity, i.pay_amount, i.weidian_item_id, o.shop_id, o.attribution_status, reporting_product.id AS reporting_product_id,
       """
           + OrderProductSql.GROUP_KEY
           + """
@@ -70,7 +70,7 @@ public interface OrderEvidenceMapper {
         FROM scoped_orders o JOIN crm_order_item i ON i.order_id = o.id
       """
           + OrderProductSql.PRODUCT_JOIN
-          + OrderProductSql.FIRST_LINK_JOIN
+          + OrderProductSql.CATALOG_JOIN
           + """
         WHERE i.tenant_id = #{s.scope.tenantId} AND NOT i.is_deleted
       ), scoped_items AS NOT MATERIALIZED (
@@ -104,13 +104,16 @@ public interface OrderEvidenceMapper {
           </if>
         </if>
         <if test="s.scope.productKeyword != null">
-          AND (line.shop_id, line.spu) IN (
-            SELECT i.shop_id, i.spu FROM visible_items i WHERE
+          AND line.id IN (
+            SELECT i.id FROM visible_items i WHERE
       """
           + OrderProductSql.MATCH
           + """
           )
         </if>
+      ), distribution_items AS NOT MATERIALIZED (
+        SELECT * FROM scoped_items
+        <if test="s.productCode != null">WHERE attribution_status = 'ATTRIBUTED' AND kol_id IS NOT NULL</if>
       ),
       """;
 
@@ -120,9 +123,22 @@ public interface OrderEvidenceMapper {
              i.item_name AS product, i.sku_name AS sku, i.quantity AS units,
              i.pay_amount AS amount, o.pay_time AS event_time,
              o.shop_id, COALESCE(i.kol_id, o.kol_id) AS creator_id, i.reporting_product_id, i.spu_id,
-             o.id AS order_id
-      FROM scoped_orders o JOIN scoped_items i ON i.order_id = o.id
+             o.id AS order_id, i.weidian_item_id AS transaction_item_id
+      FROM scoped_orders o JOIN
+      <choose>
+        <when test="kind.name() == 'ORDERS'">distribution_items</when>
+        <otherwise>scoped_items</otherwise>
+      </choose>
+      i ON i.order_id = o.id
       WHERE o.pay_time &gt;= #{s.from} AND o.pay_time &lt; #{s.until}
+      <if test="kind.name() == 'DIRECT_ORDERS'">
+        AND i.attribution_status = 'NON_KOL'
+        AND i.weidian_item_id = i.spu_id
+      </if>
+      <if test="kind.name() == 'UNCONFIRMED_ORDERS'">
+        AND i.attribution_status != 'NON_KOL'
+        AND (i.attribution_status != 'ATTRIBUTED' OR i.kol_id IS NULL)
+      </if>
       """;
 
   String REFUNDS =
@@ -130,13 +146,13 @@ public interface OrderEvidenceMapper {
       SELECT r.id, o.weidian_order_id AS order_no, r.weidian_refund_no AS refund_no,
              i.item_name AS product, i.sku_name AS sku, NULL::integer AS units,
              r.amount, r.finish_time AS event_time,
-             o.shop_id, COALESCE(i.kol_id, o.kol_id) AS creator_id, i.reporting_product_id, i.spu_id
+             o.shop_id, COALESCE(i.kol_id, o.kol_id) AS creator_id, i.reporting_product_id, i.spu_id, i.weidian_item_id AS transaction_item_id
       FROM scoped_orders o JOIN crm_refund r ON r.order_id = o.id
       <choose>
         <when test="s.productCode != null or s.scope.productKeyword != null">JOIN</when>
         <otherwise>LEFT JOIN</otherwise>
       </choose>
-        scoped_items i ON i.id = r.order_item_id AND i.order_id = o.id
+        distribution_items i ON i.id = r.order_item_id AND i.order_id = o.id
       WHERE r.tenant_id = #{s.scope.tenantId} AND NOT r.is_deleted AND r.refund_status = 'SUCCESS'
         AND r.finish_time &gt;= #{s.from} AND r.finish_time &lt; #{s.until}
       """;
@@ -146,7 +162,7 @@ public interface OrderEvidenceMapper {
           + """
       evidence AS (
         <choose>
-          <when test="kind.name() == 'ORDERS'">
+          <when test="kind.name() != 'REFUNDS'">
       """
           + ORDERS
           + """
@@ -176,7 +192,7 @@ public interface OrderEvidenceMapper {
                  refunds.amount AS refund_amount, p.amount - refunds.amount AS net_transaction_amount
                </when>
                <otherwise>NULL::numeric AS refund_amount, NULL::numeric AS net_transaction_amount</otherwise>
-             </choose>
+             </choose>, p.transaction_item_id
       FROM paged p
       LEFT JOIN crm_product product ON product.id = p.reporting_product_id AND product.tenant_id = #{s.scope.tenantId}
       LEFT JOIN crm_kol k ON k.id = p.creator_id AND k.tenant_id = #{s.scope.tenantId}
@@ -268,7 +284,7 @@ public interface OrderEvidenceMapper {
         <choose>
           <when test="s.productCode != null or s.scope.productKeyword != null">
             SELECT o.pay_time AS event_time, i.pay_amount AS sales, 0::numeric AS refunds
-            FROM scoped_orders o JOIN scoped_items i ON i.order_id = o.id
+            FROM scoped_orders o JOIN distribution_items i ON i.order_id = o.id
             WHERE o.pay_time &gt;= #{s.from} AND o.pay_time &lt; #{s.until}
           </when>
           <otherwise>
@@ -296,10 +312,19 @@ public interface OrderEvidenceMapper {
       item_groups AS (
         SELECT i.*,
           <choose>
-            <when test="group.name() == 'SKUS'">i.sku_id AS code, i.sku_name AS label</when>
+            <when test="group.name() == 'SKUS'">
+              CONCAT(i.shop_id, ':', i.weidian_item_id, ':', i.sku_id) AS code,
+              CONCAT_WS(' · ', i.sku_name, i.weidian_item_id) AS label
+            </when>
+            <when test="group.name() == 'SHOPS'">
+              i.shop_id::text AS code, shop.shop_name AS label
+            </when>
             <otherwise>i.kol_id::text AS code, NULL::text AS label</otherwise>
           </choose>
-        FROM scoped_items i
+        FROM distribution_items i
+        <if test="group.name() == 'SHOPS'">
+          LEFT JOIN crm_shop shop ON shop.id = i.shop_id AND shop.tenant_id = #{s.scope.tenantId}
+        </if>
         <if test="group.name() == 'CREATORS'">WHERE i.kol_id IS NOT NULL</if>
       ), paid_items AS (
         SELECT i.*, o.pay_time

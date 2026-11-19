@@ -94,7 +94,7 @@ class ShopPerformanceExportTest {
                 .containsExactly(
                     "Rank",
                     "Order product",
-                    "Channel / ID",
+                    "Original Product ID",
                     "Shop",
                     "Creators with sales",
                     "Units",
@@ -105,7 +105,7 @@ class ShopPerformanceExportTest {
                     "Net sales (CNY)",
                     "Settlement amount (CNY)");
             assertThat(data.getCell(0).getStringCellValue()).isEqualTo("1");
-            assertThat(data.getCell(2).getStringCellValue()).isEqualTo("Weidian / source-1");
+            assertThat(data.getCell(2).getStringCellValue()).isEqualTo("source-1");
             assertThat(data.getCell(3).getStringCellValue()).isEqualTo("Shop");
             assertThat(data.getCell(7).getStringCellValue()).isEmpty();
             assertThat(data.getCell(11).getStringCellValue()).isEmpty();

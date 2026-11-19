@@ -98,7 +98,10 @@ public class ShopPerformanceService {
             new ResolvedFilter(scope, period, resolved.filters(), resolved.dataScope()));
     long activeCount = rows.stream().filter(row -> row.paidOrderCount() > 0).count();
     long shopCount = includeShopsWithoutFacts ? shopsInPeriod.size() : activeCount;
-    long spuCount = rows.stream().mapToLong(ShopRankDTO::spuCount).sum();
+    long spuCount =
+        scope.visibleShopIds().isEmpty()
+            ? 0
+            : orders.creatorSpuCount(scope, period.from(), period.until());
     var settlement =
         includeShopsWithoutFacts
             ? orders.shopSettlement(

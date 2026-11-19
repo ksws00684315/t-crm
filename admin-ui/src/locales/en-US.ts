@@ -44,7 +44,7 @@ const enUS: MessageSchema = {
     },
     productCreatorCount: "Creators",
     product: "Product",
-    productSearch: "Product name or SPU ID",
+    productSearch: "Product name or original product ID",
     period: "Time period",
     conditions: "Filters",
     creatorSearch: "Enter creator ID or name",
@@ -176,13 +176,18 @@ const enUS: MessageSchema = {
         "Shop settlement flows are available in company shop scope. Clear creator or inviter filters to view them.",
       orderPaidTime: "Order no. / paid at",
       orderRefundTime: "Order no. / refund completed",
-      spuId: "SPU",
+      spuId: "Original Product ID",
+      shopContribution: "Shop contribution",
+      unconfirmedOrders: "Unconfirmed attribution",
+      directOrders: "Direct original-link orders",
+      multipleShops: "Multiple shops",
+      transactionItemId: "Transaction Item ID",
       quantity: "Quantity",
       orderPaidAmount: "Paid amount",
       refundAmount: "Refund amount",
       netTransactionAmount: "Net transaction amount",
       flowTime: "Flow no. / posted at",
-      settlementSpuId: "SPU ID",
+      settlementSpuId: "Original Product ID",
       direction: "Direction",
       amount: "Amount",
       added: "Increase",
@@ -205,10 +210,10 @@ const enUS: MessageSchema = {
         orderRefundTime:
           "Weidian order number and refund completion time in Beijing time. An order may have multiple refunds.",
         spuId:
-          "Shows the first known Weidian link for the product in this shop. Linked copies share one SPU. Unmapped links keep their order item ID.",
+          "Weidian item ID of the original link. A dash indicates that the original product cannot be confirmed.",
         flow: "CRM flow identifier and the Weidian posting time in Beijing time.",
         settlementSpuId:
-          "The first known Weidian link for the product in this shop. A dash indicates that the flow cannot be matched to a single SPU.",
+          "Weidian item ID of the original link. A dash indicates that the original product cannot be confirmed.",
         direction: "Whether the posting increases or decreases shop receivables.",
         settlement:
           "Synced goods revenue or refunded amount in CNY. Fees and profit shares are excluded."
@@ -245,7 +250,7 @@ const enUS: MessageSchema = {
           "Paid orders in the selected period, by payment date and deduplicated by shop and order.",
         units: "Total SKU quantities in paid orders, grouped by order payment date.",
         spuCount:
-          "Distinct SPUs with paid orders in the selected period. Each shop counts its SPUs separately.",
+          "Distinct SPUs with paid orders in the selected period. The same original product counts once across shops.",
         coverage: "Distinct SPUs and SKUs sold by this shop in the selected period.",
         kolCount: "Distinct creators with paid orders at this shop in the selected period.",
         salesAmount: "Paid sales in the selected period, grouped by order payment date.",
@@ -272,7 +277,7 @@ const enUS: MessageSchema = {
       detailTitle: "Product performance details",
       selling: "SPUs with sales",
       identity: "Order product",
-      channelCode: "Channel / ID",
+      channelCode: "Original Product ID",
       kolCount: "Creators with sales",
       paidOrderCount: "Order count",
       netSalesAmount: "Net sales",
@@ -280,21 +285,22 @@ const enUS: MessageSchema = {
       ranking: "Product ranking",
       rankingCount: "{count} product | {count} products",
       net: "Product net sales",
-      keyword: "Product name / SPU",
+      keyword: "Product name / Original Product ID",
       definitions: {
-        selling: "SPUs with sales in the selected period. Each shop counts its SPUs separately.",
+        selling:
+          "SPUs with sales in the selected period. The same original product counts once across shops.",
         cohortRefundAmount:
           "Successful line-linked refunds for these paid items completed within 30 Beijing calendar days from payment.",
         averageOrderAmount:
           "Selected item sales divided by distinct paid orders containing those items.",
         amountRefundRate:
           "Successful refunds completed for matching items divided by sales for those items in the same period.",
-        rank: "Rank by net sales under the applied filters. Sorting by another column preserves the business rank.",
+        rank: "Rank by distribution sales under the applied filters. Sorting by another column preserves the business rank.",
         identity:
           "The name from the order and the linked source product image. A placeholder appears if the image is unavailable.",
         channelCode:
-          "The order channel and the first known Weidian link for the product in its selling shop. Unmapped links retain their own item ID.",
-        shop: "The shop where the order was placed. A product is counted separately in each shop.",
+          "Weidian item ID of the original link. A dash indicates that the original product cannot be confirmed.",
+        shop: "Selling shops under the current filters. Open details to see their contributions.",
         kolCount: "Distinct creators with a paid sale of this product during the selected period.",
         units:
           "Total units purchased across all SKUs of this product in orders paid during the selected period.",

@@ -78,7 +78,7 @@ const initialPeriodMode = ref<PeriodMode>("sevenDays");
 let lastShopShortcut: string | undefined;
 const page = ref(1);
 const size = ref(20);
-const sortBy = ref("netSalesAmount");
+const sortBy = ref(product ? "salesAmount" : "netSalesAmount");
 const sortDirection = ref<"asc" | "desc">("desc");
 const result = ref<AnalyticsResult>();
 const displayedQuery = ref<RankingQuery>();
@@ -190,7 +190,7 @@ function detailSelection(row: RankRow, displayed: AnalyticsResult) {
     filters: {
       ...meta.period,
       ...meta.filters,
-      shopId: shop || product ? row.shopId : meta.filters.shopId,
+      shopId: shop ? row.shopId : meta.filters.shopId,
       productCode: product ? row.code : undefined,
       keyword: product && !meta.filters.productKeyword ? displayed.keyword : undefined,
       entityId: creator || inviter ? row.id : undefined
@@ -695,7 +695,7 @@ function search(useLive = false): void {
 
 function reset(): void {
   draft.value = dates();
-  sortBy.value = "netSalesAmount";
+  sortBy.value = product ? "salesAmount" : "netSalesAmount";
   sortDirection.value = "desc";
   search();
 }
@@ -1096,13 +1096,12 @@ onUnmounted(stop);
         </div>
       </template>
       <template #cell-channelCode="{ row }">
-        <div>
-          <el-tag size="small" type="info">{{ t("analytics.weidian") }}</el-tag>
-        </div>
         <CopyText v-if="row.sourceItemId" :value="row.sourceItemId" />
         <span v-else>—</span>
       </template>
-      <template #cell-shop="{ row }">{{ row.related || "—" }}</template>
+      <template #cell-shop="{ row }">{{
+        row.related || t("analytics.shopDrawer.multipleShops")
+      }}</template>
       <template #cell-relationship="{ row }">
         <div>{{ row.related || t("analytics.unassigned") }}</div>
         <el-tag v-if="row.relationStatus" size="small" :type="relationTagType(row.relationStatus)">

@@ -83,6 +83,10 @@ public class AnalyticsDetailService {
     }
     var ranking = StatsRanking.resolve(page, size, null);
     var resolved = overview.resolve(filters);
+    if ((activity == Kind.DIRECT_ORDERS || activity == Kind.UNCONFIRMED_ORDERS)
+        && board != Board.PRODUCT) {
+      throw new BusinessException(ErrorCode.COMMON_VALIDATION_FAILED);
+    }
     var selection = select(resolved, board, entityId, productCode, keyword);
     return activity == null
         ? new Detail(
@@ -157,7 +161,7 @@ public class AnalyticsDetailService {
     var ranking = StatsRanking.resolve(page, size, null);
     var selection = select(overview.resolve(filters), Board.PRODUCT, null, productCode, keyword);
     var result = evidence.productGroups(selection, group, ranking.page(), ranking.size());
-    if (group == ProductBreakdown.SKUS || result.items().isEmpty()) {
+    if (group != ProductBreakdown.CREATORS || result.items().isEmpty()) {
       return result;
     }
     var names =
@@ -328,8 +332,7 @@ public class AnalyticsDetailService {
         switch (board) {
           case SHOP -> scope.shopId() != null && entityId == null && productCode == null;
           case PRODUCT ->
-              scope.shopId() != null
-                  && entityId == null
+              entityId == null
                   && productCode != null
                   && !productCode.isBlank()
                   && scope.inviterId() == null;

@@ -65,12 +65,13 @@ class ShopPerformanceServiceTest {
 
   @Test
   void sortsAllNumericFieldsAndKeepsNullAveragesLast() {
+    when(orders.creatorSpuCount(any(), any(), any())).thenReturn(3L);
     var result = service.query(ALL, null, null, null, null);
     assertThat(result.sortBy()).isEqualTo("netSalesAmount");
     assertThat(result.sortDirection()).isEqualTo("desc");
     assertThat(result.summary().sellingShopCount()).isEqualTo(2);
     assertThat(result.summary().shopCount()).isEqualTo(4);
-    assertThat(result.summary().spuCount()).isEqualTo(4);
+    assertThat(result.summary().spuCount()).isEqualTo(3);
     assertThat(result.ranking().items().getFirst().amountRefundRate())
         .isEqualByComparingTo("0.125");
     assertThat(result.ranking().items().getLast().amountRefundRate()).isNull();

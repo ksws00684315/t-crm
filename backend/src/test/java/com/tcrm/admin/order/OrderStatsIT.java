@@ -157,14 +157,14 @@ class OrderStatsIT {
                 assertThat(refund.eventTime()).isEqualTo(UNTIL.minusSeconds(1));
                 assertThat(refund.product()).isEqualTo("A");
                 assertThat(refund.sku()).isEqualTo("1");
-                assertThat(refund.spuId()).isEqualTo("A");
+                assertThat(refund.spuId()).isNull();
               },
               income -> {
                 assertThat(income.amountType()).isEqualTo("INCREASE");
                 assertThat(income.eventTime()).isEqualTo(FROM);
                 assertThat(income.itemCount()).isEqualTo(2);
                 assertThat(income.product()).isNull();
-                assertThat(income.spuId()).isEqualTo("A");
+                assertThat(income.spuId()).isNull();
               });
       jdbc.update("UPDATE crm_order_item SET weidian_item_id = 'B' WHERE id = 2");
       session.clearCache();
@@ -203,7 +203,7 @@ class OrderStatsIT {
           .singleElement()
           .satisfies(
               row -> {
-                assertThat(row.code()).isEqualTo("2");
+                assertThat(row.code()).isEqualTo("1:A:2");
                 assertThat(row.netSalesAmount()).isEqualByComparingTo("40");
               });
       assertThat(evidence.productGroups(productEvidence, ProductBreakdown.CREATORS, 20, 0))
@@ -254,7 +254,7 @@ class OrderStatsIT {
               .rankFacts(new ScopeDTO(4, 9L, null, null, null), RankDimension.SHOP, FROM, UNTIL)
               .getFirst();
       assertThat(shop.paidOrders()).isEqualTo(1);
-      assertThat(shop.spuCount()).isEqualTo(1);
+      assertThat(shop.spuCount()).isZero();
       assertThat(shop.skuCount()).isEqualTo(2);
       assertThat(shop.completedRefunds()).isEqualByComparingTo("20");
 
@@ -263,7 +263,7 @@ class OrderStatsIT {
       var products = daily.productFacts(productScope, "a", FROM, UNTIL);
       assertThat(products).hasSize(2);
       var product = products.stream().filter(row -> row.shopId() != null).findFirst().orElseThrow();
-      assertThat(product.spu()).isEqualTo("unmapped:A");
+      assertThat(product.spu()).isEqualTo("unmapped:1:A");
       assertThat(product.paidOrders()).isEqualTo(1);
       assertThat(product.units()).isEqualTo(3);
       assertThat(product.sales()).isEqualByComparingTo("100");
@@ -329,29 +329,20 @@ class OrderStatsIT {
     try (var session = factory.openSession()) {
       var productMapper = session.getMapper(OrderDailyStatsMapper.class);
       var visible = new ScopeDTO(4, null, null, null, null, java.util.List.of(1L, 2L));
-      assertThat(productMapper.productFacts(visible, null, FROM, UNTIL))
-          .filteredOn(row -> row.shopId() != null)
-          .hasSize(2)
-          .allSatisfy(row -> assertThat(row.spu()).isEqualTo("product:90"));
-      for (String key : java.util.List.of("90", "ALPHA")) {
+      for (String key : java.util.Arrays.asList(null, "ALPHA", "678900", "B")) {
         assertThat(productMapper.productFacts(visible, key, FROM, UNTIL))
-            .filteredOn(row -> row.shopId() != null)
-            .hasSize(2);
+            .filteredOn(row -> row.spu() != null)
+            .singleElement()
+            .satisfies(
+                row -> {
+                  assertThat(row.shopId()).isNull();
+                  assertThat(row.spu()).isEqualTo("product:90");
+                  assertThat(row.spuId()).isEqualTo("678900");
+                  assertThat(row.sales()).isEqualByComparingTo("300");
+                  assertThat(row.paidOrders()).isEqualTo(2);
+                  assertThat(row.kolCount()).isEqualTo(2);
+                });
       }
-      assertThat(productMapper.productFacts(visible, "678900", FROM, UNTIL))
-          .filteredOn(row -> row.shopId() != null)
-          .singleElement()
-          .satisfies(row -> assertThat(row.shopId()).isEqualTo(1L));
-      assertThat(productMapper.productFacts(visible, "B", FROM, UNTIL))
-          .filteredOn(row -> row.shopId() != null)
-          .singleElement()
-          .satisfies(
-              row -> {
-                assertThat(row.shopId()).isEqualTo(1L);
-                assertThat(row.sales()).isEqualByComparingTo("100");
-                assertThat(row.paidOrders()).isEqualTo(1);
-                assertThat(row.kolCount()).isEqualTo(2);
-              });
       var shopScope = new ScopeDTO(4, null, 1L, null, null, java.util.List.of(1L));
       assertThat(session.getMapper(OrderStatsMapper.class).countShopsWithPaidOrders(visible))
           .isEqualTo(2);
@@ -445,29 +436,39 @@ class OrderStatsIT {
     try (var session = factory.openSession()) {
       var mapper = session.getMapper(OrderDailyStatsMapper.class);
       var scope = new ScopeDTO(4, null, null, null, null, java.util.List.of(11L, 12L));
-      assertThat(mapper.productFacts(scope, null, FROM, UNTIL))
-          .filteredOn(p -> p.shopId() != null)
-          .extracting(p -> p.spuId())
-          .containsExactlyInAnyOrder("7890", "9400", "9999");
-      for (String keyword : java.util.List.of("7890", "8800", "9900")) {
+      for (String keyword : java.util.Arrays.asList(null, "7890", "8800", "9900")) {
         assertThat(mapper.productFacts(scope, keyword, FROM, UNTIL))
-            .filteredOn(p -> p.shopId() != null)
+            .filteredOn(p -> p.spu() != null)
             .singleElement()
             .satisfies(
                 p -> {
-                  assertThat(p.shopId()).isEqualTo(11L);
+                  assertThat(p.shopId()).isNull();
                   assertThat(p.spuId()).isEqualTo("7890");
                   assertThat(p.paidOrders()).isEqualTo(3);
-                  assertThat(p.units()).isEqualTo(6);
-                  assertThat(p.sales()).isEqualByComparingTo("600");
+                  assertThat(p.units()).isEqualTo(9);
+                  assertThat(p.sales()).isEqualByComparingTo("900");
                   assertThat(p.cohortRefunds()).isEqualByComparingTo("30");
                 });
       }
+      var otherShop = new ScopeDTO(4, null, 12L, null, null, java.util.List.of(12L));
+      assertThat(mapper.productFacts(otherShop, "7890", FROM, UNTIL))
+          .filteredOn(p -> p.spu() != null)
+          .singleElement()
+          .satisfies(p -> assertThat(p.sales()).isEqualByComparingTo("400"));
       var selection = new Selection(scope, null, null, "product:91", null, FROM, UNTIL);
       var evidence = session.getMapper(OrderEvidenceMapper.class);
       assertThat(evidence.page(selection, Kind.ORDERS, 20, 0))
           .extracting(row -> row.spuId())
-          .containsExactlyInAnyOrder("7890", "7890", "7890", "9400");
+          .containsExactly("7890", "7890", "7890");
+      assertThat(evidence.page(selection, Kind.DIRECT_ORDERS, 20, 0))
+          .singleElement()
+          .satisfies(row -> assertThat(row.amount()).isEqualByComparingTo("100"));
+      assertThat(evidence.page(selection, Kind.ORDERS, 20, 0))
+          .extracting(row -> row.transactionItemId())
+          .containsExactlyInAnyOrder("8800", "9900", "9300");
+      assertThat(evidence.productGroups(selection, ProductBreakdown.SHOPS, 20, 0))
+          .extracting(row -> row.code())
+          .containsExactlyInAnyOrder("11", "12");
       assertThat(evidence.page(selection, Kind.ORDERS, 20, 0))
           .filteredOn(row -> row.id() == 953)
           .singleElement()
@@ -490,7 +491,7 @@ class OrderStatsIT {
           .isEqualByComparingTo("600");
       assertThat(stats.rankFacts(store, RankDimension.SHOP, FROM, UNTIL))
           .singleElement()
-          .satisfies(row -> assertThat(row.spuCount()).isEqualTo(2));
+          .satisfies(row -> assertThat(row.spuCount()).isEqualTo(1));
     }
   }
 

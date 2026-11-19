@@ -11,7 +11,9 @@ import java.util.List;
 public interface OrderEvidenceApi {
   enum Kind {
     ORDERS,
-    REFUNDS
+    REFUNDS,
+    DIRECT_ORDERS,
+    UNCONFIRMED_ORDERS
   }
 
   record Selection(
@@ -37,7 +39,8 @@ public interface OrderEvidenceApi {
       String spuId,
       String imageUrl,
       BigDecimal refundAmount,
-      BigDecimal netTransactionAmount) {}
+      BigDecimal netTransactionAmount,
+      String transactionItemId) {}
 
   record ShopCreatorCounts(long selling, long total) {}
 
@@ -60,7 +63,8 @@ public interface OrderEvidenceApi {
 
   enum ProductBreakdown {
     SKUS,
-    CREATORS
+    CREATORS,
+    SHOPS
   }
 
   record ProductGroup(

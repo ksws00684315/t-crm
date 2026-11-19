@@ -30,12 +30,12 @@ public interface OrderDailyStatsMapper {
           + """
                  AS spu_id,
                i.weidian_item_id, i.tenant_id,
-               i.item_name, reporting_product.id AS reporting_product_id, i.kol_id, i.quantity, i.pay_amount,
+               i.item_name, reporting_product.id AS reporting_product_id, i.kol_id, o.attribution_status, i.quantity, i.pay_amount,
                GREATEST(o.update_time, i.update_time) AS updated_at
         FROM crm_order o JOIN crm_order_item i ON i.order_id = o.id
       """
           + OrderProductSql.PRODUCT_JOIN
-          + OrderProductSql.FIRST_LINK_JOIN
+          + OrderProductSql.CATALOG_JOIN
           + """
         WHERE o.tenant_id = #{scope.tenantId} AND i.tenant_id = #{scope.tenantId}
           AND NOT o.is_deleted AND NOT i.is_deleted AND o.pay_time IS NOT NULL
@@ -79,19 +79,21 @@ public interface OrderDailyStatsMapper {
       ), selected_lines AS NOT MATERIALIZED (
         SELECT l.* FROM lines l
         <if test="keyword != null">
-          WHERE (l.shop_id, l.spu) IN (
-            SELECT i.shop_id, i.spu FROM lines i
+          WHERE l.spu IN (
+            SELECT i.spu FROM lines i
             WHERE
       """
           + OrderProductSql.MATCH
           + """
           )
         </if>
+      ), distribution_lines AS (
+        SELECT * FROM selected_lines WHERE attribution_status = 'ATTRIBUTED' AND kol_id IS NOT NULL
       ),
       paid AS (
         SELECT order_id, shop_id, pay_time, line_id, spu, spu_id, item_name, reporting_product_id,
                kol_id, quantity, pay_amount, updated_at
-        FROM selected_lines WHERE pay_time &gt;= #{from} AND pay_time &lt; #{until}
+        FROM distribution_lines WHERE pay_time &gt;= #{from} AND pay_time &lt; #{until}
       ),
       events AS (
         SELECT shop_id, spu, spu_id, item_name, reporting_product_id, order_id, kol_id, quantity,
@@ -110,11 +112,21 @@ public interface OrderDailyStatsMapper {
         UNION ALL
         SELECT p.shop_id, p.spu, p.spu_id, p.item_name, p.reporting_product_id, NULL, NULL, 0, 0, 0, r.amount,
                p.order_id, NULL, NULL, r.finish_time, r.update_time
-        FROM crm_refund r JOIN selected_lines p ON r.order_item_id = p.line_id AND r.order_id = p.order_id
+        FROM crm_refund r JOIN distribution_lines p ON r.order_item_id = p.line_id AND r.order_id = p.order_id
         WHERE r.tenant_id = #{scope.tenantId} AND NOT r.is_deleted AND r.refund_status = 'SUCCESS'
           AND r.finish_time &gt;= #{from} AND r.finish_time &lt; #{until}
+        <if test="keyword != null">
+          UNION ALL
+          SELECT shop_id, spu, spu_id, item_name, reporting_product_id, NULL, NULL, 0, 0, 0, 0,
+                 NULL, NULL, NULL, NULL, updated_at
+          FROM selected_lines
+          WHERE reporting_product_id IS NOT NULL
+            AND pay_time &gt;= #{from} AND pay_time &lt; #{until}
+            AND (attribution_status != 'ATTRIBUTED' OR kol_id IS NULL)
+        </if>
       )
-      SELECT shop_id, spu, MAX(item_name) AS name, MAX(reporting_product_id) AS product_id,
+      SELECT CASE WHEN GROUPING(spu) = 0 AND COUNT(DISTINCT shop_id) = 1 THEN MIN(shop_id) END AS shop_id,
+             spu, MAX(item_name) AS name, MAX(reporting_product_id) AS product_id,
              COUNT(DISTINCT order_id) AS paid_orders, COALESCE(SUM(quantity), 0) AS units,
              COUNT(DISTINCT kol_id) AS kol_count, COALESCE(SUM(sales), 0) AS sales,
              COALESCE(SUM(cohort), 0) AS cohort_refunds,
@@ -123,7 +135,7 @@ public interface OrderDailyStatsMapper {
              COUNT(DISTINCT cohort_order) AS cohort_refunded_orders,
              MAX(pay_time) AS last_paid_at, MAX(finish_time) AS last_refunded_at, MAX(updated_at) AS updated_at, MAX(spu_id) AS spu_id
       FROM events
-      GROUP BY GROUPING SETS ((shop_id, spu), ())
+      GROUP BY GROUPING SETS ((spu), ())
       </script>
       """)
   List<ProductFactsDTO> productFacts(

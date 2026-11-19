@@ -36,19 +36,17 @@ public interface OrderStatsMapper {
           FROM crm_order_item i JOIN crm_order o ON o.id = i.order_id
       """
           + OrderProductSql.PRODUCT_JOIN
-          + OrderProductSql.FIRST_LINK_JOIN
+          + OrderProductSql.CATALOG_JOIN
           + """
           WHERE i.tenant_id = #{scope.tenantId} AND o.tenant_id = #{scope.tenantId}
             AND NOT i.is_deleted AND NOT o.is_deleted AND o.pay_time IS NOT NULL
           <if test="scope.shopId != null">AND o.shop_id = #{scope.shopId}</if>
         ), product_items AS NOT MATERIALIZED (
-          SELECT line.id, line.order_id, line.pay_amount FROM searchable_items line
-          WHERE (line.shop_id, line.spu) IN (
-            SELECT i.shop_id, i.spu FROM searchable_items i WHERE
+          SELECT i.id, i.order_id, i.pay_amount FROM searchable_items i
+          WHERE
       """
           + OrderProductSql.MATCH
           + """
-          )
         ),
       </if>
       """;
@@ -150,11 +148,7 @@ public interface OrderStatsMapper {
   @Select(
       SCOPED_ORDERS
           + """
-      SELECT COUNT(DISTINCT (o.shop_id,
-      """
-          + OrderProductSql.GROUP_KEY
-          + """
-      ))
+      SELECT COUNT(DISTINCT reporting_product.id)
       FROM scoped_orders o JOIN crm_order_item i ON i.order_id = o.id AND i.tenant_id = #{scope.tenantId}
       """
           + OrderProductSql.PRODUCT_JOIN
@@ -388,12 +382,7 @@ public interface OrderStatsMapper {
       ),
       items AS (
         SELECT o.entity_id, SUM(i.quantity) AS units,
-               COUNT(DISTINCT (o.shop_id,
-      """
-          + OrderProductSql.GROUP_KEY
-          + """
-                 ))
-                 FILTER (WHERE i.weidian_item_id != '') AS spu_count,
+               COUNT(DISTINCT reporting_product.id) AS spu_count,
                COUNT(DISTINCT (o.shop_id, i.weidian_item_id, i.sku_id))
                  FILTER (WHERE i.weidian_item_id != '' AND i.sku_id != '') AS sku_count,
                COUNT(DISTINCT i.kol_item_id) FILTER (WHERE i.kol_id = o.kol_id) AS link_count

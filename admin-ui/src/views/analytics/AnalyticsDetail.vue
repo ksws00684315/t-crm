@@ -45,7 +45,9 @@ const tab = ref<
   "overview" | "creators" | "currentTeam" | "settlements" | ActivityKind | ProductBreakdown
 >("overview");
 const isCreatorList = computed(() => tab.value === "creators" || tab.value === "currentTeam");
-const isBreakdown = computed(() => tab.value === "SKUS" || tab.value === "CREATORS");
+const isBreakdown = computed(
+  () => tab.value === "SKUS" || tab.value === "CREATORS" || tab.value === "SHOPS"
+);
 const page = ref(1);
 const size = ref(20);
 const tableId = computed(() => `analytics-detail-${shop.value ? "shop-" : ""}${tab.value}`);
@@ -181,7 +183,13 @@ const columns = computed<DataColumn[]>(() => [
     : []),
   { key: "product", label: t("analytics.drilldown.product"), minWidth: 185, align: "left" },
   { key: "sku", label: "SKU", minWidth: 104 },
-  ...(tab.value === "ORDERS" ? [{ key: "units", label: t("analytics.units"), minWidth: 76 }] : []),
+  ...(props.board === "best-sellers"
+    ? [
+        { key: "spuId", label: local("spuId"), minWidth: 125 },
+        { key: "transactionItemId", label: local("transactionItemId"), minWidth: 145 }
+      ]
+    : []),
+  ...(tab.value !== "REFUNDS" ? [{ key: "units", label: t("analytics.units"), minWidth: 76 }] : []),
   {
     key: "amount",
     label: t(
@@ -226,6 +234,7 @@ const shopColumns = computed<DataColumn[]>(() => {
     },
     { key: "creatorName", label: t("analytics.creator"), minWidth: 120, align: "left" },
     { key: "spuId", label: local("spuId"), minWidth: 122, align: "left" },
+    { key: "transactionItemId", label: local("transactionItemId"), minWidth: 145 },
     ...(refund
       ? [
           {
@@ -263,7 +272,13 @@ const creatorColumns = computed<DataColumn[]>(() => [
 const groupColumns = computed<DataColumn[]>(() => [
   {
     key: "name",
-    label: t(tab.value === "SKUS" ? "analytics.skuCount" : "analytics.drilldown.creatorName"),
+    label: t(
+      tab.value === "SKUS"
+        ? "analytics.skuCount"
+        : tab.value === "SHOPS"
+          ? "analytics.shop"
+          : "analytics.drilldown.creatorName"
+    ),
     minWidth: 180,
     align: "left"
   },
@@ -359,7 +374,13 @@ const chart = computed(() => {
 async function load(): Promise<void> {
   const id = ++request;
   const section = tab.value;
-  const kind = section === "ORDERS" || section === "REFUNDS" ? section : undefined;
+  const kind =
+    section === "ORDERS" ||
+    section === "REFUNDS" ||
+    section === "DIRECT_ORDERS" ||
+    section === "UNCONFIRMED_ORDERS"
+      ? section
+      : undefined;
   loading.value = true;
   failed.value = false;
   try {
@@ -376,7 +397,7 @@ async function load(): Promise<void> {
       }
       return;
     }
-    if (section === "SKUS" || section === "CREATORS") {
+    if (section === "SKUS" || section === "CREATORS" || section === "SHOPS") {
       const result = await queryProductBreakdown({
         ...props.filters,
         group: section,
@@ -544,7 +565,22 @@ function changeSize(next: number): void {
           :label="t('analytics.drilldown.currentTeam')"
           name="currentTeam"
         />
+        <el-tab-pane
+          v-if="board === 'best-sellers'"
+          :label="local('shopContribution')"
+          name="SHOPS"
+        />
         <el-tab-pane v-if="access.can('order:view')" :label="tabTitle('ORDERS')" name="ORDERS" />
+        <el-tab-pane
+          v-if="board === 'best-sellers' && access.can('order:view')"
+          :label="local('directOrders')"
+          name="DIRECT_ORDERS"
+        />
+        <el-tab-pane
+          v-if="board === 'best-sellers' && access.can('order:view')"
+          :label="local('unconfirmedOrders')"
+          name="UNCONFIRMED_ORDERS"
+        />
         <el-tab-pane v-if="access.can('order:view')" :label="tabTitle('REFUNDS')" name="REFUNDS" />
         <el-tab-pane
           v-if="shop && access.can('order:view')"
@@ -711,6 +747,10 @@ function changeSize(next: number): void {
         <template #cell-creatorName="{ row: entry }">{{ entry.creatorName || "—" }}</template>
         <template #cell-spuId="{ row: entry }">
           <CopyText v-if="entry.spuId" :value="entry.spuId" />
+          <span v-else>—</span>
+        </template>
+        <template #cell-transactionItemId="{ row: entry }">
+          <CopyText v-if="entry.transactionItemId" :value="entry.transactionItemId" />
           <span v-else>—</span>
         </template>
         <template #cell-flow="{ row: entry }">

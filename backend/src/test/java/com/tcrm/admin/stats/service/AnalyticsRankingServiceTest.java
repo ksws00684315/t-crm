@@ -280,24 +280,53 @@ class AnalyticsRankingServiceTest {
     }
   }
 
+  @Test
+  void ranksCrossShopProductsByGrossSalesEvenWhenNetSalesAreLower() {
+    var a = product(null, "product:50", 3, 200, 30);
+    var b = product(1L, "product:51", 1, 190, 0);
+    var directOnly = product(1L, "product:52", 0, 0, 0);
+    var total = product(null, null, 4, 390, 30);
+    when(orders.productFacts(any(), any(), any(), any()))
+        .thenReturn(List.of(total, a, b, directOnly));
+
+    var result = service.query(Board.PRODUCT, FILTER, null, 1, 20, null, null);
+    assertThat(result.sortBy()).isEqualTo("salesAmount");
+    assertThat(result.summary().sellingCount()).isEqualTo(2);
+    assertThat(result.ranking().items()).extracting(Row::rank).containsExactly(1, 2, null);
+    assertThat(result.ranking().items().getFirst().metrics().netSalesAmount())
+        .isEqualByComparingTo("170");
+    assertThat(
+            service
+                .query(Board.PRODUCT, FILTER, null, 1, 20, "netSalesAmount", "desc")
+                .ranking()
+                .items())
+        .extracting(Row::rank)
+        .containsExactly(2, 1, null);
+  }
+
   private static ProductFactsDTO product(Long shop, String spu, long orders, int amount) {
+    return product(shop, spu, orders, amount, 0);
+  }
+
+  private static ProductFactsDTO product(
+      Long shop, String spu, long orders, int amount, int refund) {
     return new ProductFactsDTO(
         shop,
         spu,
         spu,
-        shop == null ? null : 50L,
+        spu == null ? null : 50L,
         orders,
         orders,
         1,
         BigDecimal.valueOf(amount),
-        ZERO,
+        BigDecimal.valueOf(refund),
         ZERO,
         1,
         1,
         FROM,
         null,
         FROM,
-        shop == null ? null : "source-50");
+        spu == null ? null : "source-50");
   }
 
   private static RankFactsDTO person(long id, long paid) {
