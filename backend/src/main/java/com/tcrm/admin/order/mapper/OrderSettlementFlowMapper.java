@@ -2,7 +2,6 @@ package com.tcrm.admin.order.mapper;
 
 import com.baomidou.mybatisplus.annotation.InterceptorIgnore;
 import com.baomidou.mybatisplus.core.mapper.BaseMapper;
-import com.tcrm.admin.order.api.OrderEvidenceApi.DailySettlement;
 import com.tcrm.admin.order.api.OrderEvidenceApi.SettlementFlowRow;
 import com.tcrm.admin.order.api.OrderStatsApi.ShopSettlementDTO;
 import com.tcrm.admin.order.model.OrderSettlementFlowDO;
@@ -112,25 +111,6 @@ public interface OrderSettlementFlowMapper extends BaseMapper<OrderSettlementFlo
       @Param("until") Instant until,
       @Param("size") int size,
       @Param("offset") long offset);
-
-  @InterceptorIgnore(tenantLine = "true")
-  @Select(
-      """
-      SELECT (trade_time AT TIME ZONE 'Asia/Shanghai')::date AS day,
-             ROUND(SUM(amount_raw), 2) AS amount
-      FROM crm_order_settlement_flow
-      WHERE
-      """
-          + RECEIVABLES_FILTER
-          + """
-      GROUP BY 1 HAVING COUNT(*) = COUNT(amount_raw)
-      ORDER BY 1
-      """)
-  List<DailySettlement> dailyShopReceivables(
-      @Param("tenantId") long tenantId,
-      @Param("shopId") long shopId,
-      @Param("from") Instant from,
-      @Param("until") Instant until);
 
   @InterceptorIgnore(tenantLine = "true")
   @Select("SELECT COUNT(*) FROM crm_order_settlement_flow WHERE " + RECEIVABLES_FILTER)

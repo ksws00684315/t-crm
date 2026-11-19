@@ -76,18 +76,7 @@ public interface OrderEvidenceApi {
       BigDecimal completedRefundAmount,
       BigDecimal netSalesAmount) {}
 
-  record DailyAmount(
-      LocalDate day,
-      BigDecimal sales,
-      BigDecimal refunds,
-      BigDecimal cohortRefunds,
-      long paidOrders,
-      long units) {}
-
-  record DailySettlement(LocalDate day, BigDecimal amount) {}
-
-  List<DailySettlement> dailyShopSettlement(
-      long tenantId, long shopId, Instant from, Instant until);
+  record DailyAmount(LocalDate day, BigDecimal sales, BigDecimal refunds) {}
 
   PageResult<EvidenceRow> page(Selection selection, Kind kind, int page, int size);
 

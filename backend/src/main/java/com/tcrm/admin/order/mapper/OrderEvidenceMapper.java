@@ -280,49 +280,27 @@ public interface OrderEvidenceMapper {
   @Select(
       SCOPED
           + """
-      paid AS (
-        SELECT o.id, o.pay_time,
+      activity AS (
         <choose>
           <when test="s.productCode != null or s.scope.productKeyword != null">
-            SUM(i.pay_amount) AS sales, SUM(i.quantity) AS units
+            SELECT o.pay_time AS event_time, i.pay_amount AS sales, 0::numeric AS refunds
             FROM scoped_orders o JOIN distribution_items i ON i.order_id = o.id
             WHERE o.pay_time &gt;= #{s.from} AND o.pay_time &lt; #{s.until}
-            GROUP BY o.id, o.pay_time
           </when>
           <otherwise>
-            o.pay_amount AS sales, COALESCE(item.units, 0) AS units
-            FROM scoped_orders o
-            LEFT JOIN LATERAL (
-              SELECT SUM(i.quantity) AS units FROM crm_order_item i
-              WHERE i.tenant_id = #{s.scope.tenantId} AND i.order_id = o.id AND NOT i.is_deleted
-            ) item ON TRUE
-            WHERE o.pay_time &gt;= #{s.from} AND o.pay_time &lt; #{s.until}
+            SELECT o.pay_time AS event_time, o.pay_amount AS sales, 0::numeric AS refunds
+            FROM scoped_orders o WHERE o.pay_time &gt;= #{s.from} AND o.pay_time &lt; #{s.until}
           </otherwise>
         </choose>
-      ), activity AS (
-        SELECT pay_time AS event_time, sales, 0::numeric AS refunds, 0::numeric AS cohort_refunds,
-               1 AS paid_orders, units
-        FROM paid
         UNION ALL
-        SELECT event_time, 0, amount, 0, 0, 0 FROM (
+        SELECT event_time, 0::numeric, amount FROM (
       """
           + REFUNDS
           + """
         ) refund_events
-        UNION ALL
-        SELECT p.pay_time, 0, 0, r.amount, 0, 0
-        FROM paid p JOIN crm_refund r ON r.order_id = p.id
-        <if test="s.productCode != null or s.scope.productKeyword != null">
-          JOIN distribution_items i ON i.id = r.order_item_id AND i.order_id = p.id
-        </if>
-        WHERE r.tenant_id = #{s.scope.tenantId} AND NOT r.is_deleted AND r.refund_status = 'SUCCESS'
-      """
-          + OrderStatsMapper.COHORT_REFUND_WINDOW
-          + """
       )
       SELECT (event_time AT TIME ZONE 'Asia/Shanghai')::date AS day,
-             SUM(sales) AS sales, SUM(refunds) AS refunds, SUM(cohort_refunds) AS cohort_refunds,
-             SUM(paid_orders) AS paid_orders, SUM(units) AS units
+             SUM(sales) AS sales, SUM(refunds) AS refunds
       FROM activity GROUP BY 1 ORDER BY 1
       </script>
       """)

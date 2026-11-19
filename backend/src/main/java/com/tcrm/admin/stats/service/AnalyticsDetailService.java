@@ -4,7 +4,6 @@ import com.tcrm.admin.kol.api.KolApi;
 import com.tcrm.admin.kol.api.KolRefDTO;
 import com.tcrm.admin.order.api.OrderEvidenceApi;
 import com.tcrm.admin.order.api.OrderEvidenceApi.DailyAmount;
-import com.tcrm.admin.order.api.OrderEvidenceApi.DailySettlement;
 import com.tcrm.admin.order.api.OrderEvidenceApi.EvidenceRow;
 import com.tcrm.admin.order.api.OrderEvidenceApi.Kind;
 import com.tcrm.admin.order.api.OrderEvidenceApi.ProductBreakdown;
@@ -89,24 +88,17 @@ public class AnalyticsDetailService {
       throw new BusinessException(ErrorCode.COMMON_VALIDATION_FAILED);
     }
     var selection = select(resolved, board, entityId, productCode, keyword);
-    if (activity != null) {
-      return new Detail(
-          resolved.period(),
-          null,
-          evidence.page(selection, activity, ranking.page(), ranking.size()),
-          null,
-          null);
-    }
-    var shop = board == Board.SHOP ? shopOverview(resolved, selection) : null;
-    var dailySettlement =
-        shop == null || shop.settlementAmount() == null
-            ? null
-            : evidence.dailyShopSettlement(
-                selection.scope().tenantId(),
-                selection.scope().shopId(),
-                selection.from(),
-                selection.until());
-    return new Detail(resolved.period(), evidence.daily(selection), null, shop, dailySettlement);
+    return activity == null
+        ? new Detail(
+            resolved.period(),
+            evidence.daily(selection),
+            null,
+            board == Board.SHOP ? shopOverview(resolved, selection) : null)
+        : new Detail(
+            resolved.period(),
+            null,
+            evidence.page(selection, activity, ranking.page(), ranking.size()),
+            null);
   }
 
   private ShopOverview shopOverview(
@@ -366,6 +358,5 @@ public class AnalyticsDetailService {
       StatsPeriod period,
       List<DailyAmount> daily,
       PageResult<EvidenceRow> activity,
-      ShopOverview shopOverview,
-      List<DailySettlement> dailySettlement) {}
+      ShopOverview shopOverview) {}
 }

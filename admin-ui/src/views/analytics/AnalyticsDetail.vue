@@ -13,7 +13,6 @@ import {
   type ActivityKind,
   type Board,
   type DailyAmount,
-  type DailySettlement,
   type DetailQuery,
   type EvidenceRow,
   type InviterCreatorRow,
@@ -53,7 +52,6 @@ const page = ref(1);
 const size = ref(20);
 const tableId = computed(() => `analytics-detail-${shop.value ? "shop-" : ""}${tab.value}`);
 const daily = ref<DailyAmount[]>([]);
-const dailySettlement = ref<DailySettlement[]>([]);
 const shopOverview = ref<ShopDetailOverview | null>(null);
 const rows = ref<EvidenceRow[]>([]);
 const flowRows = ref<SettlementFlowRow[]>([]);
@@ -120,28 +118,6 @@ const metricKeys = computed<Metric[]>(() =>
     ? [...salesMetrics, "amountRefundRate", ...orderMetrics]
     : [...salesMetrics, ...orderMetrics, "amountRefundRate"]
 );
-type TrendMetric =
-  | "salesAmount"
-  | "completedRefundAmount"
-  | "netSalesAmount"
-  | "amountRefundRate"
-  | "paidOrderCount"
-  | "units"
-  | "averageOrderAmount"
-  | "settlementAmount";
-const activeMetric = ref<TrendMetric>("netSalesAmount");
-const trendMetrics = new Set<string>([
-  ...salesMetrics,
-  ...orderMetrics,
-  "amountRefundRate",
-  "settlementAmount"
-]);
-function isTrendMetric(key: string): key is TrendMetric {
-  return trendMetrics.has(key);
-}
-function selectTrend(key: string): void {
-  if (isTrendMetric(key)) activeMetric.value = key;
-}
 function formatCount(value: unknown): string {
   return typeof value === "number" || typeof value === "string"
     ? new Intl.NumberFormat(locale.value).format(BigInt(String(value)))
@@ -363,77 +339,33 @@ const detailHeaders = computed(() =>
   })
 );
 
-const activeTrendLabel = computed(
-  () => cards.value.find(card => card.key === activeMetric.value)?.label ?? ""
-);
-const trendTitle = computed(() =>
-  t("analytics.drilldown.metricTrend", { metric: activeTrendLabel.value })
-);
 const chart = computed(() => {
-  const metric = activeMetric.value;
-  const settlement = metric === "settlementAmount";
-  if (!(settlement ? dailySettlement.value.length : daily.value.length)) return null;
+  if (!daily.value.length) return null;
   const values = new Map(daily.value.map(day => [day.day, day]));
-  const settlements = new Map(dailySettlement.value.map(day => [day.day, day.amount]));
-  const percent = new Intl.NumberFormat(locale.value, {
-    style: "percent",
-    maximumFractionDigits: 2
-  });
-  const count = metric === "paidOrderCount" || metric === "units";
-  const dataForDay = (day: string): number | null => {
-    const point = values.get(day);
-    const sales = Number(point?.sales ?? 0);
-    const refunds = Number(point?.refunds ?? 0);
-    const orders = Number(point?.paidOrders ?? 0);
-    switch (metric) {
-      case "salesAmount":
-        return sales;
-      case "completedRefundAmount":
-        return refunds;
-      case "netSalesAmount":
-        return sales - Number(point?.cohortRefunds ?? 0);
-      case "paidOrderCount":
-        return orders;
-      case "units":
-        return Number(point?.units ?? 0);
-      case "averageOrderAmount":
-        return orders ? sales / orders : null;
-      case "amountRefundRate":
-        return sales ? refunds / sales : null;
-      case "settlementAmount":
-        return settlements.has(day) ? Number(settlements.get(day)) : null;
-    }
-  };
   const days = [];
   for (let day = props.filters.startDate; day <= props.filters.endDate; day = shiftDate(day, 1)) {
     days.push(day);
   }
-  const data = days.map(dataForDay);
-  if (data.every(value => value === null)) return null;
   return {
+    legend: { top: 0 },
     tooltip: {
       trigger: "axis",
-      valueFormatter: (value: unknown) => {
-        if (typeof value !== "number") return "—";
-        if (metric === "amountRefundRate") return percent.format(value);
-        return count ? formatCount(value) : formatAmountWithCurrency(String(value.toFixed(2)));
-      }
+      valueFormatter: (amount: unknown) => formatAmountWithCurrency(String(amount))
     },
     xAxis: { type: "category", data: days, axisLabel: { hideOverlap: true } },
-    yAxis: {
-      type: "value",
-      minInterval: count ? 1 : undefined,
-      axisLabel:
-        metric === "amountRefundRate"
-          ? { formatter: (value: number) => percent.format(value) }
-          : undefined
-    },
+    yAxis: { type: "value" },
     series: [
       {
-        name: activeTrendLabel.value,
+        name: t("analytics.salesAmount"),
         type: "line",
-        showSymbol: data.includes(null) || days.length < 15,
-        data
+        showSymbol: days.length < 15,
+        data: days.map(day => Number(values.get(day)?.sales ?? 0))
+      },
+      {
+        name: t("analytics.completedRefundAmount"),
+        type: "line",
+        showSymbol: days.length < 15,
+        data: days.map(day => Number(values.get(day)?.refunds ?? 0))
       }
     ]
   };
@@ -499,7 +431,6 @@ async function load(): Promise<void> {
     });
     if (id !== request) return;
     daily.value = result.daily ?? [];
-    dailySettlement.value = result.dailySettlement ?? [];
     shopOverview.value = result.shopOverview ?? null;
     rows.value = result.activity?.items ?? [];
     total.value = Number(result.activity?.total ?? 0);
@@ -522,7 +453,6 @@ watch(
     page.value = 1;
     size.value = readPageSize(tableId.value, 20);
     daily.value = [];
-    dailySettlement.value = [];
     shopOverview.value = null;
     rows.value = [];
     flowRows.value = [];
@@ -533,9 +463,6 @@ watch(
   },
   { immediate: true }
 );
-watch(cards, current => {
-  if (!current.some(card => card.key === activeMetric.value)) activeMetric.value = "netSalesAmount";
-});
 
 function changePage(next: number): void {
   if (page.value === next) return;
@@ -666,12 +593,10 @@ function changeSize(next: number): void {
           <MetricCard
             v-for="card in cards"
             :key="card.key"
-            :class="{ 'analytics-detail__metric--accent': card.key === activeMetric }"
+            :data-drawer-metric="card.key"
             :label="card.label"
             :value="card.value"
             :hint="card.hint"
-            :selected="isTrendMetric(card.key) ? card.key === activeMetric : undefined"
-            @select="selectTrend(card.key)"
           >
             <template v-if="card.key === 'soldProducts'" #value>
               <i18n-t
@@ -691,10 +616,25 @@ function changeSize(next: number): void {
           </MetricCard>
         </div>
         <section class="analytics-detail__trend">
-          <h3>{{ trendTitle }}</h3>
+          <h3>{{ t("analytics.drilldown.daily") }}</h3>
+          <p>
+            <template
+              v-for="(key, index) in ['salesAmount', 'completedRefundAmount'] as const"
+              :key="key"
+            >
+              <span v-if="index" aria-hidden="true"> · </span>
+              <el-tooltip
+                :content="termHint(key)"
+                :trigger="['hover', 'focus']"
+                popper-class="analytics-metric-definition"
+              >
+                <span tabindex="0" class="analytics-detail__term">{{ t(`analytics.${key}`) }}</span>
+              </el-tooltip>
+            </template>
+          </p>
           <ChartPanel
             :option="chart"
-            :label="trendTitle"
+            :label="t('analytics.drilldown.daily')"
             :loading="loading"
             :failed="failed"
             @retry="load"
@@ -889,9 +829,6 @@ function changeSize(next: number): void {
   margin: 0;
   overflow-wrap: anywhere;
 }
-.analytics-detail__trend h3 {
-  margin-block-end: var(--tcrm-space-2);
-}
 .analytics-detail__metadata {
   display: flex;
   flex-wrap: wrap;
@@ -998,45 +935,40 @@ function changeSize(next: number): void {
   font-size: var(--tcrm-font-size-dashboard-metric);
 }
 .analytics-detail__cards {
-  --drawer-metric-columns: 4;
-  display: flex;
-  flex-wrap: wrap;
-  overflow: hidden;
-  border: 1px solid var(--tcrm-color-border);
+  --analytics-card-padding: var(--tcrm-space-3) var(--tcrm-space-4);
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: var(--tcrm-space-3);
 }
 .analytics-detail__cards--shop {
-  --drawer-metric-columns: 5;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
 }
 .analytics-detail__cards :deep(.metric-card) {
-  box-sizing: border-box;
-  flex: 1 0 calc(100% / var(--drawer-metric-columns));
-  border: 0;
-  border-radius: 0;
-  box-shadow: 0 0 0 1px var(--tcrm-color-border);
-  padding: var(--tcrm-space-5) var(--tcrm-space-4);
+  border-inline-start: 3px solid var(--drawer-metric-accent, var(--tcrm-color-primary));
 }
-.analytics-detail__cards :deep(.analytics-detail__metric--accent) {
-  box-shadow:
-    0 0 0 1px var(--tcrm-color-border),
-    inset 0 4px 0 var(--tcrm-color-primary);
+.analytics-detail__cards :deep([data-drawer-metric="salesAmount"]),
+.analytics-detail__cards :deep([data-drawer-metric="units"]) {
+  --drawer-metric-accent: #6945d7;
 }
-.analytics-detail__cards :deep(.metric-card__label) {
-  color: var(--tcrm-color-text);
+.analytics-detail__cards :deep([data-drawer-metric="completedRefundAmount"]),
+.analytics-detail__cards :deep([data-drawer-metric="amountRefundRate"]) {
+  --drawer-metric-accent: var(--tcrm-color-danger);
 }
-.analytics-detail__cards :deep(.metric-card__label .metric-card__text) {
-  white-space: normal;
+.analytics-detail__cards :deep([data-drawer-metric="netSalesAmount"]),
+.analytics-detail__cards :deep([data-drawer-metric="settlementAmount"]) {
+  --drawer-metric-accent: var(--tcrm-color-success);
 }
 .analytics-detail__orders :deep(.el-table__cell.tcrm-amount) {
   text-align: right;
 }
 @media (max-width: 1000px) {
   .analytics-detail__cards--shop {
-    --drawer-metric-columns: 3;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
   }
 }
 @media (max-width: 860px) {
   .analytics-detail__cards {
-    --drawer-metric-columns: 2;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 }
 @media (max-width: 480px) {
@@ -1049,10 +981,7 @@ function changeSize(next: number): void {
     margin-inline-start: 0;
   }
   .analytics-detail__cards {
-    --drawer-metric-columns: 1;
-  }
-  .analytics-detail__cards :deep(.metric-card) {
-    padding-block: var(--tcrm-space-4);
+    grid-template-columns: minmax(0, 1fr);
   }
 }
 </style>
