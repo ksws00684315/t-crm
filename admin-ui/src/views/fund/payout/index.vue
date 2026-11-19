@@ -4,6 +4,7 @@ import { useI18n } from "vue-i18n";
 import WithdrawalTasksPage from "@/views/fund/withdrawal/index.vue";
 import { useUserStore } from "@/stores/user";
 import { financeAbilities } from "@/utils/finance";
+import { accessOf } from "@/utils/permission";
 
 defineOptions({ name: "FundPayoutPage" });
 
@@ -14,7 +15,10 @@ defineOptions({ name: "FundPayoutPage" });
  */
 const { t } = useI18n();
 const user = useUserStore();
-const canViewWithdrawals = computed(() => financeAbilities(user.user).view);
+const canViewWithdrawals = computed(() => {
+  const abilities = financeAbilities(user.user);
+  return abilities.view || abilities.review || accessOf(user.user).can("withdrawal:pay");
+});
 const activeTab = ref("withdrawals");
 </script>
 

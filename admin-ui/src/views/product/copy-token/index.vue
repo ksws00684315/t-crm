@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { ElMessage, ElMessageBox } from "element-plus";
-import { computed, onMounted, reactive, ref } from "vue";
+import { computed, onMounted, reactive, ref, watch } from "vue";
+import { useRoute } from "vue-router";
 import { useI18n } from "vue-i18n";
 import {
   listCopyTokens,
@@ -26,6 +27,7 @@ import CopyTokenCreateDialog from "./CopyTokenCreateDialog.vue";
 defineOptions({ name: "CopyTokenPage" });
 
 const { t } = useI18n();
+const route = useRoute();
 const me = useUserStore();
 const canManage = computed(() => accessOf(me.user).can("kol:copy-token"));
 
@@ -282,8 +284,20 @@ function channelText(channel: string): string {
   return channel === "WEIDIAN" ? t("copyToken.channelWeidian") : channel;
 }
 
+watch(
+  () => route?.fullPath,
+  () => {
+    if (route?.query.status !== "ACTIVE" || route.name !== "CopyTokenList") return;
+    query.hint = "";
+    query.kolId = undefined;
+    query.status = "ACTIVE";
+    search();
+  },
+  { immediate: true }
+);
+
 onMounted(() => {
-  void load();
+  if (!query.status) void load();
 });
 </script>
 

@@ -21,6 +21,9 @@ public interface OrderStatsApi {
 
   TotalsDTO totals(ScopeDTO scope, Instant from, Instant until);
 
+  /** Null when a paid affiliate line has no reliable current commission snapshot. */
+  BigDecimal unsettledCommission(ScopeDTO scope, Instant from, Instant until);
+
   List<RankFactsDTO> rankFacts(
       ScopeDTO scope, RankDimension dimension, Instant from, Instant until);
 
@@ -70,7 +73,8 @@ public interface OrderStatsApi {
       List<Long> visibleShopIds,
       List<Long> matchedKolIds,
       List<Long> matchedInviterIds,
-      String productKeyword) {
+      String productKeyword,
+      boolean affiliateOnly) {
     public ScopeDTO withProductKeyword(String keyword) {
       return new ScopeDTO(
           tenantId,
@@ -81,7 +85,22 @@ public interface OrderStatsApi {
           visibleShopIds,
           matchedKolIds,
           matchedInviterIds,
-          keyword);
+          keyword,
+          affiliateOnly);
+    }
+
+    public ScopeDTO withVisibleShops(List<Long> shopIds) {
+      return new ScopeDTO(
+          tenantId,
+          ownerId,
+          shopId,
+          kolId,
+          inviterId,
+          shopIds,
+          matchedKolIds,
+          matchedInviterIds,
+          productKeyword,
+          affiliateOnly);
     }
 
     public ScopeDTO(
@@ -103,6 +122,29 @@ public interface OrderStatsApi {
           matchedKolIds,
           matchedInviterIds,
           null);
+    }
+
+    public ScopeDTO(
+        long tenantId,
+        Long ownerId,
+        Long shopId,
+        Long kolId,
+        Long inviterId,
+        List<Long> visibleShopIds,
+        List<Long> matchedKolIds,
+        List<Long> matchedInviterIds,
+        String productKeyword) {
+      this(
+          tenantId,
+          ownerId,
+          shopId,
+          kolId,
+          inviterId,
+          visibleShopIds,
+          matchedKolIds,
+          matchedInviterIds,
+          productKeyword,
+          false);
     }
 
     public ScopeDTO(

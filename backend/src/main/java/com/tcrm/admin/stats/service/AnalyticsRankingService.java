@@ -377,7 +377,8 @@ public class AnalyticsRankingService {
                 scope.visibleShopIds(),
                 board == Board.CREATOR ? matched : scope.matchedKolIds(),
                 board == Board.INVITER ? matched : scope.matchedInviterIds(),
-                scope.productKeyword())
+                scope.productKeyword(),
+                scope.affiliateOnly())
             : scope;
     var total =
         overview.overview(

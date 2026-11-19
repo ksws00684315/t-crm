@@ -14,6 +14,7 @@ import { useUserStore } from "@/stores/user";
 import { formatAmountWithCurrency, formatInstant } from "@/utils/format";
 import { financeAbilities, financeApiReady, previewContext } from "@/utils/finance";
 import { notifyError } from "@/utils/notify";
+import { accessOf } from "@/utils/permission";
 import { saveBlob } from "@/utils/download";
 import WithdrawalDrawer from "./WithdrawalDrawer.vue";
 import ReviewDialog from "./ReviewDialog.vue";
@@ -35,7 +36,11 @@ const route = useRoute();
 const router = useRouter();
 const user = useUserStore();
 const abilities = computed(() => financeAbilities(user.user));
-const filters = reactive({ applicationNo: "", kolId: "", status: "" });
+const filters = reactive({
+  applicationNo: "",
+  kolId: "",
+  status: route?.query.status === "ACTION_REQUIRED" ? "ACTION_REQUIRED" : ""
+});
 const rows = ref<FinanceTask[]>([]);
 const appliedFilters = ref<WithdrawalQuery>({ ...filters });
 const total = ref(0);
@@ -82,7 +87,7 @@ const chips = computed(() =>
     .map(([key, value]) => ({
       key,
       label: t(`finance.${key}`),
-      text: key === "status" ? t(`finance.${value}`) : value
+      text: key === "status" ? statusLabel(value) : value
     }))
 );
 
@@ -125,7 +130,7 @@ function canReview(row: FinanceTask) {
   return abilities.value.review && row.status === "PENDING_REVIEW";
 }
 function canPay(row: FinanceTask) {
-  return abilities.value.pay && row.status === "PENDING_PAYMENT";
+  return row.status === "PENDING_PAYMENT" && accessOf(user.user).can("withdrawal:pay");
 }
 function processLabel(row: FinanceTask) {
   return row.status === "PENDING_REVIEW" ? t("finance.operationsReview") : t("finance.financePay");
@@ -170,7 +175,7 @@ async function openCommissionAction(row: FinanceTask) {
   }
 }
 async function exportRows() {
-  if (!abilities.value.export) return;
+  if (!abilities.value.export || appliedFilters.value.status === "ACTION_REQUIRED") return;
   try {
     const file = await exportWithdrawals({ ...appliedFilters.value });
     saveBlob(file.blob, file.fileName ?? "t1023_withdrawals.csv");
@@ -183,7 +188,7 @@ function reviewSaved() {
   void load();
 }
 function statusLabel(status: string) {
-  return t(`finance.${status}`);
+  return status === "ACTION_REQUIRED" ? t("workbench.payouts") : t(`finance.${status}`);
 }
 /**
  * Withdrawal notifications (L-017) jump here with ?withdrawalId=…: open the task drawer. The
@@ -211,6 +216,15 @@ watch(
   () => [previewContext.role, previewContext.scenario],
   () => search()
 );
+watch(
+  () => route?.fullPath,
+  () => {
+    if (route?.name !== "FundPayouts" || route.query.status !== "ACTION_REQUIRED") return;
+    Object.assign(filters, { applicationNo: "", kolId: "", status: "ACTION_REQUIRED" });
+    search();
+  }
+);
+
 onMounted(load);
 </script>
 
@@ -235,6 +249,11 @@ onMounted(load);
               data-test="withdrawal-status"
             >
               <el-option
+                v-if="filters.status === 'ACTION_REQUIRED'"
+                :label="t('workbench.payouts')"
+                value="ACTION_REQUIRED"
+              />
+              <el-option
                 v-for="status in WITHDRAWAL_STATUSES"
                 :key="status"
                 :label="statusLabel(status)"
@@ -255,7 +274,7 @@ onMounted(load);
         :total="total"
         :loading="loading"
         :filter-count="chips.length"
-        :exportable="abilities.export && !failed"
+        :exportable="abilities.export && !failed && appliedFilters.status !== 'ACTION_REQUIRED'"
         @refresh="load"
         @clear-filters="reset"
         @export="exportRows"

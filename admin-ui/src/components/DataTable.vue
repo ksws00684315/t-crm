@@ -31,7 +31,7 @@ export interface DataColumn {
   minWidth?: ColumnMinWidth;
   amount?: boolean;
   /** Long content is left aligned; short content is centered by default. */
-  align?: "left" | "center";
+  align?: "left" | "center" | "right";
   /** Form controls supply their own focus handling and per-control descriptions. */
   interactive?: boolean;
   /** Keeps the previous overflow tooltip on long remark and request columns. */

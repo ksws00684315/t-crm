@@ -4,6 +4,7 @@ import com.tcrm.admin.order.api.OrderStatsApi;
 import com.tcrm.admin.order.mapper.OrderDailyStatsMapper;
 import com.tcrm.admin.order.mapper.OrderSettlementFlowMapper;
 import com.tcrm.admin.order.mapper.OrderStatsMapper;
+import java.math.BigDecimal;
 import java.time.Instant;
 import java.time.LocalDate;
 import java.util.List;
@@ -38,6 +39,11 @@ public class OrderStatsService implements OrderStatsApi {
   @Override
   public TotalsDTO totals(ScopeDTO scope, Instant from, Instant until) {
     return mapper.totals(scope, from, until);
+  }
+
+  @Override
+  public BigDecimal unsettledCommission(ScopeDTO scope, Instant from, Instant until) {
+    return mapper.unsettledCommission(scope, from, until);
   }
 
   @Override

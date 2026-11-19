@@ -3,7 +3,6 @@ package com.tcrm.admin.stats.service;
 import com.tcrm.admin.order.api.OrderStatsApi;
 import com.tcrm.admin.order.api.OrderStatsApi.RankDimension;
 import com.tcrm.admin.order.api.OrderStatsApi.RankFactsDTO;
-import com.tcrm.admin.order.api.OrderStatsApi.ScopeDTO;
 import com.tcrm.admin.product.api.ShopAccessApi;
 import com.tcrm.admin.product.api.ShopAccessDTO;
 import com.tcrm.admin.security.api.DataScope;
@@ -54,22 +53,14 @@ public class ShopPerformanceService {
         shops.listShops().stream()
             .filter(shop -> filters.shopId() == null || Objects.equals(shop.id(), filters.shopId()))
             .toList();
-    var scope =
-        new ScopeDTO(
-            filters.tenantId(),
-            filters.ownerId(),
-            filters.shopId(),
-            filters.kolId(),
-            filters.inviterId(),
-            visibleShops.stream().map(ShopAccessDTO::id).toList(),
-            filters.matchedKolIds(),
-            filters.matchedInviterIds());
+    var scope = filters.withVisibleShops(visibleShops.stream().map(ShopAccessDTO::id).toList());
     var facts = new HashMap<Long, RankFactsDTO>();
     for (var row : orders.rankFacts(scope, RankDimension.SHOP, period.from(), period.until())) {
       facts.put(row.entityId(), row);
     }
     boolean includeShopsWithoutFacts =
-        resolved.dataScope() == DataScope.ALL
+        !scope.affiliateOnly()
+            && resolved.dataScope() == DataScope.ALL
             && scope.kolId() == null
             && scope.inviterId() == null
             && scope.matchedKolIds() == null

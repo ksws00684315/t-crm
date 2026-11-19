@@ -1,7 +1,8 @@
 <script setup lang="ts">
 import NameCode from "@/components/NameCode.vue";
 import { ElMessage, ElMessageBox } from "element-plus";
-import { computed, nextTick, onMounted, reactive, ref } from "vue";
+import { computed, nextTick, onMounted, reactive, ref, watch } from "vue";
+import { useRoute } from "vue-router";
 import { useI18n } from "vue-i18n";
 import { getCleanupRemaining, updateKolStatus } from "@/api/kol/kol";
 import type { DisplayRelationStatus, KolVO, ReviewStatus } from "@/api/types";
@@ -36,6 +37,8 @@ defineOptions({ name: "KolListPage" });
  * transfer history itself lives in the audit log.
  */
 const { t } = useI18n();
+const route = useRoute();
+const pendingOnly = ref(route?.query.reviewStatus === "PENDING");
 const me = useUserStore();
 const abilities = computed(() => kolAbilities(me.user));
 const isSuperAdmin = computed(() => accessOf(me.user).isSuperAdmin);
@@ -68,6 +71,8 @@ const tableRef = ref<InstanceType<typeof DataTable>>();
 const chips = computed<SearchChip[]>(() => {
   const list: SearchChip[] = [];
   const current = applied.value;
+  if (pendingOnly.value)
+    list.push({ key: "reviewStatus", label: t("workbench.pending"), text: t("workbench.pending") });
   if (current.kolId) list.push({ key: "kolId", label: t("kol.kolId"), text: current.kolId });
   if (current.name) list.push({ key: "name", label: t("kol.kolName"), text: current.name });
   if (current.email) list.push({ key: "email", label: t("kol.email"), text: current.email });
@@ -83,7 +88,8 @@ async function load() {
       size: query.size,
       kolCode: applied.value.kolId || undefined,
       name: applied.value.name || undefined,
-      email: applied.value.email || undefined
+      email: applied.value.email || undefined,
+      ...(pendingOnly.value ? { reviewStatus: "PENDING" as const } : {})
     });
     rows.value = page.items;
     total.value = Number(page.total);
@@ -110,6 +116,7 @@ function search() {
 }
 
 function reset() {
+  pendingOnly.value = false;
   query.kolId = "";
   query.name = "";
   query.email = "";
@@ -117,6 +124,7 @@ function reset() {
 }
 
 function removeChip(key: string): void {
+  if (key === "reviewStatus") pendingOnly.value = false;
   if (key === "kolId") query.kolId = "";
   if (key === "name") query.name = "";
   if (key === "email") query.email = "";
@@ -377,6 +385,19 @@ async function resetTableScroll(): Promise<void> {
   const wrap = root?.querySelector<HTMLElement>(".el-table__body-wrapper .el-scrollbar__wrap");
   if (wrap) wrap.scrollLeft = 0;
 }
+
+watch(
+  () => route?.fullPath,
+  () => {
+    if (route?.name !== "KolList" || route.query.reviewStatus !== "PENDING") return;
+    pendingOnly.value = true;
+    activeTab.value = "list";
+    query.kolId = "";
+    query.name = "";
+    query.email = "";
+    search();
+  }
+);
 
 onMounted(async () => {
   await load();

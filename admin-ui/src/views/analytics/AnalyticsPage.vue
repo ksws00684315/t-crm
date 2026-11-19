@@ -743,15 +743,17 @@ async function download(): Promise<void> {
 }
 
 function applyShopShortcut(): boolean {
-  if (!product || route.name !== "AnalyticsBestSellers") {
+  const workbenchRanking =
+    (route.name === "AnalyticsShopPerformance" || route.name === "AnalyticsKolRanking") &&
+    route.query.sortBy === "salesAmount";
+  if (!workbenchRanking && (!product || route.name !== "AnalyticsBestSellers")) {
     lastShopShortcut = undefined;
     return false;
   }
   const { shopId, startDate, endDate } = route.query;
   if (
     route.fullPath === lastShopShortcut ||
-    typeof shopId !== "string" ||
-    !/^[1-9][0-9]{0,18}$/.test(shopId)
+    (!workbenchRanking && (typeof shopId !== "string" || !/^[1-9][0-9]{0,18}$/.test(shopId)))
   )
     return false;
   lastShopShortcut = route.fullPath;
@@ -763,7 +765,15 @@ function applyShopShortcut(): boolean {
     validDates({ startDate, endDate })
       ? { startDate, endDate }
       : undefined;
-  draft.value = { ...(range ?? dates()), shopId };
+  if (workbenchRanking && range) {
+    draft.value = { ...range, affiliateOnly: true };
+    sortBy.value = "salesAmount";
+    sortDirection.value = "desc";
+  } else if (!workbenchRanking) {
+    draft.value = { ...(range ?? dates()), shopId: shopId as string };
+  } else {
+    return false;
+  }
   applied.value = { ...draft.value };
   initialPeriodMode.value = range
     ? range.startDate === range.endDate

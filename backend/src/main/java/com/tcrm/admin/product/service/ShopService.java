@@ -68,6 +68,15 @@ public class ShopService implements ShopAccessApi, CopyTargetShopApi {
 
   public PageResult<ShopDTO> page(
       String shopCode, String shopName, String channel, int page, int size) {
+    return page(shopCode, shopName, channel, false, page, size);
+  }
+
+  public List<ShopDTO> workbenchShops() {
+    return buildViews(shops.selectList(new LambdaQueryWrapper<>()));
+  }
+
+  public PageResult<ShopDTO> page(
+      String shopCode, String shopName, String channel, boolean authException, int page, int size) {
     LambdaQueryWrapper<ShopDO> query = new LambdaQueryWrapper<>();
     if (shopCode != null && !shopCode.isBlank()) {
       query.likeRight(ShopDO::getShopCode, shopCode.strip());
@@ -79,6 +88,17 @@ public class ShopService implements ShopAccessApi, CopyTargetShopApi {
       query.eq(ShopDO::getChannel, channel.strip().toUpperCase(Locale.ROOT));
     }
     query.orderByAsc(ShopDO::getId);
+    if (authException) {
+      var rows =
+          buildViews(shops.selectList(query.eq(ShopDO::getStatus, 1))).stream()
+              .filter(shop -> !"AUTHORIZED".equals(shop.authStatus()))
+              .toList();
+      return new PageResult<>(
+          rows.stream().skip((long) (page - 1) * size).limit(size).toList(),
+          rows.size(),
+          page,
+          size);
+    }
     var result = shops.selectPage(new Page<>(page, size), query);
     List<ShopDTO> items = buildViews(result.getRecords());
     return new PageResult<>(items, result.getTotal(), page, size);

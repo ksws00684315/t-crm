@@ -187,6 +187,22 @@ class OrderStatsIT {
       assertThat(own.refundedOrders()).isEqualTo(1);
       assertThat(own.updatedAt()).isNotNull();
 
+      var affiliate = new ScopeDTO(4, 9L, null, null, null, null, null, null, null, true);
+      jdbc.update("UPDATE crm_order SET pay_amount = 150, freight = 50 WHERE id = 1");
+      jdbc.update("UPDATE crm_order_item SET kol_id = NULL WHERE id = 2");
+      session.clearCache();
+      var affiliateTotals = mapper.totals(affiliate, FROM, UNTIL);
+      assertThat(affiliateTotals.paidOrders()).isEqualTo(1);
+      assertThat(affiliateTotals.units()).isEqualTo(2);
+      assertThat(affiliateTotals.sales()).isEqualByComparingTo("60");
+      assertThat(mapper.rankFacts(affiliate, RankDimension.SHOP, FROM, UNTIL))
+          .singleElement()
+          .satisfies(row -> assertThat(row.sales()).isEqualByComparingTo("60"));
+      assertThat(mapper.unsettledCommission(affiliate, FROM, UNTIL)).isNull();
+      jdbc.update("UPDATE crm_order SET pay_amount = 100, freight = 0 WHERE id = 1");
+      jdbc.update("UPDATE crm_order_item SET kol_id = 11 WHERE id = 2");
+      session.clearCache();
+
       var evidence = session.getMapper(OrderEvidenceMapper.class);
       var scope = new ScopeDTO(4, 9L, 1L, 11L, null, java.util.List.of(1L));
       var shopEvidence = new Selection(scope, null, null, null, null, FROM, UNTIL);
@@ -693,8 +709,15 @@ class OrderStatsIT {
                 assertThat(value.estimated()).isEqualByComparingTo("8");
                 assertThat(value.actual()).isZero();
               });
+      var affiliate = new ScopeDTO(4, 9L, 1L, null, null, null, null, null, null, true);
+      jdbc.update("UPDATE crm_order_item SET kol_id = NULL WHERE id = 2");
+      session.clearCache();
+      assertThat(orders.unsettledCommission(affiliate, FROM, UNTIL)).isEqualByComparingTo("8");
       jdbc.update(
           "UPDATE crm_commission_item_state SET released_commission_cny = 8 WHERE id = 701");
+      session.clearCache();
+      assertThat(orders.unsettledCommission(affiliate, FROM, UNTIL)).isZero();
+      jdbc.update("UPDATE crm_order_item SET kol_id = 11 WHERE id = 2");
       jdbc.update(
           "UPDATE crm_order_item SET item_name = 'Other', weidian_item_id = 'B', product_id = NULL WHERE id = 2");
       jdbc.update("UPDATE crm_order_item SET item_name = 'Single selected item' WHERE id = 1");

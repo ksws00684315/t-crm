@@ -8,6 +8,7 @@ import com.tcrm.admin.order.api.OrderStatsApi.RankDimension;
 import com.tcrm.admin.order.api.OrderStatsApi.RankFactsDTO;
 import com.tcrm.admin.order.api.OrderStatsApi.ScopeDTO;
 import com.tcrm.admin.order.api.OrderStatsApi.TotalsDTO;
+import java.math.BigDecimal;
 import java.time.Instant;
 import java.util.List;
 import org.apache.ibatis.annotations.Mapper;
@@ -56,6 +57,7 @@ public interface OrderStatsMapper {
       <if test="scope.productKeyword != null">
         AND EXISTS (SELECT 1 FROM product_items matched WHERE matched.id = i.id)
       </if>
+      <if test="scope.affiliateOnly">AND i.kol_id IS NOT NULL</if>
       """;
 
   String MATCHED_REFUND =
@@ -63,6 +65,11 @@ public interface OrderStatsMapper {
       <if test="scope.productKeyword != null">
         AND EXISTS (SELECT 1 FROM product_items matched WHERE matched.id = r.order_item_id
           AND matched.order_id = r.order_id)
+      </if>
+      <if test="scope.affiliateOnly">
+        AND EXISTS (SELECT 1 FROM crm_order_item line
+          WHERE line.tenant_id = #{scope.tenantId} AND NOT line.is_deleted
+            AND line.id = r.order_item_id AND line.order_id = r.order_id AND line.kol_id IS NOT NULL)
       </if>
       """;
 
@@ -77,19 +84,25 @@ public interface OrderStatsMapper {
       scoped_orders AS NOT MATERIALIZED (
         SELECT o.id, o.shop_id, o.kol_id, o.bd_user_id, o.pay_time,
         <choose>
-          <when test="scope.productKeyword != null">matched.amount</when>
+          <when test="scope.affiliateOnly or scope.productKeyword != null">matched.amount</when>
           <otherwise>o.pay_amount</otherwise>
         </choose>
         AS pay_amount, o.update_time
         FROM crm_order o
-        <if test="scope.productKeyword != null">
+        <if test="scope.affiliateOnly or scope.productKeyword != null">
           JOIN LATERAL (
             SELECT COALESCE(SUM(i.pay_amount), 0) AS amount
-            FROM product_items i WHERE i.order_id = o.id HAVING COUNT(*) &gt; 0
+            FROM crm_order_item i WHERE i.order_id = o.id AND i.tenant_id = #{scope.tenantId}
+              AND NOT i.is_deleted
+      """
+          + MATCHED_ITEM
+          + """
+            HAVING COUNT(*) &gt; 0
           ) matched ON TRUE
         </if>
         WHERE o.tenant_id = #{scope.tenantId} AND NOT o.is_deleted
           AND o.pay_time IS NOT NULL
+        <if test="scope.affiliateOnly">AND o.attribution_status = 'ATTRIBUTED'</if>
         <if test="scope.ownerId != null">AND o.bd_user_id = #{scope.ownerId}</if>
         <if test="scope.shopId != null">AND o.shop_id = #{scope.shopId}</if>
         <if test="scope.kolId != null">AND o.kol_id = #{scope.kolId}</if>
@@ -253,6 +266,29 @@ public interface OrderStatsMapper {
       </script>
       """)
   List<InviterCommissionDTO> inviterCommissions(
+      @Param("scope") ScopeDTO scope, @Param("from") Instant from, @Param("until") Instant until);
+
+  @InterceptorIgnore(tenantLine = "true")
+  @Select(
+      SCOPED_PAID_ORDERS
+          + """
+      commission_orders AS (
+        SELECT p.id, BOOL_AND(s.id IS NOT NULL) AS verified,
+          SUM(s.accrued_commission_cny) AS accrued,
+          BOOL_OR(s.accrued_commission_cny &gt; COALESCE(s.released_commission_cny, 0)) AS unsettled
+        FROM paid p
+        JOIN crm_order_item i ON i.order_id = p.id AND i.tenant_id = #{scope.tenantId}
+          AND NOT i.is_deleted AND i.kol_id IS NOT NULL
+        LEFT JOIN crm_commission_item_state s ON s.order_item_id = i.id AND s.order_id = p.id
+          AND s.tenant_id = i.tenant_id AND s.kol_id = i.kol_id AND s.verified AND NOT s.is_deleted
+        GROUP BY p.id
+      )
+      SELECT CASE WHEN COUNT(*) FILTER (WHERE NOT verified) = 0
+        THEN COALESCE(SUM(accrued) FILTER (WHERE unsettled), 0) END
+      FROM commission_orders
+      </script>
+      """)
+  BigDecimal unsettledCommission(
       @Param("scope") ScopeDTO scope, @Param("from") Instant from, @Param("until") Instant until);
 
   String COHORT_REFUND_WINDOW =

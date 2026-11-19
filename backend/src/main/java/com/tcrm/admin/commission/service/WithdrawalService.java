@@ -1399,12 +1399,31 @@ public class WithdrawalService {
   @Transactional(readOnly = true)
   public PageResult<FinanceTask> financeTasks(AccountDTO user, FinanceFilter filter) {
     long tenantId = requireTenant(user);
-    requireFinanceTaskPermission(user);
-    requirePage(filter.page(), filter.size());
-    String status = rawTaskStatus(filter.status());
     String type = taskTypeOrNull(filter.type());
+    requireFinanceTaskPermission(user, type);
+    requirePage(filter.page(), filter.size());
+    String status =
+        "ACTION_REQUIRED".equals(filter.status()) && "COMMISSION".equals(type)
+            ? actionableWithdrawalStatus(user)
+            : rawTaskStatus(filter.status());
     return TenantScope.callCompany(
         tenantId, () -> financeTasksInCompany(user, filter, status, type));
+  }
+
+  private static String actionableWithdrawalStatus(AccountDTO user) {
+    var permissions = user.effectivePermissions();
+    boolean review = permissions.contains("withdrawal:review");
+    boolean pay = permissions.contains("withdrawal:pay");
+    if (review && pay) {
+      return "ACTION_REQUIRED";
+    }
+    if (review) {
+      return "PENDING_REVIEW";
+    }
+    if (pay) {
+      return "PENDING_PAYMENT";
+    }
+    throw new BusinessException(ErrorCode.AUTH_FORBIDDEN);
   }
 
   private PageResult<FinanceTask> financeTasksInCompany(
@@ -1901,10 +1920,10 @@ public class WithdrawalService {
     }
   }
 
-  private static void requireFinanceTaskPermission(AccountDTO user) {
+  private static void requireFinanceTaskPermission(AccountDTO user, String type) {
     if (user.role() != Role.SUPER_ADMIN
         && !user.permissions().contains("withdrawal:review")
-        && !user.permissions().contains("withdrawal:pay")
+        && !("COMMISSION".equals(type) && user.permissions().contains("withdrawal:pay"))
         && !user.permissions().contains("prepay:review")
         && !user.permissions().contains("prepay:finance-review")
         && !user.permissions().contains("prepay:pay")

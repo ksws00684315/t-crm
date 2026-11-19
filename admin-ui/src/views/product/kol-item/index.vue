@@ -383,8 +383,16 @@ async function rebuildIndex() {
  * so watch the route instead of reading it once on mount.
  */
 watch(
-  () => route.query.linkCode,
-  linkCode => {
+  [() => route.query.linkCode, () => route.query.status],
+  ([linkCode, status]) => {
+    if (status === "ENABLED") {
+      query.linkCode = "";
+      query.kolId = undefined;
+      query.shopId = undefined;
+      query.status = "ENABLED";
+      search();
+      return;
+    }
     const wanted = typeof linkCode === "string" ? linkCode.trim() : "";
     if (!wanted || wanted === query.linkCode) return;
     query.linkCode = wanted;
@@ -396,7 +404,7 @@ watch(
 onMounted(() => {
   void loadShops();
   // The immediate route watch above already searched when a linkCode came with the URL.
-  if (!query.linkCode) void load();
+  if (!query.linkCode && query.status !== "ENABLED") void load();
 });
 </script>
 

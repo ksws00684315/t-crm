@@ -493,6 +493,30 @@ public class KolService {
         > 0;
   }
 
+  /** A self-registered creator's first BD assignment records the registration-code owner. */
+  public Map<Long, String> registrationInviters(List<KolDTO> visibleApplicants) {
+    var ids =
+        visibleApplicants.stream()
+            .filter(row -> Integer.valueOf(2).equals(row.registerSource()))
+            .map(KolDTO::id)
+            .toList();
+    if (ids.isEmpty()) {
+      return Map.of();
+    }
+    Map<Long, Long> inviterIds = new HashMap<>();
+    history
+        .selectList(
+            new LambdaQueryWrapper<KolBdHistoryDO>()
+                .in(KolBdHistoryDO::getKolId, ids)
+                .isNull(KolBdHistoryDO::getCreateBy)
+                .orderByAsc(KolBdHistoryDO::getStartTime, KolBdHistoryDO::getId))
+        .forEach(row -> inviterIds.putIfAbsent(row.getKolId(), row.getBdUserId()));
+    var names = bdNames(inviterIds.values().stream());
+    Map<Long, String> result = new HashMap<>();
+    inviterIds.forEach((kolId, bdId) -> result.put(kolId, names.get(bdId)));
+    return result;
+  }
+
   private Map<Long, String> bdNames(Stream<Long> ids) {
     Set<Long> wanted = new HashSet<>();
     ids.filter(Objects::nonNull).forEach(wanted::add);

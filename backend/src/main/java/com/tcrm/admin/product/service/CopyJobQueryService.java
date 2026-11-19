@@ -69,13 +69,20 @@ public class CopyJobQueryService {
     if (user.ownScope() && ownKolIds.isEmpty()) {
       return new PageResult<>(List.of(), 0, filter.page(), filter.size());
     }
+    boolean hasFailure = "HAS_FAILURE".equals(status);
     var query =
         new LambdaQueryWrapper<CopyJobDO>()
             .in(user.ownScope(), CopyJobDO::getKolId, ownKolIds)
             .eq(channel != null, CopyJobDO::getTargetChannel, channel)
-            .eq(status != null, CopyJobDO::getStatus, status)
+            .eq(status != null && !hasFailure, CopyJobDO::getStatus, status)
+            .in(
+                hasFailure,
+                CopyJobDO::getStatus,
+                CopyJobDO.STATUS_FAILED,
+                CopyJobDO.STATUS_PARTIAL_FAILED)
             .apply(prefix != null, "job_code LIKE {0} ESCAPE '\\'", prefix)
-            .orderByDesc(CopyJobDO::getCreateTime)
+            .orderByDesc(hasFailure, CopyJobDO::getFinishTime)
+            .orderByDesc(!hasFailure, CopyJobDO::getCreateTime)
             .orderByDesc(CopyJobDO::getId);
     var result = jobs.selectPage(new Page<>(filter.page(), filter.size()), query);
     Map<Long, KolRefDTO> kolMap = kolMap(result.getRecords());
@@ -166,7 +173,7 @@ public class CopyJobQueryService {
       return null;
     }
     String value = status.strip();
-    if (!JOB_STATUSES.contains(value)) {
+    if (!"HAS_FAILURE".equals(value) && !JOB_STATUSES.contains(value)) {
       throw new BusinessException(ErrorCode.COMMON_VALIDATION_FAILED);
     }
     return value;

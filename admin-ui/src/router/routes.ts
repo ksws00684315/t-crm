@@ -278,7 +278,7 @@ export const routes: RouteRecordRaw[] = [
             component: () => import("@/views/fund/payout/index.vue"),
             meta: {
               title: "route.payouts",
-              permission: ["commission:view"],
+              permission: ["commission:view", "withdrawal:review", "withdrawal:pay"],
               componentName: "FundPayoutPage"
             }
           },

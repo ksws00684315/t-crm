@@ -614,7 +614,10 @@ public interface WithdrawalMapper {
       <where>
         <if test="q.applicationNo != null">AND application_no = #{q.applicationNo}</if>
         <if test="q.kolId != null">AND kol_id = #{q.kolId}</if>
-        <if test="q.status != null">AND status = #{q.status}</if>
+        <choose>
+          <when test='q.status == "ACTION_REQUIRED"'>AND status IN ('PENDING_REVIEW', 'PENDING_PAYMENT')</when>
+          <when test="q.status != null">AND status = #{q.status}</when>
+        </choose>
         <if test="q.withdrawalScope != null">
           AND kol_id IN
           <foreach collection="q.withdrawalScope" item="id" open="(" separator="," close=")">#{id}</foreach>
@@ -633,7 +636,10 @@ public interface WithdrawalMapper {
       <where>
         <if test="q.applicationNo != null">AND application_no = #{q.applicationNo}</if>
         <if test="q.kolId != null">AND kol_id = #{q.kolId}</if>
-        <if test="q.status != null">AND status = #{q.status}</if>
+        <choose>
+          <when test='q.status == "ACTION_REQUIRED"'>AND status IN ('PENDING_REVIEW', 'PENDING_PAYMENT')</when>
+          <when test="q.status != null">AND status = #{q.status}</when>
+        </choose>
         <if test="q.withdrawalScope != null">
           AND kol_id IN
           <foreach collection="q.withdrawalScope" item="id" open="(" separator="," close=")">#{id}</foreach>

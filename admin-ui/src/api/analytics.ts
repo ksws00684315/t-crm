@@ -26,6 +26,7 @@ export interface Filters {
   creatorKeyword?: string;
   productKeyword?: string;
   inviterKeyword?: string;
+  affiliateOnly?: boolean;
 }
 export interface RankingQuery extends Filters {
   page: number;
