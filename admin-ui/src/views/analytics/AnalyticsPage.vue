@@ -59,7 +59,6 @@ import {
 import type { DateRange, PeriodMode } from "./board";
 import DashboardFilter from "./DashboardFilter.vue";
 import MetricCard from "./MetricCard.vue";
-import QuerySummary from "./QuerySummary.vue";
 
 defineOptions({ name: "AnalyticsPage" });
 
@@ -822,7 +821,6 @@ onUnmounted(stop);
       @reset="reset"
       @refresh="refresh"
     />
-    <QuerySummary v-if="result" :result="result" :options="options" />
     <el-alert
       v-if="result && (loading || failed)"
       :title="t(loading ? 'analytics.refreshingResults' : 'analytics.staleResults')"
