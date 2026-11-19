@@ -10,6 +10,10 @@ const zhCN = {
   prepay,
   finance,
   analytics: {
+    detailHeader: {
+      totalInvited: "总邀请达人数",
+      totalInvitedHint: "截至当前首次归属该邀请人的去重达人数，包含后来转出或停用的达人。"
+    },
     creatorCards: {
       selling: "有销售达人",
       sellingHint: "所选期间内有已支付订单的达人，按达人去重。",

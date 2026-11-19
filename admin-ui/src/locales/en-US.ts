@@ -7,6 +7,11 @@ const enUS: MessageSchema = {
   prepay,
   finance,
   analytics: {
+    detailHeader: {
+      totalInvited: "Total invited creators",
+      totalInvitedHint:
+        "Distinct creators first assigned to this inviter, including creators later transferred or disabled."
+    },
     creatorCards: {
       selling: "Creators with sales",
       sellingHint: "Distinct creators with paid orders during the selected period.",

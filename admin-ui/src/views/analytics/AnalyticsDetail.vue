@@ -4,6 +4,7 @@ import { Goods } from "@element-plus/icons-vue";
 import { useI18n } from "vue-i18n";
 import DataTable, { type DataColumn } from "@/components/DataTable.vue";
 import CopyText from "@/components/CopyText.vue";
+import AnalyticsDetailHeader from "./AnalyticsDetailHeader.vue";
 import CreatorIdentity from "./CreatorIdentity.vue";
 import ChartPanel from "@/components/dashboard/ChartPanel.vue";
 import {
@@ -639,21 +640,7 @@ function changeSize(next: number): void {
           >
         </div>
       </section>
-      <section v-else class="analytics-detail__identity">
-        <img v-if="row.imageUrl" :src="row.imageUrl" alt="" class="analytics-detail__image" />
-        <div>
-          <CreatorIdentity v-if="board === 'kol-ranking'" :name="name" :code="identityCode" heading />
-          <h2 v-else>{{ name }}</h2>
-          <div class="analytics-detail__metadata">
-            <CopyText v-if="board !== 'kol-ranking' && identityCode" :value="identityCode" />
-            <span v-if="row.related">{{ row.related }}</span>
-          </div>
-        </div>
-        <time class="analytics-detail__period"
-          >{{ filters.startDate }} – {{ filters.endDate }} ·
-          {{ t("analytics.drilldown.beijingTime") }}</time
-        >
-      </section>
+      <AnalyticsDetailHeader v-else :board="board" :row="row" :name="name" :period="filters" />
 
       <el-tabs v-model="tab">
         <el-tab-pane
@@ -983,12 +970,6 @@ function changeSize(next: number): void {
 }
 .analytics-detail__period {
   margin-inline-start: auto;
-}
-.analytics-detail__image {
-  width: var(--tcrm-control-height-large);
-  height: var(--tcrm-control-height-large);
-  border-radius: var(--tcrm-radius-control);
-  object-fit: cover;
 }
 .analytics-detail__identity--shop {
   gap: var(--tcrm-space-4);
