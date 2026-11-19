@@ -7,7 +7,8 @@ interface Queue<T> {
   rows: T[];
 }
 
-interface Rank {
+export interface Rank {
+  id: Count;
   name: string | null;
   code: string | null;
   quantity: Count;
@@ -17,7 +18,8 @@ interface Rank {
 export interface Workbench {
   businessDate: string;
   asOf: string;
-  sales?: { amount: string; orders: Count };
+  sales?: { totalAmount: string; totalOrders: Count; todayAmount: string; todayOrders: Count };
+  commission?: { totalAmount: string | null; todayAmount: string | null };
   topShops?: Rank[];
   topCreators?: Rank[];
   shops?: {
@@ -28,8 +30,7 @@ export interface Workbench {
     limit: Count | null;
     remaining: Count | null;
   };
-  activeLinks?: Count | null;
-  activeTokens?: Count | null;
+  processingJobs?: Count | null;
   jobs?: Queue<{
     jobCode: string;
     kolName: string | null;
@@ -37,7 +38,9 @@ export interface Workbench {
     totalCount: number;
     status: string;
   }>;
-  creators?: { visible: Count; approved: Count };
+  creators?: { visible: Count; today: Count };
+  promoting?: Count | null;
+  prepays?: Count | null;
   pending?: Queue<{
     code: string;
     name: string | null;
@@ -45,9 +48,17 @@ export interface Workbench {
     createdAt: string;
   }>;
   payouts?: Queue<{ applicationNo: string; amount: string; status: string; paused: boolean }>;
-  estimatedCommission?: string | null;
   unavailable: string[];
 }
+
+export type RankBoard = "SHOP" | "CREATOR";
+
+export const getWorkbenchRanks = (dimension: RankBoard, page = 1) =>
+  http.request<{ items: Rank[]; total: Count; page: number; size: number }>({
+    method: "get",
+    url: "/workbench/rankings",
+    params: { dimension, page }
+  });
 
 export const getWorkbench = () =>
   http.request<Workbench>({ method: "get", url: "/workbench/overview" });

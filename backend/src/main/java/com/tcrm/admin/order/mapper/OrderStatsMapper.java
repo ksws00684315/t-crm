@@ -2,12 +2,15 @@ package com.tcrm.admin.order.mapper;
 
 import com.baomidou.mybatisplus.annotation.InterceptorIgnore;
 import com.tcrm.admin.order.api.OrderStatsApi.BestCreatorDTO;
+import com.tcrm.admin.order.api.OrderStatsApi.CommissionWindowDTO;
 import com.tcrm.admin.order.api.OrderStatsApi.CreatorCommissionDTO;
 import com.tcrm.admin.order.api.OrderStatsApi.InviterCommissionDTO;
 import com.tcrm.admin.order.api.OrderStatsApi.RankDimension;
 import com.tcrm.admin.order.api.OrderStatsApi.RankFactsDTO;
+import com.tcrm.admin.order.api.OrderStatsApi.SalesWindowDTO;
 import com.tcrm.admin.order.api.OrderStatsApi.ScopeDTO;
 import com.tcrm.admin.order.api.OrderStatsApi.TotalsDTO;
+import com.tcrm.admin.order.api.OrderStatsApi.WorkbenchRankDTO;
 import java.math.BigDecimal;
 import java.time.Instant;
 import java.util.List;
@@ -290,6 +293,74 @@ public interface OrderStatsMapper {
       """)
   BigDecimal unsettledCommission(
       @Param("scope") ScopeDTO scope, @Param("from") Instant from, @Param("until") Instant until);
+
+  @InterceptorIgnore(tenantLine = "true")
+  @Select(
+      SCOPED_ORDERS
+          + """
+      SELECT COALESCE(SUM(pay_amount), 0) AS total_amount, COUNT(*) AS total_orders,
+        COALESCE(SUM(pay_amount) FILTER (WHERE pay_time &gt;= #{dayStart}), 0) AS today_amount,
+        COUNT(*) FILTER (WHERE pay_time &gt;= #{dayStart}) AS today_orders
+      FROM scoped_orders WHERE pay_time &lt; #{asOf}
+      </script>
+      """)
+  SalesWindowDTO salesWindow(
+      @Param("scope") ScopeDTO scope,
+      @Param("dayStart") Instant dayStart,
+      @Param("asOf") Instant asOf);
+
+  @InterceptorIgnore(tenantLine = "true")
+  @Select(
+      SCOPED_ORDERS
+          + """
+      , commission_lines AS (
+        SELECT p.pay_time, s.id, s.accrued_commission_cny
+        FROM scoped_orders p
+        JOIN crm_order_item i ON i.order_id = p.id AND i.tenant_id = #{scope.tenantId}
+          AND NOT i.is_deleted AND i.kol_id IS NOT NULL
+        LEFT JOIN crm_commission_item_state s ON s.order_item_id = i.id AND s.order_id = p.id
+          AND s.tenant_id = i.tenant_id AND s.kol_id = i.kol_id AND s.verified AND NOT s.is_deleted
+        WHERE p.pay_time &lt; #{asOf}
+      )
+      SELECT CASE WHEN COUNT(*) FILTER (WHERE id IS NULL) = 0
+          THEN COALESCE(SUM(accrued_commission_cny), 0) END AS total_amount,
+        CASE WHEN COUNT(*) FILTER (WHERE id IS NULL AND pay_time &gt;= #{dayStart}) = 0
+          THEN COALESCE(SUM(accrued_commission_cny) FILTER (WHERE pay_time &gt;= #{dayStart}), 0)
+        END AS today_amount
+      FROM commission_lines
+      </script>
+      """)
+  CommissionWindowDTO commissionWindow(
+      @Param("scope") ScopeDTO scope,
+      @Param("dayStart") Instant dayStart,
+      @Param("asOf") Instant asOf);
+
+  @InterceptorIgnore(tenantLine = "true")
+  @Select(
+      SCOPED_ORDERS
+          + """
+      <choose>
+        <when test="dimension.name() == 'SHOP'">
+          SELECT p.shop_id AS entity_id, COUNT(*) AS quantity, SUM(p.pay_amount) AS amount
+          FROM scoped_orders p WHERE p.pay_time &lt; #{asOf}
+          GROUP BY p.shop_id
+        </when>
+        <otherwise>
+          SELECT p.kol_id AS entity_id, SUM(i.quantity) AS quantity, SUM(i.pay_amount) AS amount
+          FROM scoped_orders p
+          JOIN crm_order_item i ON i.order_id = p.id AND i.tenant_id = #{scope.tenantId}
+            AND NOT i.is_deleted AND i.kol_id IS NOT NULL
+          WHERE p.pay_time &lt; #{asOf} AND p.kol_id IS NOT NULL
+          GROUP BY p.kol_id
+        </otherwise>
+      </choose>
+      ORDER BY amount DESC NULLS LAST, entity_id
+      </script>
+      """)
+  List<WorkbenchRankDTO> workbenchRanks(
+      @Param("scope") ScopeDTO scope,
+      @Param("dimension") RankDimension dimension,
+      @Param("asOf") Instant asOf);
 
   String COHORT_REFUND_WINDOW =
       """

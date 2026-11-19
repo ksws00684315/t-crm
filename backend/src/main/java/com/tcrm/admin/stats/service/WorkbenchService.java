@@ -1,19 +1,31 @@
 package com.tcrm.admin.stats.service;
 
 import com.tcrm.admin.commission.api.WithdrawalWorkbenchApi;
+import com.tcrm.admin.kol.api.KolApi;
+import com.tcrm.admin.kol.api.KolRefDTO;
 import com.tcrm.admin.kol.api.KolWorkbenchApi;
+import com.tcrm.admin.order.api.OrderStatsApi;
+import com.tcrm.admin.order.api.OrderStatsApi.CommissionWindowDTO;
+import com.tcrm.admin.order.api.OrderStatsApi.RankDimension;
+import com.tcrm.admin.order.api.OrderStatsApi.SalesWindowDTO;
+import com.tcrm.admin.order.api.OrderStatsApi.ScopeDTO;
 import com.tcrm.admin.product.api.ProductWorkbenchApi;
+import com.tcrm.admin.product.api.ShopAccessApi;
+import com.tcrm.admin.product.api.ShopAccessDTO;
+import com.tcrm.admin.security.api.AccountDTO;
 import com.tcrm.admin.security.api.CurrentUserContext;
 import com.tcrm.admin.shared.BusinessException;
 import com.tcrm.admin.shared.ErrorCode;
-import com.tcrm.admin.stats.service.AnalyticsRankingService.Board;
+import com.tcrm.admin.shared.PageResult;
 import com.tcrm.admin.stats.service.StatsOverviewService.FilterDTO;
 import java.math.BigDecimal;
 import java.time.Instant;
 import java.time.LocalDate;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.function.Function;
 import java.util.function.Supplier;
+import java.util.stream.Collectors;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.dao.DataAccessException;
@@ -25,8 +37,9 @@ public class WorkbenchService {
 
   private final CurrentUserContext current;
   private final StatsOverviewService stats;
-  private final ShopPerformanceService shopRanking;
-  private final AnalyticsRankingService rankings;
+  private final OrderStatsApi orders;
+  private final ShopAccessApi shopAccess;
+  private final KolApi kolDirectory;
   private final ProductWorkbenchApi product;
   private final KolWorkbenchApi kol;
   private final WithdrawalWorkbenchApi withdrawal;
@@ -34,101 +47,69 @@ public class WorkbenchService {
   public WorkbenchService(
       CurrentUserContext current,
       StatsOverviewService stats,
-      ShopPerformanceService shopRanking,
-      AnalyticsRankingService rankings,
+      OrderStatsApi orders,
+      ShopAccessApi shopAccess,
+      KolApi kolDirectory,
       ProductWorkbenchApi product,
       KolWorkbenchApi kol,
       WithdrawalWorkbenchApi withdrawal) {
     this.current = current;
     this.stats = stats;
-    this.shopRanking = shopRanking;
-    this.rankings = rankings;
+    this.orders = orders;
+    this.shopAccess = shopAccess;
+    this.kolDirectory = kolDirectory;
     this.product = product;
     this.kol = kol;
     this.withdrawal = withdrawal;
   }
 
   public Overview overview() {
-    var user = current.user();
-    if (user.tenantId() == null) {
-      throw new BusinessException(ErrorCode.AUTH_FORBIDDEN);
-    }
+    var user = tenantUser();
     var permissions = current.effectivePermissions(user);
     Instant now = Instant.now();
     LocalDate day = now.atZone(StatsPeriod.ZONE).toLocalDate();
     var filter = new FilterDTO(day, day, null, null, null, null).withAffiliateOnly(true);
     List<String> unavailable = new ArrayList<>();
-    boolean canShop = permissions.contains("dashboard:shop");
-    boolean canCreator = permissions.contains("dashboard:kol");
+    boolean canShop = permissions.contains(Ranking.SHOP.permission);
+    boolean canCreator = permissions.contains(Ranking.CREATOR.permission);
     boolean canProduct = permissions.contains("product:view");
     boolean canKol = permissions.contains("kol:view");
     boolean canWithdrawal =
         permissions.contains("withdrawal:review") || permissions.contains("withdrawal:pay");
 
     var sales =
-        read(
-            canShop || canCreator,
-            "sales",
-            unavailable,
-            () -> {
-              var metrics = stats.overview(filter).summary();
-              return new Sales(metrics.salesAmount(), metrics.paidOrderCount());
-            });
+        read(canShop || canCreator, "sales", unavailable, () -> stats.workbenchSales(filter, now));
     var topShops =
-        read(
-            canShop,
-            "topShops",
-            unavailable,
-            () ->
-                shopRanking.query(filter, 1, 20, "salesAmount", "desc").ranking().items().stream()
-                    .filter(row -> row.paidOrderCount() > 0)
-                    .limit(5)
-                    .map(
-                        row ->
-                            new Rank(
-                                row.shopName(),
-                                row.shopCode(),
-                                row.paidOrderCount(),
-                                row.salesAmount()))
-                    .toList());
+        read(canShop, "topShops", unavailable, () -> ranks(user, Ranking.SHOP, 1, 5, now).items());
     var topCreators =
         read(
             canCreator,
             "topCreators",
             unavailable,
-            () ->
-                rankings
-                    .query(Board.CREATOR, filter, null, 1, 20, "salesAmount", "desc")
-                    .ranking()
-                    .items()
-                    .stream()
-                    .filter(row -> row.metrics().paidOrderCount() > 0)
-                    .limit(5)
-                    .map(
-                        row ->
-                            new Rank(
-                                row.name(),
-                                row.code(),
-                                row.metrics().units(),
-                                row.metrics().salesAmount()))
-                    .toList());
+            () -> ranks(user, Ranking.CREATOR, 1, 5, now).items());
     var shops = read(canProduct, "shops", unavailable, product::shops);
-    var activeLinks = read(canProduct, "activeLinks", unavailable, product::activeLinks);
     var jobs = read(canProduct, "jobs", unavailable, product::failedJobs);
-    var activeTokens =
+    var processingJobs = read(canProduct, "processingJobs", unavailable, product::processingJobs);
+    var creators =
         read(
-            permissions.contains("kol:copy-token"), "activeTokens", unavailable, kol::activeTokens);
-    var creators = read(canKol, "creators", unavailable, kol::counts);
+            canKol,
+            "creators",
+            unavailable,
+            () -> kol.counts(day.atStartOfDay(StatsPeriod.ZONE).toInstant(), now));
+    var promoting = read(canKol, "promoting", unavailable, kol::promoting);
     var pending = read(canKol, "pending", unavailable, kol::pending);
+    boolean canPrepay =
+        permissions.contains("prepay:review")
+            || permissions.contains("prepay:finance-review")
+            || permissions.contains("prepay:pay");
+    var prepays =
+        read(canPrepay, "prepays", unavailable, () -> withdrawal.pendingPrepays(user, permissions));
     var payouts = read(canWithdrawal, "payouts", unavailable, () -> withdrawal.pending(user));
 
     boolean canCommission = (canShop || canCreator) && permissions.contains("commission:view");
-    var estimatedCommission =
+    var commission =
         read(
-            canCommission,
-            "estimatedCommission",
-            unavailable,
-            () -> stats.unsettledCommission(filter));
+            canCommission, "commission", unavailable, () -> stats.workbenchCommission(filter, now));
     return new Overview(
         day,
         now,
@@ -136,14 +117,99 @@ public class WorkbenchService {
         topShops,
         topCreators,
         shops,
-        activeLinks,
-        activeTokens,
         jobs,
+        processingJobs,
         creators,
+        promoting,
         pending,
         payouts,
-        estimatedCommission,
+        prepays,
+        commission,
         unavailable);
+  }
+
+  public PageResult<Rank> ranks(Ranking board, int page) {
+    var user = tenantUser();
+    if (!current.effectivePermissions(user).contains(board.permission)) {
+      throw new BusinessException(ErrorCode.AUTH_FORBIDDEN);
+    }
+    if (page < 1 || page > PageResult.MAX_PAGE) {
+      throw new BusinessException(ErrorCode.COMMON_VALIDATION_FAILED);
+    }
+    return ranks(user, board, page, 10, Instant.now());
+  }
+
+  private AccountDTO tenantUser() {
+    var user = current.user();
+    if (user.tenantId() == null) {
+      throw new BusinessException(ErrorCode.AUTH_FORBIDDEN);
+    }
+    return user;
+  }
+
+  private PageResult<Rank> ranks(AccountDTO user, Ranking board, int page, int size, Instant now) {
+    var scope =
+        new ScopeDTO(
+            user.tenantId(),
+            user.ownScope() ? user.id() : null,
+            null,
+            null,
+            null,
+            null,
+            null,
+            null,
+            null,
+            true);
+    var shops =
+        board == Ranking.SHOP
+            ? shopAccess.listShops().stream()
+                .collect(Collectors.toMap(ShopAccessDTO::id, Function.identity()))
+            : java.util.Map.<Long, ShopAccessDTO>of();
+    if (board == Ranking.SHOP) {
+      scope = scope.withVisibleShops(List.copyOf(shops.keySet()));
+    }
+    var facts = orders.workbenchRanks(scope, board.dimension, now);
+    var selected = facts.stream().skip((long) (page - 1) * size).limit(size).toList();
+    var creators =
+        board == Ranking.CREATOR
+            ? kolDirectory
+                .listByIdsIncludingDeleted(
+                    selected.stream().map(OrderStatsApi.WorkbenchRankDTO::entityId).toList())
+                .stream()
+                .collect(Collectors.toMap(KolRefDTO::id, Function.identity()))
+            : java.util.Map.<Long, KolRefDTO>of();
+    var rows =
+        selected.stream()
+            .map(
+                row -> {
+                  var shop = shops.get(row.entityId());
+                  var creator = creators.get(row.entityId());
+                  if (shop != null) {
+                    return new Rank(
+                        row.entityId(), shop.name(), shop.shopCode(), row.quantity(), row.amount());
+                  }
+                  return new Rank(
+                      row.entityId(),
+                      creator == null ? null : creator.name(),
+                      creator == null ? null : creator.kolCode(),
+                      row.quantity(),
+                      row.amount());
+                })
+            .toList();
+    return new PageResult<>(rows, facts.size(), page, size);
+  }
+
+  public enum Ranking {
+    SHOP("dashboard:shop", RankDimension.SHOP),
+    CREATOR("dashboard:kol", RankDimension.KOL);
+
+    private final String permission;
+    private final RankDimension dimension;
+
+    Ranking(String permission, RankDimension dimension) {
+      this.permission = permission;
+      this.dimension = dimension;
+    }
   }
 
   private static <T> T read(
@@ -167,20 +233,19 @@ public class WorkbenchService {
   public record Overview(
       LocalDate businessDate,
       Instant asOf,
-      Sales sales,
+      SalesWindowDTO sales,
       List<Rank> topShops,
       List<Rank> topCreators,
       ProductWorkbenchApi.ShopSummary shops,
-      Long activeLinks,
-      Long activeTokens,
       ProductWorkbenchApi.FailedJobs jobs,
+      Long processingJobs,
       KolWorkbenchApi.Counts creators,
+      Long promoting,
       KolWorkbenchApi.Pending pending,
       WithdrawalWorkbenchApi.Pending payouts,
-      BigDecimal estimatedCommission,
+      Long prepays,
+      CommissionWindowDTO commission,
       List<String> unavailable) {}
 
-  public record Sales(BigDecimal amount, long orders) {}
-
-  public record Rank(String name, String code, long quantity, BigDecimal amount) {}
+  public record Rank(long id, String name, String code, long quantity, BigDecimal amount) {}
 }

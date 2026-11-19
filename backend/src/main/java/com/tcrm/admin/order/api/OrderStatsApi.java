@@ -19,6 +19,19 @@ public interface OrderStatsApi {
     }
   }
 
+  List<WorkbenchRankDTO> workbenchRanks(ScopeDTO scope, RankDimension dimension, Instant asOf);
+
+  record WorkbenchRankDTO(long entityId, long quantity, BigDecimal amount) {}
+
+  SalesWindowDTO salesWindow(ScopeDTO scope, Instant dayStart, Instant asOf);
+
+  CommissionWindowDTO commissionWindow(ScopeDTO scope, Instant dayStart, Instant asOf);
+
+  record SalesWindowDTO(
+      BigDecimal totalAmount, long totalOrders, BigDecimal todayAmount, long todayOrders) {}
+
+  record CommissionWindowDTO(BigDecimal totalAmount, BigDecimal todayAmount) {}
+
   TotalsDTO totals(ScopeDTO scope, Instant from, Instant until);
 
   /** Null when a paid affiliate line has no reliable current commission snapshot. */

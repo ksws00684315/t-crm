@@ -1,8 +1,5 @@
 package com.tcrm.admin.kol.api;
 
-import com.tcrm.admin.kol.model.CopyTokenDisplayStatus;
-import com.tcrm.admin.kol.service.CopyTokenFilterDTO;
-import com.tcrm.admin.kol.service.CopyTokenService;
 import com.tcrm.admin.kol.service.KolFilterDTO;
 import com.tcrm.admin.kol.service.KolService;
 import java.time.Instant;
@@ -12,15 +9,21 @@ import org.springframework.stereotype.Component;
 @Component
 public class KolWorkbenchApi {
   private final KolService kols;
-  private final CopyTokenService tokens;
 
-  public KolWorkbenchApi(KolService kols, CopyTokenService tokens) {
+  public KolWorkbenchApi(KolService kols) {
     this.kols = kols;
-    this.tokens = tokens;
   }
 
-  public Counts counts() {
-    return new Counts(kols.page(filter(null, 1)).total(), kols.page(filter("APPROVED", 1)).total());
+  public Counts counts(Instant dayStart, Instant asOf) {
+    return new Counts(
+        kols.workbenchCreatorCount(null, asOf), kols.workbenchCreatorCount(dayStart, asOf));
+  }
+
+  public long promoting() {
+    return kols.page(
+            new KolFilterDTO(
+                null, null, null, null, null, null, null, null, "PROMOTING", null, 1, 1))
+        .total();
   }
 
   public Pending pending() {
@@ -31,15 +34,8 @@ public class KolWorkbenchApi {
         page.items().stream()
             .map(
                 row ->
-                    new Review(
-                        row.kolCode(), row.name(), inviters.get(row.id()), row.createTime()))
+                    new Review(row.kolCode(), row.name(), inviters.get(row.id()), row.createTime()))
             .toList());
-  }
-
-  public long activeTokens() {
-    return tokens
-        .page(new CopyTokenFilterDTO(null, null, null, CopyTokenDisplayStatus.ACTIVE, 1, 1))
-        .total();
   }
 
   private static KolFilterDTO filter(String reviewStatus, int size) {
@@ -47,7 +43,7 @@ public class KolWorkbenchApi {
         null, null, null, null, null, null, null, reviewStatus, null, null, 1, size);
   }
 
-  public record Counts(long visible, long approved) {}
+  public record Counts(long visible, long today) {}
 
   public record Pending(long total, List<Review> rows) {}
 

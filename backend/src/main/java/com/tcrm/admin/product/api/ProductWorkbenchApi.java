@@ -1,9 +1,8 @@
 package com.tcrm.admin.product.api;
 
+import com.tcrm.admin.product.model.CopyJobDO;
 import com.tcrm.admin.product.service.CopyJobQueryDTO;
 import com.tcrm.admin.product.service.CopyJobQueryService;
-import com.tcrm.admin.product.service.KolItemFilterDTO;
-import com.tcrm.admin.product.service.KolItemService;
 import com.tcrm.admin.product.service.ShopService;
 import java.util.List;
 import org.springframework.stereotype.Component;
@@ -11,12 +10,10 @@ import org.springframework.stereotype.Component;
 @Component
 public class ProductWorkbenchApi {
   private final ShopService shops;
-  private final KolItemService links;
   private final CopyJobQueryService jobs;
 
-  public ProductWorkbenchApi(ShopService shops, KolItemService links, CopyJobQueryService jobs) {
+  public ProductWorkbenchApi(ShopService shops, CopyJobQueryService jobs) {
     this.shops = shops;
-    this.links = links;
     this.jobs = jobs;
   }
 
@@ -45,8 +42,8 @@ public class ProductWorkbenchApi {
             : null);
   }
 
-  public long activeLinks() {
-    return links.page(new KolItemFilterDTO(null, null, null, "ENABLED", 1, 1)).total();
+  public long processingJobs() {
+    return jobs.page(new CopyJobQueryDTO(null, null, CopyJobDO.STATUS_PROCESSING, 1, 1)).total();
   }
 
   public FailedJobs failedJobs() {

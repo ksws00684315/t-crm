@@ -37,6 +37,22 @@ public class OrderStatsService implements OrderStatsApi {
   }
 
   @Override
+  public List<WorkbenchRankDTO> workbenchRanks(
+      ScopeDTO scope, RankDimension dimension, Instant asOf) {
+    return mapper.workbenchRanks(scope, dimension, asOf);
+  }
+
+  @Override
+  public SalesWindowDTO salesWindow(ScopeDTO scope, Instant dayStart, Instant asOf) {
+    return mapper.salesWindow(scope, dayStart, asOf);
+  }
+
+  @Override
+  public CommissionWindowDTO commissionWindow(ScopeDTO scope, Instant dayStart, Instant asOf) {
+    return mapper.commissionWindow(scope, dayStart, asOf);
+  }
+
+  @Override
   public TotalsDTO totals(ScopeDTO scope, Instant from, Instant until) {
     return mapper.totals(scope, from, until);
   }

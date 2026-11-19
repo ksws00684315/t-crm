@@ -717,6 +717,32 @@ class OrderStatsIT {
           "UPDATE crm_commission_item_state SET released_commission_cny = 8 WHERE id = 701");
       session.clearCache();
       assertThat(orders.unsettledCommission(affiliate, FROM, UNTIL)).isZero();
+      var commissionWindow = orders.commissionWindow(affiliate, FROM, UNTIL);
+      assertThat(commissionWindow.todayAmount()).isEqualByComparingTo("8");
+      assertThat(commissionWindow.totalAmount()).isEqualByComparingTo("8");
+      var salesWindow = orders.salesWindow(affiliate, FROM, UNTIL);
+      assertThat(orders.workbenchRanks(affiliate, RankDimension.SHOP, UNTIL))
+          .singleElement()
+          .satisfies(
+              row -> {
+                assertThat(row.entityId()).isEqualTo(1);
+                assertThat(row.quantity()).isEqualTo(salesWindow.totalOrders());
+                assertThat(row.amount()).isEqualByComparingTo(salesWindow.totalAmount());
+              });
+      assertThat(orders.workbenchRanks(affiliate, RankDimension.KOL, UNTIL))
+          .singleElement()
+          .satisfies(
+              row -> {
+                assertThat(row.entityId()).isEqualTo(11);
+                assertThat(row.quantity()).isEqualTo(2);
+                assertThat(row.amount()).isEqualByComparingTo(salesWindow.totalAmount());
+              });
+      var today = orders.totals(affiliate, FROM, UNTIL);
+      assertThat(salesWindow.todayAmount()).isEqualByComparingTo(today.sales());
+      assertThat(salesWindow.todayOrders()).isEqualTo(today.paidOrders());
+      var nextDay = orders.salesWindow(affiliate, UNTIL, UNTIL.plusSeconds(60));
+      assertThat(nextDay.todayOrders()).isZero();
+      assertThat(nextDay.totalOrders()).isEqualTo(salesWindow.todayOrders());
       jdbc.update("UPDATE crm_order_item SET kol_id = 11 WHERE id = 2");
       jdbc.update(
           "UPDATE crm_order_item SET item_name = 'Other', weidian_item_id = 'B', product_id = NULL WHERE id = 2");

@@ -95,6 +95,15 @@ public class KolService {
     this.tokens = tokens;
   }
 
+  public long workbenchCreatorCount(Instant from, Instant asOf) {
+    var user = current.user();
+    return kols.selectCount(
+        new LambdaQueryWrapper<KolDO>()
+            .eq(user.ownScope(), KolDO::getBdUserId, user.id())
+            .ge(from != null, KolDO::getCreateTime, from)
+            .lt(KolDO::getCreateTime, asOf));
+  }
+
   public PageResult<KolDTO> page(KolFilterDTO filter) {
     AccountDTO user = current.user();
     Long bd = user.ownScope() ? null : filter.bdUserId();

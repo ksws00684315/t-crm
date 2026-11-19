@@ -49,10 +49,14 @@ public class StatsOverviewService {
     return overview(resolve(filter));
   }
 
-  BigDecimal unsettledCommission(FilterDTO filter) {
+  OrderStatsApi.SalesWindowDTO workbenchSales(FilterDTO filter, Instant asOf) {
     var resolved = resolve(filter);
-    return orders.unsettledCommission(
-        resolved.scope(), resolved.period().from(), resolved.period().until());
+    return orders.salesWindow(resolved.scope(), resolved.period().from(), asOf);
+  }
+
+  OrderStatsApi.CommissionWindowDTO workbenchCommission(FilterDTO filter, Instant asOf) {
+    var resolved = resolve(filter);
+    return orders.commissionWindow(resolved.scope(), resolved.period().from(), asOf);
   }
 
   boolean canViewCommission() {
