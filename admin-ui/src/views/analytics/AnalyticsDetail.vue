@@ -299,7 +299,14 @@ const productOrderColumns = computed<DataColumn[]>(() => {
         ]
       : [
           { key: "soldUnits", label: t("analytics.units"), minWidth: 72 },
-          { key: "salesAmount", label: t("analytics.salesAmount"), minWidth: 106, amount: true }
+          { key: "salesAmount", label: t("analytics.salesAmount"), minWidth: 106, amount: true },
+          { key: "refundAmount", label: local("refundAmount"), minWidth: 112, amount: true },
+          {
+            key: "netTransactionAmount",
+            label: local("netTransactionAmount"),
+            minWidth: 112,
+            amount: true
+          }
         ])
   ];
 });
@@ -470,7 +477,11 @@ const detailHeaders = computed(() =>
         : evidenceKey
           ? t(`analytics.evidenceDefinitions.${evidenceKey}`)
           : termHint(
-              key === "amount" ? "completedRefundAmount" : key === "net" ? "netSalesAmount" : key
+              key === "amount"
+                ? "completedRefundAmount"
+                : ["net", "netTransactionAmount"].includes(key)
+                  ? "netSalesAmount"
+                  : key
             );
     const sortBy =
       key === "amount" && tab.value === "ORDERS"
