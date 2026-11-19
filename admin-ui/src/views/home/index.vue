@@ -139,7 +139,7 @@ const panels = computed(() => {
     },
     {
       key: "topCreators",
-      columns: [column("name", 105), column("units", 60), column("amount", 110, true)],
+      columns: [column("name", 105), column("units", 90), column("amount", 110, true)],
       rows: rankRows(overview.topCreators),
       to: { name: "AnalyticsKolRanking", query }
     },
