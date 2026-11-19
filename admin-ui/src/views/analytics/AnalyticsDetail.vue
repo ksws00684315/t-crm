@@ -279,22 +279,28 @@ const productOrderColumns = computed<DataColumn[]>(() => {
   return [
     {
       key: "orderNo",
-      label: refund ? t("analytics.drilldown.orderNo") : local("orderPaidTime"),
-      minWidth: refund ? 150 : 176,
+      label: local(refund ? "orderRefundTime" : "orderPaidTime"),
+      minWidth: 176,
       align: "left"
     },
     { key: "sku", label: "SKU", minWidth: 125, align: "left" },
-    ...(refund ? [{ key: "eventTime", label: productText("refundTime"), minWidth: 156 }] : []),
-    {
-      key: "shopName",
-      label: refund ? productText("sellingShop") : t("analytics.shop"),
-      minWidth: 110
-    },
+    { key: "shopName", label: t("analytics.shop"), minWidth: 110 },
     { key: "creatorName", label: t("analytics.creator"), minWidth: 144 },
-    ...(refund ? [{ key: "spuId", label: local("spuId"), minWidth: 120 }] : []),
     { key: "transactionItemId", label: productText("transactionItemId"), minWidth: 120 },
-    { key: "soldUnits", label: t("analytics.units"), minWidth: 72 },
-    { key: "salesAmount", label: t("analytics.salesAmount"), minWidth: 106, amount: true }
+    ...(refund
+      ? [
+          { key: "refundUnits", label: t("analytics.refundUnits"), minWidth: 100 },
+          {
+            key: "amount",
+            label: t("analytics.completedRefundAmount"),
+            minWidth: 106,
+            amount: true
+          }
+        ]
+      : [
+          { key: "soldUnits", label: t("analytics.units"), minWidth: 72 },
+          { key: "salesAmount", label: t("analytics.salesAmount"), minWidth: 106, amount: true }
+        ])
   ];
 });
 
@@ -438,8 +444,7 @@ const detailHeaders = computed(() =>
         ? "settlementTime"
         : tab.value === "settlements" && key === "amount"
           ? "settlement"
-          : key === "orderNo" &&
-              ((shop.value && tab.value !== "settlements") || (product.value && !refund))
+          : key === "orderNo" && ((shop.value && tab.value !== "settlements") || product.value)
             ? refund
               ? "orderRefundTime"
               : "orderPaidTime"
@@ -457,18 +462,16 @@ const detailHeaders = computed(() =>
             ? key
             : null;
     const hint =
-      product.value && tab.value === "REFUNDS" && ["soldUnits", "salesAmount"].includes(key)
-        ? productText("originalSaleHint")
-        : (shop.value ||
-              (product.value && key === "orderNo" && !refund) ||
-              key === "refundAmount") &&
-            te(`analytics.shopDrawer.definitions.${localKey}`)
-          ? t(`analytics.shopDrawer.definitions.${localKey}`)
-          : evidenceKey
-            ? t(`analytics.evidenceDefinitions.${evidenceKey}`)
-            : termHint(
-                key === "amount" ? "completedRefundAmount" : key === "net" ? "netSalesAmount" : key
-              );
+      (shop.value ||
+        (product.value && ["orderNo", "refundUnits"].includes(key)) ||
+        key === "refundAmount") &&
+      te(`analytics.shopDrawer.definitions.${localKey}`)
+        ? t(`analytics.shopDrawer.definitions.${localKey}`)
+        : evidenceKey
+          ? t(`analytics.evidenceDefinitions.${evidenceKey}`)
+          : termHint(
+              key === "amount" ? "completedRefundAmount" : key === "net" ? "netSalesAmount" : key
+            );
     const sortBy =
       key === "amount" && tab.value === "ORDERS"
         ? "SALES_AMOUNT"
@@ -934,7 +937,7 @@ function changeSize(next: number): void {
         <template #cell-orderNo="{ row: entry }">
           <div class="analytics-detail__stack">
             <CopyText :value="entry.orderNo" />
-            <small v-if="(shop && tab !== 'settlements') || (product && tab === 'ORDERS')">{{
+            <small v-if="(shop && tab !== 'settlements') || product">{{
               eventTime.format(new Date(entry.eventTime))
             }}</small>
           </div>
@@ -978,7 +981,7 @@ function changeSize(next: number): void {
               'analytics-detail__amount--added':
                 tab === 'settlements' && entry.amountType === 'INCREASE',
               'analytics-detail__amount--deducted':
-                shop && (tab === 'REFUNDS' || entry.amountType === 'REFUND')
+                tab === 'REFUNDS' || (shop && entry.amountType === 'REFUND')
             }"
             >{{ entry.amount == null ? "—" : formatAmountWithCurrency(String(entry.amount)) }}</span
           >
