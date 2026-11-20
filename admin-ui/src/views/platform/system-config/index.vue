@@ -138,7 +138,6 @@ onMounted(load);
             maxlength="100"
             :placeholder="t('systemConfig.keywordPlaceholder')"
             data-test="config-keyword"
-            style="width: 220px"
           />
         </el-form-item>
       </template>

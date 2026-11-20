@@ -113,9 +113,16 @@ export const getConfig = () =>
   call<SettlementConfig>("get", "/commission/settlement-configs/current", {}, preview =>
     preview.getConfig(role(), scenario())
   );
-export const saveConfig = (payload: SettlementConfig) =>
-  call<SettlementConfig>("put", "/commission/settlement-configs/current", payload, preview =>
-    previewAction("configure", () => preview.saveConfig(role(), scenario(), payload))
+export const saveConfig = (config: SettlementConfig) =>
+  call<SettlementConfig>(
+    "put",
+    "/commission/settlement-configs/current",
+    {
+      version: config.version,
+      minimum: config.minimum,
+      days: config.channels.find(channel => channel.code === "WEIDIAN")?.days
+    },
+    preview => previewAction("configure", () => preview.saveConfig(role(), scenario(), config))
   );
 export const listSettlements = (query: SettlementQuery) =>
   call<Page<Settlement>>("get", "/commission/settlement-details", query, preview =>

@@ -12,4 +12,16 @@ public record LibraryKolFilter(
     String outreachStatus,
     String followUpOwner,
     int page,
-    int size) {}
+    int size,
+    SortField sortBy,
+    SortOrder sortOrder) {
+  public enum SortField {
+    FOLLOWERS,
+    GRADE
+  }
+
+  public enum SortOrder {
+    ASC,
+    DESC
+  }
+}

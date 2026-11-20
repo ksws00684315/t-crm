@@ -60,6 +60,11 @@ async function save() {
     !(await form.value?.validate().catch(() => false))
   )
     return;
+  const days = config.value?.channels.find(channel => channel.code === "WEIDIAN")?.days;
+  if (typeof days !== "number" || !Number.isInteger(days) || days < 0 || days > 365) {
+    ElMessage.error(t("finance.validFreezeDays"));
+    return;
+  }
   busy.value = true;
   try {
     config.value = await saveConfig(
@@ -120,10 +125,9 @@ onMounted(load);
         :paged="false"
         @refresh="load"
       >
-        <template #cell-channelCode="{ row }">{{ row.code }}</template
-        ><template #cell-channelName="{ row }">{{
-          row.code === "WEIDIAN" ? t("finance.weidian") : row.name
-        }}</template
+        <template #cell-channelCode="{ row }">{{ row.code }}</template><template
+          #cell-channelName="{ row }"
+          >{{ row.code === "WEIDIAN" ? t("finance.weidian") : row.name }}</template
         ><template #cell-releaseBasis="{ row }">{{
           t(`finance.${row.basis ?? "freezeBasis"}`)
         }}</template>

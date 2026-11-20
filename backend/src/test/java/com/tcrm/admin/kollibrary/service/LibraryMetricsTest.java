@@ -81,12 +81,16 @@ class LibraryMetricsTest {
         LibraryMetrics.totals(
             List.of(
                 new LibraryMetrics.ContentRecord(null, null, null, null, null, null),
-                new LibraryMetrics.ContentRecord(3L, 1L, d("10.00"), d("0.00"), null, d("100"))));
+                new LibraryMetrics.ContentRecord(
+                    3L, 1L, d("10.00"), d("2.30"), d("1.20"), d("100"))));
     assertThat(totals.clicks()).isEqualTo(3);
     assertThat(totals.orders()).isEqualTo(1);
     assertThat(totals.gmv()).isEqualByComparingTo("10.00");
-    assertThat(totals.totalCost()).isEqualByComparingTo("10.00");
-    assertThat(totals.roi()).isEqualByComparingTo("1.00");
+    assertThat(totals.commissionCost()).isEqualByComparingTo("10.00");
+    assertThat(totals.sampleCost()).isEqualByComparingTo("2.30");
+    assertThat(totals.slotFee()).isEqualByComparingTo("1.20");
+    assertThat(totals.totalCost()).isEqualByComparingTo("13.50");
+    assertThat(totals.roi()).isEqualByComparingTo("0.74");
   }
 
   @Test

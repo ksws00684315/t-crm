@@ -15,6 +15,8 @@ public record KolDTO(
     List<SocialAccountDTO> socialAccounts,
     Long bdUserId,
     String bdUserName,
+    String bdDiscord,
+    String bdWhatsapp,
     BigDecimal defaultRate,
     Integer status,
     String remark,

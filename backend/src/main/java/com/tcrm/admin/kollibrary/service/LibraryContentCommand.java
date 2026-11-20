@@ -9,13 +9,12 @@ import java.time.LocalDate;
  */
 public record LibraryContentCommand(
     String publishUrl,
+    String publishTitle,
     LocalDate publishDate,
     String contentForm,
-    Long clicks,
-    Long orders,
-    BigDecimal gmv,
-    String sampleType,
+    String sampleStatus,
     BigDecimal sampleCost,
     BigDecimal slotFee,
     BigDecimal commissionRate,
-    String nextAction) {}
+    String nextAction,
+    String remark) {}

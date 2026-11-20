@@ -133,6 +133,24 @@ class SystemConfigIT {
   }
 
   @Test
+  void shouldAcceptConvertBatchLimitAboveTheOldCeiling() throws Exception {
+    String platform = CompanySessions.login(mvc, json, "bootstrap", PASSWORD);
+
+    // Task 155: the per-request limit follows the setting, so 6000 is a valid value now.
+    putConfig(platform, "product-links.max-convert-items", "6000").andExpect(status().isOk());
+    assertThat(configs.getInt("product-links.max-convert-items")).isEqualTo(6000);
+
+    putConfig(platform, "product-links.max-convert-items", "1000001")
+        .andExpect(status().isBadRequest());
+
+    mvc.perform(
+            delete("/admin-api/platform/system-configs/product-links.max-convert-items")
+                .header(TOKEN, platform))
+        .andExpect(status().isOk());
+    assertThat(configs.getInt("product-links.max-convert-items")).isEqualTo(500);
+  }
+
+  @Test
   void shouldExposeOnlyThePublicContractWithoutLogin() throws Exception {
     mvc.perform(get("/admin-api/public/site-config"))
         .andExpect(status().isOk())

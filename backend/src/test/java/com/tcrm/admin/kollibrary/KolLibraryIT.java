@@ -11,6 +11,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 
 import com.tcrm.admin.CompanySessions;
 import com.tcrm.admin.WeidianTestProperties;
+import com.tcrm.admin.kollibrary.service.LibraryKolWorkbook;
 import java.io.ByteArrayInputStream;
 import java.io.ByteArrayOutputStream;
 import java.time.Duration;
@@ -26,7 +27,7 @@ import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
 import org.apache.poi.ss.usermodel.IndexedColors;
-import org.apache.poi.xssf.usermodel.XSSFRow;
+import org.apache.poi.xssf.usermodel.XSSFSheet;
 import org.apache.poi.xssf.usermodel.XSSFWorkbook;
 import org.awaitility.Awaitility;
 import org.junit.jupiter.api.BeforeEach;
@@ -180,6 +181,163 @@ class KolLibraryIT {
   }
 
   @Test
+  void shouldSortFilteredCreatorsBeforePaging() throws Exception {
+    String token = library.token();
+    var first = profile("sort_first", "Sort team");
+    first.put("followers", 900);
+    first.put("grade", "C");
+    create(token, first).andExpect(status().isOk());
+    var second = profile("sort_second", "Sort team");
+    second.put("followers", 12000);
+    second.put("grade", "S");
+    create(token, second).andExpect(status().isOk());
+    var third = profile("sort_third", "Sort team");
+    third.put("followers", 10000);
+    third.put("grade", "A");
+    create(token, third).andExpect(status().isOk());
+    createOk(token, "sort_unrated", "Sort team");
+    jdbc.update(
+        "UPDATE crm_library_kol SET followers = NULL, grade = NULL WHERE kol_username = ?",
+        "sort_unrated");
+    createOk(token, "sort_excluded", "Different team");
+
+    assertSortedPage(token, "FOLLOWERS", "ASC", 1, "sort_first", "sort_third");
+    assertSortedPage(token, "FOLLOWERS", "DESC", 2, "sort_first", "sort_unrated");
+    assertSortedPage(token, "GRADE", "ASC", 2, "sort_second", "sort_unrated");
+    assertSortedPage(token, "GRADE", "DESC", 1, "sort_second", "sort_third");
+  }
+
+  private void assertSortedPage(
+      String token, String field, String direction, int page, String first, String second)
+      throws Exception {
+    mvc.perform(
+            get(LIB)
+                .header(TOKEN, token)
+                .param("followUpOwner", "Sort team")
+                .param("page", Integer.toString(page))
+                .param("size", "2")
+                .param("sortBy", field)
+                .param("sortOrder", direction))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.data.total").value(4))
+        .andExpect(jsonPath("$.data.items[0].kolUsername").value(first))
+        .andExpect(jsonPath("$.data.items[1].kolUsername").value(second));
+  }
+
+  @Test
+  void shouldSumSavedWeeksAndRefreshContentAndCreatorTotals() throws Exception {
+    String token = library.token();
+    String id = createOk(token, "weekly_creator", "Amy BD");
+    String path = LIB + "/" + id + "/contents";
+    var item = content("2026-10-01");
+    item.put("publishTitle", "Weekly video");
+    var created =
+        mvc.perform(
+                post(path)
+                    .header(TOKEN, token)
+                    .contentType(MediaType.APPLICATION_JSON)
+                    .content(json.writeValueAsString(item)))
+            .andExpect(status().isOk())
+            .andReturn();
+    var contentId =
+        json.readTree(created.getResponse().getContentAsString())
+            .path("data")
+            .path("id")
+            .asString();
+    String weekly = path + "/" + contentId + "/weekly-data";
+    // This content already had aggregate figures before weekly tracking existed.
+    jdbc.update(
+        "UPDATE crm_library_kol_content SET clicks = 50, orders = 2, gmv = 8.50 WHERE id = ?",
+        Long.parseLong(contentId));
+    String thisWeek =
+        LocalDate.now(java.time.ZoneId.of("Asia/Shanghai"))
+            .with(java.time.temporal.TemporalAdjusters.previousOrSame(java.time.DayOfWeek.MONDAY))
+            .toString();
+    String valid =
+        "{\"weekStart\":\""
+            + thisWeek
+            + "\",\"clicks\":\"123\",\"orders\":\"4\",\"gmv\":\"56.78\"}";
+    mvc.perform(
+            post(weekly)
+                .header(TOKEN, token)
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(valid))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.data[0].clicks").value("123"));
+    mvc.perform(
+            post(weekly)
+                .header(TOKEN, token)
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(valid))
+        .andExpect(status().isBadRequest());
+    mvc.perform(
+            post(weekly)
+                .header(TOKEN, token)
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(valid.replace(thisWeek, LocalDate.parse(thisWeek).plusDays(1).toString())))
+        .andExpect(status().isBadRequest());
+    mvc.perform(
+            put(weekly)
+                .header(TOKEN, token)
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(valid.replace("123", "456").replace("56.78", "99.89")))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.data[0].clicks").value("456"));
+    mvc.perform(
+            post(weekly)
+                .header(TOKEN, token)
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(
+                    valid.replace(thisWeek, LocalDate.parse(thisWeek).minusWeeks(10).toString())))
+        .andExpect(status().isBadRequest());
+    mvc.perform(
+            post(weekly)
+                .header(TOKEN, token)
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(
+                    valid.replace(thisWeek, LocalDate.parse(thisWeek).plusWeeks(1).toString())))
+        .andExpect(status().isBadRequest());
+    mvc.perform(
+            put(weekly)
+                .header(TOKEN, other.token())
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(valid))
+        .andExpect(status().isNotFound());
+    mvc.perform(get(weekly).header(TOKEN, other.token())).andExpect(status().isNotFound());
+    String earlierWeek = LocalDate.parse(thisWeek).minusWeeks(1).toString();
+    String earlier =
+        valid.replace(thisWeek, earlierWeek).replace("123", "111").replace("56.78", "20.20");
+    mvc.perform(
+            post(weekly)
+                .header(TOKEN, token)
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(earlier))
+        .andExpect(status().isOk());
+    mvc.perform(
+            put(weekly)
+                .header(TOKEN, token)
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(earlier.replace("111", "112").replace("20.20", "20.21")))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.data[0].clicks").value("112"))
+        .andExpect(jsonPath("$.data[1].clicks").value("456"));
+    mvc.perform(get(weekly).header(TOKEN, token))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.data.length()").value(2));
+    mvc.perform(get(path).header(TOKEN, token))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.data[0].publishTitle").value("Weekly video"))
+        .andExpect(jsonPath("$.data[0].clicks").value("618"))
+        .andExpect(jsonPath("$.data[0].orders").value("10"))
+        .andExpect(jsonPath("$.data[0].gmv").value("128.60"));
+    mvc.perform(get(LIB + "/" + id).header(TOKEN, token))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.data.totals.clicks").value(618))
+        .andExpect(jsonPath("$.data.totals.orders").value(10))
+        .andExpect(jsonPath("$.data.totals.gmv").value("128.60"));
+  }
+
+  @Test
   void shouldDownloadTemplateAndOnlyImportNewCreators() throws Exception {
     String token = library.token();
     String id = createOk(token, "old_creator", "Amy BD");
@@ -199,47 +357,65 @@ class KolLibraryIT {
     try (var book = new XSSFWorkbook(new ByteArrayInputStream(template));
         var out = new ByteArrayOutputStream()) {
       var sheet = book.getSheet("达人导入");
-      assertThat(sheet.getRow(1).getCell(0).getCellStyle().getFillForegroundColor())
+      assertThat(sheet.getRow(2).getCell(0).getCellStyle().getFillForegroundColor())
           .isEqualTo(IndexedColors.LIGHT_YELLOW.getIndex());
-      assertThat(sheet.getRow(1).getCell(6).getCellStyle().getFillForegroundColor())
+      assertThat(sheet.getRow(8).getCell(0).getCellStyle().getFillForegroundColor())
           .isNotEqualTo(IndexedColors.LIGHT_YELLOW.getIndex());
-      assertThat(sheet.getRow(1).getLastCellNum()).isEqualTo((short) 25);
+      assertThat(sheet.getRow(2).getLastCellNum()).isEqualTo((short) 1);
+      assertThat(sheet.getRow(2).getCell(0).getCellStyle().getRotation()).isZero();
       assertThat(sheet.getDataValidations())
-          .hasSize(11)
+          .hasSize(12)
           .anySatisfy(
               validation -> {
                 assertThat(validation.getValidationConstraint().getFormula1())
                     .isEqualTo("KOL_PLATFORM");
                 assertThat(validation.getRegions().getCellRangeAddress(0).formatAsString())
-                    .isEqualTo("C3:C202");
+                    .isEqualTo("B5:GS5");
+              })
+          .anySatisfy(
+              validation -> {
+                assertThat(validation.getValidationConstraint().getFormula1())
+                    .isEqualTo("KOL_SAMPLE_TYPE");
+                assertThat(validation.getRegions().getCellRangeAddress(0).formatAsString())
+                    .isEqualTo("B23:GS23");
+              })
+          .anySatisfy(
+              validation -> {
+                assertThat(validation.getValidationConstraint().getFormula1())
+                    .isEqualTo("KOL_GENDER");
+                assertThat(validation.getRegions().getCellRangeAddress(0).formatAsString())
+                    .isEqualTo("B17:GS17");
               });
       assertThat(book.isSheetHidden(book.getSheetIndex("_options"))).isTrue();
       assertThat(book.getSheet("_options").getRow(0).getCell(4).getStringCellValue())
           .isEqualTo("美国");
-      var sample = book.getSheet("填写示例").getRow(2);
-      assertThat(sample.getCell(0).getStringCellValue()).isEqualTo("demo.creator");
+      var genderOptions = book.getSheet("_options");
+      assertThat(genderOptions.getRow(0).getCell(14).getStringCellValue()).isEqualTo("女性");
+      assertThat(genderOptions.getRow(1).getCell(14).getStringCellValue()).isEqualTo("男性");
+      assertThat(genderOptions.getRow(2).getCell(14)).isNull();
+      var sample = book.getSheet("填写示例");
+      assertThat(sample.getRow(2).getCell(1).getStringCellValue()).isEqualTo("demo.creator");
+      assertThat(sample.getRow(16).getCell(1).getStringCellValue()).isEqualTo("女性");
       assertThat(sheet.getRow(0).getCell(0).getStringCellValue())
           .contains("必填项")
           .doesNotContain("更新");
-      assertThat(sheet.getLastRowNum()).isEqualTo(1);
-      var fresh = sheet.createRow(2);
-      copyExample(sample, fresh, "demo.creator");
-      fresh.getCell(3).setCellValue(186_200);
+      assertThat(sheet.getLastRowNum()).isEqualTo(29);
+      copyExample(sample, sheet, 1, "demo.creator");
+      sheet.getRow(5).getCell(1).setCellValue(186_200);
       var dateStyle = book.createCellStyle();
       dateStyle.setDataFormat(book.createDataFormat().getFormat("yyyy-mm-dd"));
-      fresh.getCell(16).setCellValue(LocalDate.of(2026, 11, 6));
-      fresh.getCell(16).setCellStyle(dateStyle);
-      var malformed = sheet.createRow(3);
-      copyExample(sample, malformed, "bad_number");
-      malformed.getCell(3).setCellValue(1);
-      malformed.getCell(3).getCTCell().setV("1E+2147483647");
-      var existing = sheet.createRow(4);
-      copyExample(sample, existing, "@OLD_CREATOR");
-      existing.getCell(24).setCellValue("S");
-      copyExample(sample, sheet.createRow(5), "@DEMO.CREATOR");
-      var incomplete = sheet.createRow(6);
-      incomplete.createCell(0).setCellValue("incomplete_creator");
-      incomplete.createCell(2).setCellValue("TikTok");
+      sheet.getRow(20).getCell(1).setCellValue(LocalDate.of(2026, 11, 6));
+      sheet.getRow(20).getCell(1).setCellStyle(dateStyle);
+      copyExample(sample, sheet, 2, "bad_number");
+      sheet.getRow(5).getCell(2).setCellValue(1);
+      sheet.getRow(5).getCell(2).getCTCell().setV("1E+2147483647");
+      copyExample(sample, sheet, 3, "@OLD_CREATOR");
+      sheet.getRow(29).getCell(3).setCellValue("S");
+      copyExample(sample, sheet, 4, "@DEMO.CREATOR");
+      sheet.getRow(2).createCell(5).setCellValue("incomplete_creator");
+      sheet.getRow(4).createCell(5).setCellValue("TikTok");
+      copyExample(sample, sheet, 6, "male_audience_creator");
+      sheet.getRow(16).getCell(6).setCellValue("男性");
       book.write(out);
       uploaded = out.toByteArray();
     }
@@ -255,15 +431,15 @@ class KolLibraryIT {
                 .header(TOKEN, token)
                 .header("Accept-Language", "zh-CN"))
         .andExpect(status().isOk())
-        .andExpect(jsonPath("$.data.created").value(1))
+        .andExpect(jsonPath("$.data.created").value(2))
         .andExpect(jsonPath("$.data.updated").doesNotExist())
-        .andExpect(jsonPath("$.data.errors[0].row").value(4))
+        .andExpect(jsonPath("$.data.errors[0].recordColumn").value("C"))
         .andExpect(jsonPath("$.data.errors[0].column").value("粉丝数"))
-        .andExpect(jsonPath("$.data.errors[1].row").value(5))
+        .andExpect(jsonPath("$.data.errors[1].recordColumn").value("D"))
         .andExpect(jsonPath("$.data.errors[1].errorCode").value("KOL_LIBRARY_DUPLICATE"))
-        .andExpect(jsonPath("$.data.errors[2].row").value(6))
+        .andExpect(jsonPath("$.data.errors[2].recordColumn").value("E"))
         .andExpect(jsonPath("$.data.errors[2].errorCode").value("KOL_LIBRARY_IMPORT_DUPLICATE_ROW"))
-        .andExpect(jsonPath("$.data.errors[3].row").value(7))
+        .andExpect(jsonPath("$.data.errors[3].recordColumn").value("F"))
         .andExpect(jsonPath("$.data.errors[3].errorCode").value("KOL_LIBRARY_IMPORT_REQUIRED"));
     assertThat(
             jdbc.queryForObject(
@@ -277,6 +453,20 @@ class KolLibraryIT {
                 LocalDate.class,
                 "demo.creator"))
         .isEqualTo(LocalDate.of(2026, 11, 6));
+    assertThat(
+            jdbc.queryForObject(
+                "SELECT sample_type FROM crm_library_kol WHERE kol_username = ?",
+                String.class,
+                "demo.creator"))
+        .isEqualTo("GIFT");
+    assertThat(
+            jdbc.queryForList(
+                "SELECT audience_gender FROM crm_library_kol WHERE kol_username IN (?, ?)"
+                    + " ORDER BY kol_username",
+                String.class,
+                "demo.creator",
+                "male_audience_creator"))
+        .containsExactly("MOSTLY_FEMALE", "MOSTLY_MALE");
     mvc.perform(get(LIB + "/" + id).header(TOKEN, token))
         .andExpect(status().isOk())
         .andExpect(jsonPath("$.data.followUpOwner").value("Amy BD"))
@@ -287,22 +477,58 @@ class KolLibraryIT {
         .andExpect(jsonPath("$.data.total").value(0));
   }
 
-  private static void copyExample(XSSFRow example, XSSFRow row, String username) {
-    for (var cell : example) {
-      row.createCell(cell.getColumnIndex()).setCellValue(cell.getStringCellValue());
+  @Test
+  void shouldImportLegacyHorizontalWorkbook() throws Exception {
+    byte[] uploaded;
+    try (var book =
+            new XSSFWorkbook(
+                new ByteArrayInputStream(new LibraryKolWorkbook(null).template(true)));
+        var out = new ByteArrayOutputStream()) {
+      var sample = book.getSheet("Example");
+      book.removeSheetAt(book.getSheetIndex("Creators"));
+      var sheet = book.createSheet("Creators");
+      var headings = sheet.createRow(1);
+      var data = sheet.createRow(2);
+      for (int index = 2; index <= sample.getLastRowNum(); index++) {
+        var field = sample.getRow(index);
+        String label = field.getCell(0).getStringCellValue();
+        if (!label.endsWith("share (%)") && !label.equals("Sample type")) {
+          int column = headings.getPhysicalNumberOfCells();
+          headings.createCell(column).setCellValue(label);
+          data.createCell(column)
+              .setCellValue(
+                  label.equals("Audience gender")
+                      ? "Mostly female"
+                      : field.getCell(1).getStringCellValue());
+        }
+      }
+      data.getCell(0).setCellValue("legacy_creator");
+      book.write(out);
+      uploaded = out.toByteArray();
     }
-    row.getCell(0).setCellValue(username);
+    var file = new MockMultipartFile("file", "legacy.xlsx", null, uploaded);
+    mvc.perform(multipart(LIB + "/imports").file(file).header(TOKEN, library.token()))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.data.created").value(1))
+        .andExpect(jsonPath("$.data.errors").isEmpty());
+  }
+
+  private static void copyExample(XSSFSheet example, XSSFSheet sheet, int column, String username) {
+    for (int index = 2; index <= example.getLastRowNum(); index++) {
+      sheet
+          .getRow(index)
+          .createCell(column)
+          .setCellValue(example.getRow(index).getCell(1).getStringCellValue());
+    }
+    sheet.getRow(2).getCell(column).setCellValue(username);
   }
 
   private Map<String, Object> content(String day) {
     var body = new LinkedHashMap<String, Object>();
     body.put("publishUrl", "https://www.tiktok.com/@x/video/" + day);
     body.put("publishDate", day);
+    body.put("publishTitle", "Content " + day);
     body.put("contentForm", "SHORT_VIDEO");
-    body.put("clicks", 1200);
-    body.put("orders", 30);
-    body.put("gmv", "1000.00");
-    body.put("sampleType", "GIFT");
     body.put("sampleCost", "30.00");
     body.put("slotFee", "50.00");
     body.put("commissionRate", "12.50");
@@ -313,7 +539,17 @@ class KolLibraryIT {
   @Test
   void shouldCreateReadUpdateAndList_whenLibrarySuperAdminWorks() throws Exception {
     String token = library.token();
-    String id = createOk(token, "@BeautyByAmy ", "Amy BD");
+    var profile = profile("@BeautyByAmy ", "Amy BD");
+    profile.put("sampleType", "GIFT");
+    String id =
+        json.readTree(
+                create(token, profile)
+                    .andExpect(status().isOk())
+                    .andReturn()
+                    .getResponse()
+                    .getContentAsString())
+            .at("/data/id")
+            .asText();
     mvc.perform(get(LIB + "/" + id).header(TOKEN, token))
         .andExpect(status().isOk())
         // The creator ID is stored normalised: no @, no spaces, lower case.
@@ -323,6 +559,7 @@ class KolLibraryIT {
         .andExpect(jsonPath("$.data.tags[1]").value("坑位费贵"))
         .andExpect(jsonPath("$.data.outreachStatus").value("REPLIED"))
         .andExpect(jsonPath("$.data.contact").value("+1 555 0100"))
+        .andExpect(jsonPath("$.data.sampleType").value("GIFT"))
         .andExpect(jsonPath("$.data.totals.contentCount").value(0))
         .andExpect(jsonPath("$.data.totals.roi").doesNotExist());
     mvc.perform(get(LIB).header(TOKEN, token))
@@ -333,6 +570,7 @@ class KolLibraryIT {
     // Editing keeps the ID normalisation and replaces every group.
     var edit = profile("beautybyamy", "Bob BD");
     edit.put("grade", "S");
+    edit.put("sampleType", "PHOTO_SHOOT");
     edit.put("categories", List.of("FOOD_BEVERAGE"));
     mvc.perform(
             put(LIB + "/" + id)
@@ -341,6 +579,7 @@ class KolLibraryIT {
                 .content(json.writeValueAsString(edit)))
         .andExpect(status().isOk())
         .andExpect(jsonPath("$.data.grade").value("S"))
+        .andExpect(jsonPath("$.data.sampleType").value("PHOTO_SHOOT"))
         .andExpect(jsonPath("$.data.followUpOwner").value("Bob BD"))
         .andExpect(jsonPath("$.data.categories.length()").value(1));
   }
@@ -544,6 +783,14 @@ class KolLibraryIT {
     String token = library.token();
     String id = createOk(token, "calc", "Amy BD");
     String contentsPath = LIB + "/" + id + "/contents";
+    var missingTitle = content("2026-10-01");
+    missingTitle.remove("publishTitle");
+    mvc.perform(
+            post(contentsPath)
+                .header(TOKEN, token)
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(json.writeValueAsString(missingTitle)))
+        .andExpect(status().isBadRequest());
     String first =
         mvc.perform(
                 post(contentsPath)
@@ -551,14 +798,31 @@ class KolLibraryIT {
                     .contentType(MediaType.APPLICATION_JSON)
                     .content(json.writeValueAsString(content("2026-10-01"))))
             .andExpect(status().isOk())
-            // 1000 × 12.5% = 125.00; 30 + 50 + 125 = 205.00; 1000 / 205 = 4.88
-            .andExpect(jsonPath("$.data.estimatedCommission").value("125.00"))
-            .andExpect(jsonPath("$.data.totalCost").value("205.00"))
-            .andExpect(jsonPath("$.data.actualRoi").value("4.88"))
+            .andExpect(jsonPath("$.data.clicks").doesNotExist())
+            .andExpect(jsonPath("$.data.gmv").doesNotExist())
             .andReturn()
             .getResponse()
             .getContentAsString();
     String firstId = json.readTree(first).at("/data/id").asText();
+    LocalDate week =
+        LocalDate.now(java.time.ZoneId.of("Asia/Shanghai"))
+            .with(java.time.temporal.TemporalAdjusters.previousOrSame(java.time.DayOfWeek.MONDAY));
+    mvc.perform(
+            post(contentsPath + "/" + firstId + "/weekly-data")
+                .header(TOKEN, token)
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(
+                    json.writeValueAsString(
+                        Map.of(
+                            "weekStart",
+                            week,
+                            "clicks",
+                            "1200",
+                            "orders",
+                            "30",
+                            "gmv",
+                            "1000.00"))))
+        .andExpect(status().isOk());
     // A second record whose total cost is 0 has a null ROI and counts empty fields as 0.
     var second = content("2026-10-05");
     second.put("gmv", null);
@@ -590,6 +854,10 @@ class KolLibraryIT {
     // Editing a record recalculates and is reflected in the totals.
     var edit = content("2026-10-01");
     edit.put("gmv", "2000.00");
+    edit.put("clicks", 999);
+    edit.put("commissionRate", "25");
+    edit.put("sampleStatus", "SHIPPED");
+    edit.put("remark", "Awaiting sample delivery");
     mvc.perform(
             put(contentsPath + "/" + firstId)
                 .header(TOKEN, token)
@@ -598,9 +866,12 @@ class KolLibraryIT {
         .andExpect(status().isOk())
         .andExpect(jsonPath("$.data.estimatedCommission").value("250.00"))
         .andExpect(jsonPath("$.data.totalCost").value("330.00"))
-        .andExpect(jsonPath("$.data.actualRoi").value("6.06"));
+        .andExpect(jsonPath("$.data.actualRoi").value("3.03"))
+        .andExpect(jsonPath("$.data.sampleStatus").value("SHIPPED"))
+        .andExpect(jsonPath("$.data.remark").value("Awaiting sample delivery"))
+        .andExpect(jsonPath("$.data.clicks").value("1200"));
     mvc.perform(get(LIB + "/" + id).header(TOKEN, token))
-        .andExpect(jsonPath("$.data.totals.gmv").value("2000.00"));
+        .andExpect(jsonPath("$.data.totals.gmv").value("1000.00"));
   }
 
   @Test
@@ -617,6 +888,7 @@ class KolLibraryIT {
                             "outreachStatus", "COOPERATING",
                             "lastContactDate", "2026-11-05",
                             "sampleStatus", "RECEIVED",
+                            "sampleType", "PHOTO_SHOOT",
                             "trackingNo", "SF999",
                             "sampleDate", "2026-11-02",
                             "followUpRemark", "dialog remark"))))
@@ -624,6 +896,7 @@ class KolLibraryIT {
         .andExpect(jsonPath("$.data.followUpRemark").value("dialog remark"))
         .andExpect(jsonPath("$.data.outreachStatus").value("COOPERATING"))
         .andExpect(jsonPath("$.data.sampleStatus").value("RECEIVED"))
+        .andExpect(jsonPath("$.data.sampleType").value("PHOTO_SHOOT"))
         .andExpect(jsonPath("$.data.trackingNo").value("SF999"))
         .andExpect(jsonPath("$.data.lastContactDate").value("2026-11-05"))
         // Everything else is untouched.

@@ -302,6 +302,8 @@ public class KolService {
                           "typeHandler=com.tcrm.admin.kol.model.JsonbStringTypeHandler")
                       .set(KolDO::getRemark, blankToNull(c.remark()))
                       .set(KolDO::getWhatsapp, blankToNull(c.whatsapp()))
+                      .set(KolDO::getBdDiscord, blankToNull(c.bdDiscord()))
+                      .set(KolDO::getBdWhatsapp, blankToNull(c.bdWhatsapp()))
                       .set(KolDO::getUpdateBy, user.id())
                       .set(KolDO::getUpdateTime, now));
           requireUpdated(updated, user);
@@ -529,6 +531,8 @@ public class KolService {
         SocialAccountsJson.read(kol.getSocialAccounts()),
         bdId,
         bdId == null ? null : displayBdName(bdNames, bdId, bd),
+        kol.getBdDiscord(),
+        kol.getBdWhatsapp(),
         kol.getDefaultRate(),
         kol.getStatus(),
         kol.getRemark(),

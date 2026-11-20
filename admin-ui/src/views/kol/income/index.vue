@@ -168,8 +168,9 @@ onMounted(load);
       ></ListSearch>
       <div v-if="result" class="income-summary" data-test="income-summary">
         <article>
-          <span>{{ t("finance.periodPaid") }}</span
-          ><strong>{{ formatPrice(result.summary.paid, "CNY") }}</strong
+          <span>{{ t("finance.periodPaid") }}</span><strong>{{
+            formatPrice(result.summary.paid, "CNY")
+          }}</strong
           ><small class="summary-breakdown"
             ><span
               >{{ t("finance.commissionPaid") }}
@@ -181,8 +182,7 @@ onMounted(load);
           >
         </article>
         <article v-for="key in ['creators', 'orders', 'quantity'] as const" :key="key">
-          <span>{{ t(`finance.${key}`) }}</span
-          ><strong>{{ result.summary[key] }}</strong>
+          <span>{{ t(`finance.${key}`) }}</span><strong>{{ result.summary[key] }}</strong>
         </article>
       </div>
       <div class="income-notes">
@@ -221,8 +221,7 @@ onMounted(load);
         <template #toolbar><span /></template>
         <template #cell-creator="{ row }"
           ><div class="identity">
-            <strong>{{ row.name }}</strong
-            ><CopyText :value="row.code" /></div
+            <strong>{{ row.name }}</strong><CopyText :value="row.code" /></div
         ></template>
         <template #cell-salesAmount="{ row }">{{ formatPrice(row.salesAmount, "CNY") }}</template>
         <template #cell-rate="{ row }">{{
@@ -239,8 +238,7 @@ onMounted(load);
         >
         <template #cell-paid="{ row }"
           ><div class="paid-cell">
-            <strong>{{ formatPrice(row.paid, "CNY") }}</strong
-            ><small>{{
+            <strong>{{ formatPrice(row.paid, "CNY") }}</strong><small>{{
               t("finance.paidBreakdown", {
                 commission: Number(row.commissionPaid ?? 0).toFixed(2),
                 prepay: Number(row.prepayPaid ?? 0).toFixed(2)

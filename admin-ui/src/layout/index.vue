@@ -123,11 +123,14 @@ watch(
     // longer matches the session (still loading from the previous company) takes no tab.
     if (!componentName || !title || route.meta.noTab || company.resetting.value) return;
     if (!mayOpenTab(route.path, { isLoggedIn: user.isLoggedIn, ...access.value })) return;
+    const existing = tabs.tabs.find(tab => tab.path === route.path);
+    // Keep a page-supplied title when activating a cached or restored tab.
+    const keepTitle = existing?.literalTitle === true && route.meta.dynamicTitle !== true;
     tabs.open({
       path: route.path,
-      titleKey: String(title),
+      titleKey: keepTitle ? existing.titleKey : String(title),
       // A title the page built at run time is already the shown text, not a language key.
-      literalTitle: route.meta.dynamicTitle === true,
+      literalTitle: keepTitle || route.meta.dynamicTitle === true,
       affix: route.path === affix.value.path,
       componentName
     });

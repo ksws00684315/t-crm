@@ -185,8 +185,10 @@ describe("creator library layout", () => {
 
     const details = tabs.tabs.filter(tab => tab.path.startsWith("/kol-library/kols/"));
     expect(details.map(tab => tab.path)).toEqual(["/kol-library/kols/11", "/kol-library/kols/22"]);
-    // Each tab title is its creator's nickname.
-    expect(details.map(tab => tab.titleKey)).toEqual(["Beauty by Amy", "Creator 22"]);
+    expect(details.map(tab => tab.titleKey)).toEqual([
+      "详细信息：Beauty by Amy",
+      "详细信息：Creator 22"
+    ]);
     expect(details.every(tab => tab.literalTitle)).toBe(true);
 
     // Both pages stay cached; switching back shows the first creator, not the second.
@@ -196,6 +198,31 @@ describe("creator library layout", () => {
     await router.push("/kol-library/kols/22");
     await flushPromises();
     expect(wrapper.find('[data-test="detail-name"]').text()).toBe("Creator 22");
+    wrapper.unmount();
+  });
+
+  it("keeps creator names in the first-level tabs when switching between detail and edit", async () => {
+    const detailPath = "/kol-library/kols/11";
+    const editPath = `${detailPath}/edit`;
+    const { wrapper, router, tabs } = await mountAs(user("KOL_LIBRARY"), detailPath);
+    await wrapper.get('[data-test="detail-edit"]').trigger("click");
+    await vi.waitFor(() => expect(router.currentRoute.value.path).toBe(editPath));
+    await flushPromises();
+    const editTitle = i18n.global.t("library.editTabTitle", { name: "Beauty by Amy" });
+    expect(tabs.tabs.find(tab => tab.path === editPath)?.titleKey).toBe(editTitle);
+
+    await router.push(detailPath);
+    await flushPromises();
+    await router.push(editPath);
+    await flushPromises();
+    expect(tabs.active).toBe(editPath);
+    expect(tabs.tabs.find(tab => tab.path === detailPath)?.titleKey).toBe(
+      "详细信息：Beauty by Amy"
+    );
+    expect(tabs.tabs.find(tab => tab.path === editPath)).toMatchObject({
+      titleKey: editTitle,
+      literalTitle: true
+    });
     wrapper.unmount();
   });
 
