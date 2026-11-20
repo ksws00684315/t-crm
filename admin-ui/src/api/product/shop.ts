@@ -6,6 +6,7 @@ export interface ShopQuery {
   shopName?: string;
   channel?: ShopChannel;
   authException?: boolean;
+  enabledOnly?: boolean;
   page?: number;
   size?: number;
 }

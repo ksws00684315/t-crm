@@ -729,7 +729,7 @@ class OrderStatsIT {
       assertThat(commissionWindow.todayAmount()).isEqualByComparingTo("8");
       assertThat(commissionWindow.totalAmount()).isEqualByComparingTo("8");
       var salesWindow = orders.salesWindow(affiliate, FROM, UNTIL);
-      assertThat(orders.workbenchRanks(affiliate, RankDimension.SHOP, UNTIL))
+      assertThat(orders.workbenchRanks(affiliate, RankDimension.SHOP, null, UNTIL))
           .singleElement()
           .satisfies(
               row -> {
@@ -737,7 +737,7 @@ class OrderStatsIT {
                 assertThat(row.quantity()).isEqualTo(salesWindow.totalOrders());
                 assertThat(row.amount()).isEqualByComparingTo(salesWindow.totalAmount());
               });
-      assertThat(orders.workbenchRanks(affiliate, RankDimension.KOL, UNTIL))
+      assertThat(orders.workbenchRanks(affiliate, RankDimension.KOL, null, UNTIL))
           .singleElement()
           .satisfies(
               row -> {
@@ -745,6 +745,23 @@ class OrderStatsIT {
                 assertThat(row.quantity()).isEqualTo(2);
                 assertThat(row.amount()).isEqualByComparingTo(salesWindow.totalAmount());
               });
+      assertThat(orders.workbenchRanks(affiliate, RankDimension.SHOP, FROM, UNTIL))
+          .singleElement()
+          .satisfies(
+              row -> {
+                assertThat(row.quantity()).isEqualTo(salesWindow.todayOrders());
+                assertThat(row.amount()).isEqualByComparingTo(salesWindow.todayAmount());
+              });
+      assertThat(orders.workbenchRanks(affiliate, RankDimension.KOL, FROM, UNTIL))
+          .singleElement()
+          .satisfies(
+              row -> {
+                assertThat(row.quantity()).isEqualTo(2);
+                assertThat(row.amount()).isEqualByComparingTo(salesWindow.todayAmount());
+              });
+      for (RankDimension dimension : new RankDimension[] {RankDimension.SHOP, RankDimension.KOL}) {
+        assertThat(orders.workbenchRanks(affiliate, dimension, UNTIL, UNTIL)).isEmpty();
+      }
       var today = orders.totals(affiliate, FROM, UNTIL);
       assertThat(salesWindow.todayAmount()).isEqualByComparingTo(today.sales());
       assertThat(salesWindow.todayOrders()).isEqualTo(today.paidOrders());

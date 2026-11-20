@@ -7,6 +7,7 @@ import com.tcrm.admin.shared.R;
 import com.tcrm.admin.stats.service.WorkbenchService;
 import com.tcrm.admin.stats.service.WorkbenchService.Overview;
 import com.tcrm.admin.stats.service.WorkbenchService.Rank;
+import com.tcrm.admin.stats.service.WorkbenchService.RankPeriod;
 import com.tcrm.admin.stats.service.WorkbenchService.Ranking;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RequestParam;
@@ -33,7 +34,10 @@ public class WorkbenchController {
       value = {"SUPER_ADMIN", "STAFF"},
       mode = SaMode.OR)
   public R<PageResult<Rank>> rankings(
-      @RequestParam Ranking dimension, @RequestParam(defaultValue = "1") int page) {
-    return R.ok(workbench.ranks(dimension, page));
+      @RequestParam Ranking dimension,
+      @RequestParam(defaultValue = "ALL_TIME") RankPeriod period,
+      @RequestParam(defaultValue = "1") int page,
+      @RequestParam(defaultValue = "10") int size) {
+    return R.ok(workbench.ranks(dimension, period, page, size));
   }
 }

@@ -19,7 +19,7 @@ public interface OrderStatsApi {
     }
   }
 
-  List<WorkbenchRankDTO> workbenchRanks(ScopeDTO scope, RankDimension dimension, Instant asOf);
+  List<WorkbenchRankDTO> workbenchRanks(ScopeDTO scope, RankDimension dimension, Instant from, Instant asOf);
 
   record WorkbenchRankDTO(long entityId, long quantity, BigDecimal amount) {}
 

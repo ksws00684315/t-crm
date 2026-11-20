@@ -68,7 +68,7 @@ class WorkbenchServiceTest {
               assertThat(filter.affiliateOnly()).isTrue();
               return new SalesWindowDTO(new BigDecimal("270.00"), 3, new BigDecimal("100.00"), 1);
             });
-    when(orders.workbenchRanks(any(), any(), any()))
+    when(orders.workbenchRanks(any(), any(), any(), any()))
         .thenThrow(new DataRetrievalFailureException("fixture"));
 
     var result = service.overview();

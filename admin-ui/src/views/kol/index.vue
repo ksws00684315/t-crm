@@ -38,6 +38,7 @@ defineOptions({ name: "KolListPage" });
  */
 const { t } = useI18n();
 const route = useRoute();
+const promotingOnly = ref(route?.query.relationStatus === "PROMOTING");
 const pendingOnly = ref(route?.query.reviewStatus === "PENDING");
 const me = useUserStore();
 const abilities = computed(() => kolAbilities(me.user));
@@ -73,6 +74,12 @@ const chips = computed<SearchChip[]>(() => {
   const current = applied.value;
   if (pendingOnly.value)
     list.push({ key: "reviewStatus", label: t("workbench.pending"), text: t("workbench.pending") });
+  if (promotingOnly.value)
+    list.push({
+      key: "relationStatus",
+      label: t("workbench.promotingCreators"),
+      text: t("workbench.promotingCreators")
+    });
   if (current.kolId) list.push({ key: "kolId", label: t("kol.kolId"), text: current.kolId });
   if (current.name) list.push({ key: "name", label: t("kol.kolName"), text: current.name });
   if (current.email) list.push({ key: "email", label: t("kol.email"), text: current.email });
@@ -89,6 +96,7 @@ async function load() {
       kolCode: applied.value.kolId || undefined,
       name: applied.value.name || undefined,
       email: applied.value.email || undefined,
+      ...(promotingOnly.value ? { relationStatus: "PROMOTING" as const } : {}),
       ...(pendingOnly.value ? { reviewStatus: "PENDING" as const } : {})
     });
     rows.value = page.items;
@@ -117,6 +125,7 @@ function search() {
 
 function reset() {
   pendingOnly.value = false;
+  promotingOnly.value = false;
   query.kolId = "";
   query.name = "";
   query.email = "";
@@ -125,6 +134,7 @@ function reset() {
 
 function removeChip(key: string): void {
   if (key === "reviewStatus") pendingOnly.value = false;
+  if (key === "relationStatus") promotingOnly.value = false;
   if (key === "kolId") query.kolId = "";
   if (key === "name") query.name = "";
   if (key === "email") query.email = "";
@@ -389,8 +399,16 @@ async function resetTableScroll(): Promise<void> {
 watch(
   () => route?.fullPath,
   () => {
-    if (route?.name !== "KolList" || route.query.reviewStatus !== "PENDING") return;
-    pendingOnly.value = true;
+    if (route?.name !== "KolList") return;
+    if (
+      !pendingOnly.value &&
+      !promotingOnly.value &&
+      route.query.reviewStatus !== "PENDING" &&
+      route.query.relationStatus !== "PROMOTING"
+    )
+      return;
+    pendingOnly.value = route.query.reviewStatus === "PENDING";
+    promotingOnly.value = route.query.relationStatus === "PROMOTING";
     activeTab.value = "list";
     query.kolId = "";
     query.name = "";

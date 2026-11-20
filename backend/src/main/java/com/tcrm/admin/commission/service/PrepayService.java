@@ -756,7 +756,7 @@ public class PrepayService {
       throw new BusinessException(ErrorCode.COMMON_VALIDATION_FAILED);
     }
     String status = stripToNull(filter.status());
-    if (status != null && !STATUSES.contains(status)) {
+    if (status != null && !STATUSES.contains(status) && !"ACTION_REQUIRED".equals(status)) {
       throw new BusinessException(ErrorCode.COMMON_VALIDATION_FAILED);
     }
     return TenantScope.callCompany(tenantId, () -> pageInCompany(user, filter, status));
@@ -780,11 +780,21 @@ public class PrepayService {
         return new PageResult<>(List.of(), 0L, filter.page(), filter.size());
       }
     }
+    List<String> statuses = null;
+    if ("ACTION_REQUIRED".equals(status)) {
+      statuses = new java.util.ArrayList<>();
+      if (user.role() == Role.SUPER_ADMIN || user.permissions().contains("prepay:review")) statuses.add("PENDING_OPERATIONS_REVIEW");
+      if (user.role() == Role.SUPER_ADMIN || user.permissions().contains("prepay:finance-review")) statuses.add("PENDING_FINANCE_REVIEW");
+      if (user.role() == Role.SUPER_ADMIN || user.permissions().contains("prepay:pay")) statuses.add("APPROVED");
+      if (statuses.isEmpty()) return new PageResult<>(List.of(), 0L, filter.page(), filter.size());
+    } else if (status != null) {
+      statuses = List.of(status);
+    }
     PrepayPageQuery query =
         new PrepayPageQuery(
             prepayNo,
             kolId,
-            status,
+            statuses,
             ownIds,
             filter.size(),
             (long) (filter.page() - 1) * filter.size());

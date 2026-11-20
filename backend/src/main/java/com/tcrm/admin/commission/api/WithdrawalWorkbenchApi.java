@@ -18,24 +18,8 @@ public class WithdrawalWorkbenchApi {
     this.prepays = prepays;
   }
 
-  public long pendingPrepays(AccountDTO user, List<String> permissions) {
-    long total = 0;
-    if (permissions.contains("prepay:review")) {
-      total +=
-          prepays
-              .page(user, new PrepayService.Filter(null, null, "PENDING_OPERATIONS_REVIEW", 1, 1))
-              .total();
-    }
-    if (permissions.contains("prepay:finance-review")) {
-      total +=
-          prepays
-              .page(user, new PrepayService.Filter(null, null, "PENDING_FINANCE_REVIEW", 1, 1))
-              .total();
-    }
-    if (permissions.contains("prepay:pay")) {
-      total += prepays.page(user, new PrepayService.Filter(null, null, "APPROVED", 1, 1)).total();
-    }
-    return total;
+  public long pendingPrepays(AccountDTO user) {
+    return prepays.page(user, new PrepayService.Filter(null, null, "ACTION_REQUIRED", 1, 1)).total();
   }
 
   public Pending pending(AccountDTO user) {

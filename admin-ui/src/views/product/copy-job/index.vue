@@ -294,8 +294,9 @@ watch(
   [() => route.name, () => route.query.jobCode, () => route.query.status],
   ([routeName, jobCode, status]) => {
     if (routeName && routeName !== "ProductTasks") return;
-    if (status === "HAS_FAILURE") {
+    if (status === "HAS_FAILURE" || status === "processing") {
       query.jobCode = "";
+      query.targetChannel = "";
       query.status = status;
       search();
       return;
@@ -303,7 +304,7 @@ watch(
     const wanted = typeof jobCode === "string" ? jobCode.trim() : "";
     if (!wanted || wanted === query.jobCode) return;
     query.jobCode = wanted;
-    if (query.status === "HAS_FAILURE") query.status = "";
+    if (query.status === "HAS_FAILURE" || query.status === "processing") query.status = "";
     search();
   },
   { immediate: true }
@@ -311,7 +312,12 @@ watch(
 
 onMounted(() => {
   // The immediate route watch above already searched when a jobCode came with the URL.
-  if (!query.jobCode && query.status !== "HAS_FAILURE") void load();
+  if (
+    !route.query.jobCode &&
+    route.query.status !== "HAS_FAILURE" &&
+    route.query.status !== "processing"
+  )
+    void load();
 });
 </script>
 

@@ -345,6 +345,7 @@ public interface OrderStatsMapper {
         <when test="dimension.name() == 'SHOP'">
           SELECT p.shop_id AS entity_id, COUNT(*) AS quantity, SUM(p.pay_amount) AS amount
           FROM scoped_orders p WHERE p.pay_time &lt; #{asOf}
+          <if test="from != null">AND p.pay_time &gt;= #{from}</if>
           GROUP BY p.shop_id
         </when>
         <otherwise>
@@ -353,6 +354,7 @@ public interface OrderStatsMapper {
           JOIN crm_order_item i ON i.order_id = p.id AND i.tenant_id = #{scope.tenantId}
             AND NOT i.is_deleted AND i.kol_id IS NOT NULL
           WHERE p.pay_time &lt; #{asOf} AND p.kol_id IS NOT NULL
+          <if test="from != null">AND p.pay_time &gt;= #{from}</if>
           GROUP BY p.kol_id
         </otherwise>
       </choose>
@@ -362,6 +364,7 @@ public interface OrderStatsMapper {
   List<WorkbenchRankDTO> workbenchRanks(
       @Param("scope") ScopeDTO scope,
       @Param("dimension") RankDimension dimension,
+      @Param("from") Instant from,
       @Param("asOf") Instant asOf);
 
   String COHORT_REFUND_WINDOW =

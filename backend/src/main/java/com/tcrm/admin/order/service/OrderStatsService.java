@@ -38,8 +38,8 @@ public class OrderStatsService implements OrderStatsApi {
 
   @Override
   public List<WorkbenchRankDTO> workbenchRanks(
-      ScopeDTO scope, RankDimension dimension, Instant asOf) {
-    return mapper.workbenchRanks(scope, dimension, asOf);
+      ScopeDTO scope, RankDimension dimension, Instant from, Instant asOf) {
+    return mapper.workbenchRanks(scope, dimension, from, asOf);
   }
 
   @Override

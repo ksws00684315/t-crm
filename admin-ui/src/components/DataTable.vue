@@ -28,6 +28,8 @@ export interface DataColumn {
   label: string;
   prop?: string;
   width?: number | string;
+  /** Keep the specified width instead of sharing surplus space. */
+  stretch?: boolean;
   minWidth?: ColumnMinWidth;
   amount?: boolean;
   /** Long content is left aligned; short content is centered by default. */
@@ -400,10 +402,10 @@ const visibleColumns = computed(() =>
 /**
  * Column widths are a floor, not a fixed size. Element Plus only stretches flex columns
  * (`min-width`), so fixed `width` left a blank band on the right of the card on wide monitors.
- * Every column except the action cell shares the surplus; the action column keeps its own width
- * so its buttons stay on the card's right edge instead of drifting into a stretched cell.
+ * Columns share the surplus by default. Action columns and columns that opt out retain
+ * their specified widths.
  */
-const isFlexColumn = (column: DataColumn) => column.key !== "actions";
+const isFlexColumn = (column: DataColumn) => column.key !== "actions" && column.stretch !== false;
 
 function resolveWidth(value: ColumnMinWidth | undefined): number | string | undefined {
   if (value && typeof value === "object") {

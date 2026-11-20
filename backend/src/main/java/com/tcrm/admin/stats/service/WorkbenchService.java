@@ -80,13 +80,13 @@ public class WorkbenchService {
     var sales =
         read(canShop || canCreator, "sales", unavailable, () -> stats.workbenchSales(filter, now));
     var topShops =
-        read(canShop, "topShops", unavailable, () -> ranks(user, Ranking.SHOP, 1, 5, now).items());
+        read(canShop, "topShops", unavailable, () -> ranks(user, Ranking.SHOP, 1, 5, null, now).items());
     var topCreators =
         read(
             canCreator,
             "topCreators",
             unavailable,
-            () -> ranks(user, Ranking.CREATOR, 1, 5, now).items());
+            () -> ranks(user, Ranking.CREATOR, 1, 5, null, now).items());
     var shops = read(canProduct, "shops", unavailable, product::shops);
     var jobs = read(canProduct, "jobs", unavailable, product::failedJobs);
     var processingJobs = read(canProduct, "processingJobs", unavailable, product::processingJobs);
@@ -103,7 +103,7 @@ public class WorkbenchService {
             || permissions.contains("prepay:finance-review")
             || permissions.contains("prepay:pay");
     var prepays =
-        read(canPrepay, "prepays", unavailable, () -> withdrawal.pendingPrepays(user, permissions));
+        read(canPrepay, "prepays", unavailable, () -> withdrawal.pendingPrepays(user));
     var payouts = read(canWithdrawal, "payouts", unavailable, () -> withdrawal.pending(user));
 
     boolean canCommission = (canShop || canCreator) && permissions.contains("commission:view");
@@ -128,15 +128,24 @@ public class WorkbenchService {
         unavailable);
   }
 
-  public PageResult<Rank> ranks(Ranking board, int page) {
+  public PageResult<Rank> ranks(Ranking board, RankPeriod period, int page, int size) {
     var user = tenantUser();
     if (!current.effectivePermissions(user).contains(board.permission)) {
       throw new BusinessException(ErrorCode.AUTH_FORBIDDEN);
     }
-    if (page < 1 || page > PageResult.MAX_PAGE) {
+    if (page < 1 || page > PageResult.MAX_PAGE || (size != 5 && size != 10)) {
       throw new BusinessException(ErrorCode.COMMON_VALIDATION_FAILED);
     }
-    return ranks(user, board, page, 10, Instant.now());
+    var now = Instant.now();
+    var from =
+        period.days == 0
+            ? null
+            : now.atZone(StatsPeriod.ZONE)
+                .toLocalDate()
+                .minusDays(period.days - 1)
+                .atStartOfDay(StatsPeriod.ZONE)
+                .toInstant();
+    return ranks(user, board, page, size, from, now);
   }
 
   private AccountDTO tenantUser() {
@@ -147,7 +156,8 @@ public class WorkbenchService {
     return user;
   }
 
-  private PageResult<Rank> ranks(AccountDTO user, Ranking board, int page, int size, Instant now) {
+  private PageResult<Rank> ranks(
+      AccountDTO user, Ranking board, int page, int size, Instant from, Instant now) {
     var scope =
         new ScopeDTO(
             user.tenantId(),
@@ -168,7 +178,7 @@ public class WorkbenchService {
     if (board == Ranking.SHOP) {
       scope = scope.withVisibleShops(List.copyOf(shops.keySet()));
     }
-    var facts = orders.workbenchRanks(scope, board.dimension, now);
+    var facts = orders.workbenchRanks(scope, board.dimension, from, now);
     var selected = facts.stream().skip((long) (page - 1) * size).limit(size).toList();
     var creators =
         board == Ranking.CREATOR
@@ -197,6 +207,19 @@ public class WorkbenchService {
                 })
             .toList();
     return new PageResult<>(rows, facts.size(), page, size);
+  }
+
+  public enum RankPeriod {
+    TODAY(1),
+    LAST_7_DAYS(7),
+    LAST_30_DAYS(30),
+    ALL_TIME(0);
+
+    private final int days;
+
+    RankPeriod(int days) {
+      this.days = days;
+    }
   }
 
   public enum Ranking {

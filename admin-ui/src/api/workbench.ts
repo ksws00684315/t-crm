@@ -53,11 +53,13 @@ export interface Workbench {
 
 export type RankBoard = "SHOP" | "CREATOR";
 
-export const getWorkbenchRanks = (dimension: RankBoard, page = 1) =>
+export type RankPeriod = "TODAY" | "LAST_7_DAYS" | "LAST_30_DAYS" | "ALL_TIME";
+
+export const getWorkbenchRanks = (dimension: RankBoard, period: RankPeriod, page = 1, size = 10) =>
   http.request<{ items: Rank[]; total: Count; page: number; size: number }>({
     method: "get",
     url: "/workbench/rankings",
-    params: { dimension, page }
+    params: { dimension, period, page, size }
   });
 
 export const getWorkbench = () =>

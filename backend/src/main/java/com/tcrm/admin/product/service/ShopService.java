@@ -77,6 +77,12 @@ public class ShopService implements ShopAccessApi, CopyTargetShopApi {
 
   public PageResult<ShopDTO> page(
       String shopCode, String shopName, String channel, boolean authException, int page, int size) {
+    return page(shopCode, shopName, channel, authException, false, page, size);
+  }
+
+  public PageResult<ShopDTO> page(
+      String shopCode, String shopName, String channel, boolean authException, boolean enabledOnly,
+      int page, int size) {
     LambdaQueryWrapper<ShopDO> query = new LambdaQueryWrapper<>();
     if (shopCode != null && !shopCode.isBlank()) {
       query.likeRight(ShopDO::getShopCode, shopCode.strip());
@@ -88,9 +94,10 @@ public class ShopService implements ShopAccessApi, CopyTargetShopApi {
       query.eq(ShopDO::getChannel, channel.strip().toUpperCase(Locale.ROOT));
     }
     query.orderByAsc(ShopDO::getId);
+    if (authException || enabledOnly) query.eq(ShopDO::getStatus, 1);
     if (authException) {
       var rows =
-          buildViews(shops.selectList(query.eq(ShopDO::getStatus, 1))).stream()
+          buildViews(shops.selectList(query)).stream()
               .filter(shop -> !"AUTHORIZED".equals(shop.authStatus()))
               .toList();
       return new PageResult<>(
