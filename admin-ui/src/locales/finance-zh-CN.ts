@@ -221,6 +221,7 @@ export default {
   thresholdNote:
     "最低提现 {minimum} CNY；可提现 {available} CNY。冻结中、提现中、已抵扣预付及资料不齐会影响申请。",
   validAmount: "请输入大于零且最多两位小数的金额",
+  validFreezeDays: "请输入 0 到 365 之间的冻结天数",
   belowMinimum: "申请金额低于最低提现门槛",
   insufficient: "可提现余额不足；请核对冻结中、提现中和已抵扣预付",
   required: "请填写此项",

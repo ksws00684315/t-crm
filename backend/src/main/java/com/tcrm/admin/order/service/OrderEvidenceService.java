@@ -33,11 +33,22 @@ public class OrderEvidenceService implements OrderEvidenceApi {
 
   @Override
   public PageResult<EvidenceRow> page(Selection selection, Kind kind, int page, int size) {
+    return page(selection, kind, page, size, null, false);
+  }
+
+  @Override
+  public PageResult<EvidenceRow> sortedActivity(
+      Selection selection, Kind kind, int page, int size, DetailSort sortBy, boolean ascending) {
+    return page(selection, kind, page, size, sortBy, ascending);
+  }
+
+  private PageResult<EvidenceRow> page(
+      Selection selection, Kind kind, int page, int size, DetailSort sortBy, boolean ascending) {
     if (selection.scope().visibleShopIds().isEmpty()) {
       return new PageResult<>(List.of(), 0, page, size);
     }
     long offset = (long) (page - 1) * size;
-    var rows = evidence.page(selection, kind, size, offset);
+    var rows = evidence.pageWithSort(selection, kind, size, offset, sortBy, ascending);
     long total =
         rows.size() < size && (page == 1 || !rows.isEmpty())
             ? offset + rows.size()
@@ -48,11 +59,22 @@ public class OrderEvidenceService implements OrderEvidenceApi {
   @Override
   public PageResult<ProductGroup> productGroups(
       Selection selection, ProductBreakdown group, int page, int size) {
+    return sortedProductGroups(selection, group, page, size, null, false);
+  }
+
+  @Override
+  public PageResult<ProductGroup> sortedProductGroups(
+      Selection selection,
+      ProductBreakdown group,
+      int page,
+      int size,
+      DetailSort sortBy,
+      boolean ascending) {
     if (selection.scope().visibleShopIds().isEmpty()) {
       return new PageResult<>(List.of(), 0, page, size);
     }
     long offset = (long) (page - 1) * size;
-    var rows = evidence.productGroups(selection, group, size, offset);
+    var rows = evidence.productGroupsWithSort(selection, group, size, offset, sortBy, ascending);
     long total =
         rows.size() < size && (page == 1 || !rows.isEmpty())
             ? offset + rows.size()

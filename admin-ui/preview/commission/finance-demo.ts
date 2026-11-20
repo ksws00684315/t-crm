@@ -598,6 +598,6 @@ for (const row of seedWithdrawals) {
 export const seedConfig: SettlementConfig = {
   currency: "CNY",
   minimum: "200.00",
-  version: "CFG-2026-10-V1",
+  version: 1,
   channels: [{ code: "WEIDIAN", name: "weidian", basis: "COMPLETED_PLUS_DAYS", days: 7 }]
 };

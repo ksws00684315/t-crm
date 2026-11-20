@@ -783,10 +783,18 @@ public class PrepayService {
     List<String> statuses = null;
     if ("ACTION_REQUIRED".equals(status)) {
       statuses = new java.util.ArrayList<>();
-      if (user.role() == Role.SUPER_ADMIN || user.permissions().contains("prepay:review")) statuses.add("PENDING_OPERATIONS_REVIEW");
-      if (user.role() == Role.SUPER_ADMIN || user.permissions().contains("prepay:finance-review")) statuses.add("PENDING_FINANCE_REVIEW");
-      if (user.role() == Role.SUPER_ADMIN || user.permissions().contains("prepay:pay")) statuses.add("APPROVED");
-      if (statuses.isEmpty()) return new PageResult<>(List.of(), 0L, filter.page(), filter.size());
+      if (user.role() == Role.SUPER_ADMIN || user.permissions().contains("prepay:review")) {
+        statuses.add("PENDING_OPERATIONS_REVIEW");
+      }
+      if (user.role() == Role.SUPER_ADMIN || user.permissions().contains("prepay:finance-review")) {
+        statuses.add("PENDING_FINANCE_REVIEW");
+      }
+      if (user.role() == Role.SUPER_ADMIN || user.permissions().contains("prepay:pay")) {
+        statuses.add("APPROVED");
+      }
+      if (statuses.isEmpty()) {
+        return new PageResult<>(List.of(), 0L, filter.page(), filter.size());
+      }
     } else if (status != null) {
       statuses = List.of(status);
     }

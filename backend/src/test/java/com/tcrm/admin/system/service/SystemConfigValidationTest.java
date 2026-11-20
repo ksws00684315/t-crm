@@ -48,6 +48,8 @@ class SystemConfigValidationTest {
   void shouldValidateIntegerRangesAndOptionalUploadAddress() {
     SystemConfigService.validate(SystemConfigDefinition.PRODUCT_LINKS_MAX_CONVERT_ITEMS, "1");
     SystemConfigService.validate(SystemConfigDefinition.PRODUCT_LINKS_MAX_CONVERT_ITEMS, "5000");
+    SystemConfigService.validate(SystemConfigDefinition.PRODUCT_LINKS_MAX_CONVERT_ITEMS, "6000");
+    SystemConfigService.validate(SystemConfigDefinition.PRODUCT_LINKS_MAX_CONVERT_ITEMS, "1000000");
     SystemConfigService.validate(SystemConfigDefinition.COPY_DAILY_LIMIT_PER_COMPANY, "1");
     SystemConfigService.validate(SystemConfigDefinition.COPY_DAILY_LIMIT_PER_COMPANY, "1000000");
     assertThatThrownBy(
@@ -84,7 +86,7 @@ class SystemConfigValidationTest {
     assertThatThrownBy(
             () ->
                 SystemConfigService.validate(
-                    SystemConfigDefinition.PRODUCT_LINKS_MAX_CONVERT_ITEMS, "5001"))
+                    SystemConfigDefinition.PRODUCT_LINKS_MAX_CONVERT_ITEMS, "1000001"))
         .isInstanceOf(BusinessException.class);
     assertThatThrownBy(
             () -> SystemConfigService.validate(SystemConfigDefinition.KOL_INVITE_TTL_HOURS, "73"))

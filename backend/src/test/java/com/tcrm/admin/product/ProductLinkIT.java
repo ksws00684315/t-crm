@@ -844,23 +844,33 @@ class ProductLinkIT {
   }
 
   @Test
-  void shouldAllowCopyJobTotal_upToTheConfiguredMaximum() {
+  void shouldNotCapCopyJobTotal_inDatabase() {
     insertJob(141001, 1, 141001, 141001, "big141", "processing", 1500, 0, 0, null, Instant.now());
     assertThat(
             jdbc.queryForObject(
                 "SELECT total_count FROM crm_copy_job WHERE id = 141001", Integer.class))
         .isEqualTo(1500);
 
+    // Task 155: the old 5000 ceiling is gone; the system setting decides how large a job may be.
+    insertJob(141002, 1, 141001, 141001, "big142", "processing", 6000, 0, 0, null, Instant.now());
+    insertJob(
+        141003, 1, 141001, 141001, "big143", "processing", 1000000, 0, 0, null, Instant.now());
+    assertThat(
+            jdbc.queryForObject(
+                "SELECT total_count FROM crm_copy_job WHERE id = 141003", Integer.class))
+        .isEqualTo(1000000);
+
+    // The non-negative invariant stays in force.
     assertThatThrownBy(
             () ->
                 insertJob(
-                    141002,
+                    141004,
                     1,
                     141001,
                     141001,
-                    "big142",
+                    "big144",
                     "processing",
-                    5001,
+                    -1,
                     0,
                     0,
                     null,

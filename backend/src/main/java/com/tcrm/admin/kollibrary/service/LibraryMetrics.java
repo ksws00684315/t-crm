@@ -50,16 +50,30 @@ public final class LibraryMetrics {
     long clicks = 0;
     long orders = 0;
     BigDecimal gmv = BigDecimal.ZERO.setScale(SCALE);
-    BigDecimal cost = BigDecimal.ZERO.setScale(SCALE);
+    BigDecimal commissionCost = BigDecimal.ZERO.setScale(SCALE);
+    BigDecimal sampleCost = BigDecimal.ZERO.setScale(SCALE);
+    BigDecimal slotFee = BigDecimal.ZERO.setScale(SCALE);
     for (ContentRecord record : records) {
       clicks += record.clicks() == null ? 0 : record.clicks();
       orders += record.orders() == null ? 0 : record.orders();
       ContentMetrics metrics =
           of(record.gmv(), record.sampleCost(), record.slotFee(), record.commissionRate());
       gmv = gmv.add(metrics.gmv());
-      cost = cost.add(metrics.totalCost());
+      commissionCost = commissionCost.add(metrics.estimatedCommission());
+      sampleCost = sampleCost.add(metrics.sampleCost());
+      slotFee = slotFee.add(metrics.slotFee());
     }
-    return new Totals(records.size(), clicks, orders, gmv, cost, roi(gmv, cost));
+    BigDecimal cost = commissionCost.add(sampleCost).add(slotFee).setScale(SCALE);
+    return new Totals(
+        records.size(),
+        clicks,
+        orders,
+        gmv,
+        cost,
+        roi(gmv, cost),
+        commissionCost,
+        sampleCost,
+        slotFee);
   }
 
   /** The manual input of one content record, as stored. */
@@ -99,5 +113,8 @@ public final class LibraryMetrics {
       long orders,
       BigDecimal gmv,
       BigDecimal totalCost,
-      BigDecimal roi) {}
+      BigDecimal roi,
+      BigDecimal commissionCost,
+      BigDecimal sampleCost,
+      BigDecimal slotFee) {}
 }

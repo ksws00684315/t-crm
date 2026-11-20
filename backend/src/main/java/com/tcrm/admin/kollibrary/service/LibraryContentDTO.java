@@ -8,6 +8,8 @@ import java.time.LocalDate;
 public record LibraryContentDTO(
     Long id,
     String publishUrl,
+    String publishTitle,
+    boolean hasWeeklyData,
     LocalDate publishDate,
     String contentForm,
     Long clicks,
@@ -21,4 +23,6 @@ public record LibraryContentDTO(
     BigDecimal totalCost,
     BigDecimal actualRoi,
     String nextAction,
+    String remark,
+    String sampleStatus,
     Instant updateTime) {}

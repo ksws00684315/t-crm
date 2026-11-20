@@ -204,6 +204,7 @@ class SystemIT {
             "crm_kol_cleanup_item:NO",
             "crm_kol_copy_token:NO",
             "crm_kol_item:NO",
+            "crm_kol_reporting_status:NO",
             "crm_kol_platform:NO",
             "crm_kol_promotion_record:NO",
             "crm_kol_register_code:NO",

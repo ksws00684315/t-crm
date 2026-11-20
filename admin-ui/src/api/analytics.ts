@@ -123,6 +123,12 @@ export interface DetailQuery extends Filters {
   productCode?: string;
 }
 export type ActivityKind = "ORDERS" | "REFUNDS";
+export type DetailSort =
+  "PAID_ORDER_COUNT" | "UNITS" | "SALES_AMOUNT" | "REFUND_AMOUNT" | "NET_SALES_AMOUNT";
+export interface DetailSortQuery {
+  sortBy: DetailSort;
+  sortDirection: "asc" | "desc";
+}
 export interface EvidenceRow {
   id: string;
   orderNo: string;
@@ -180,7 +186,8 @@ interface DetailResult {
 }
 export function queryAnalyticsDetail(
   board: Board,
-  params: DetailQuery & { kind?: ActivityKind; page?: number; size?: number }
+  params: DetailQuery &
+    Partial<DetailSortQuery> & { kind?: ActivityKind; page?: number; size?: number }
 ) {
   return http.request<DetailResult>({ method: "get", url: `/stats/${board}/details`, params });
 }
@@ -199,7 +206,8 @@ export interface ProductGroup {
   imageUrl?: string;
 }
 export function queryProductBreakdown(
-  params: DetailQuery & { group: ProductBreakdown; page: number; size: number }
+  params: DetailQuery &
+    Partial<DetailSortQuery> & { group: ProductBreakdown; page: number; size: number }
 ) {
   return http.request<{ items: ProductGroup[]; total: Scalar }>({
     method: "get",
@@ -218,7 +226,8 @@ export interface InviterCreatorRow {
 }
 
 export function queryInviterCreators(
-  params: DetailQuery & { page: number; size: number; currentTeam: boolean }
+  params: DetailQuery &
+    Partial<DetailSortQuery> & { page: number; size: number; currentTeam: boolean }
 ) {
   return http.request<{ items: InviterCreatorRow[]; total: Scalar; page: number; size: number }>({
     method: "get",

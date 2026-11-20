@@ -1,12 +1,11 @@
 <script setup lang="ts">
-import { ElMessage, ElMessageBox } from "element-plus";
+import { ElMessage } from "element-plus";
 import type { FormInstance, FormRules } from "element-plus";
 import { computed, nextTick, onMounted, reactive, ref, watch } from "vue";
 import { useI18n } from "vue-i18n";
 import { useRoute, useRouter } from "vue-router";
 import {
   createLibraryKol,
-  deleteLibraryKol,
   getLibraryKol,
   updateLibraryKol,
   type LibraryDuplicate,
@@ -26,6 +25,7 @@ import {
   LIBRARY_OUTREACH_STATUSES,
   LIBRARY_PLATFORMS,
   LIBRARY_SAMPLE_STATUSES,
+  LIBRARY_SAMPLE_TYPES,
   libraryDefaultValue,
   libraryOptionLabel
 } from "@/utils/kol-library";
@@ -108,6 +108,8 @@ function emptyForm(): LibraryKolRequest {
     audienceCountry: null,
     audienceAgeRange: null,
     audienceGender: null,
+    audienceAgeShare: null,
+    audienceGenderShare: null,
     contact: null,
     contentQuality: null,
     salesPotential: null,
@@ -119,6 +121,7 @@ function emptyForm(): LibraryKolRequest {
     followUpOwner: "",
     lastContactDate: null,
     sampleStatus: libraryDefaultValue(LIBRARY_SAMPLE_STATUSES),
+    sampleType: null,
     trackingNo: null,
     sampleDate: null,
     followUpRemark: null
@@ -127,10 +130,7 @@ function emptyForm(): LibraryKolRequest {
 
 const form = reactive<LibraryKolRequest>(emptyForm());
 
-/**
- * The edit tab names the creator being edited: the route's title key alone would show as
- * "route.libraryKolEdit" in the tab strip.
- */
+/** The edit tab names the creator being edited. */
 watch(
   () => form.displayName,
   name => {
@@ -138,7 +138,7 @@ watch(
     if (!editing.value || !tab || !name.trim()) return;
     tabs.open({
       ...tab,
-      titleKey: `${t("route.libraryKolEdit")}: ${name.trim()}`,
+      titleKey: t("library.editTabTitle", { name: name.trim() }),
       literalTitle: true
     });
   },
@@ -216,6 +216,8 @@ function fill(detail: LibraryKolDetailVO): void {
     audienceCountry: detail.audienceCountry,
     audienceAgeRange: detail.audienceAgeRange,
     audienceGender: detail.audienceGender,
+    audienceAgeShare: detail.audienceAgeShare ?? null,
+    audienceGenderShare: detail.audienceGenderShare ?? null,
     contact: detail.contact,
     contentQuality: detail.contentQuality,
     salesPotential: detail.salesPotential,
@@ -227,6 +229,7 @@ function fill(detail: LibraryKolDetailVO): void {
     followUpOwner: detail.followUpOwner,
     lastContactDate: detail.lastContactDate,
     sampleStatus: detail.sampleStatus,
+    sampleType: detail.sampleType ?? null,
     trackingNo: detail.trackingNo,
     sampleDate: detail.sampleDate,
     followUpRemark: detail.followUpRemark
@@ -290,6 +293,8 @@ function toRequest(): LibraryKolRequest {
     followUpRemark: clean(form.followUpRemark),
     followers: form.followers === null || `${form.followers}` === "" ? null : form.followers,
     avgViews: form.avgViews === null || `${form.avgViews}` === "" ? null : form.avgViews,
+    audienceAgeShare: form.audienceAgeShare || null,
+    audienceGenderShare: form.audienceGenderShare || null,
     engagementRate:
       form.engagementRate === null || form.engagementRate === "" ? null : form.engagementRate
   };
@@ -335,7 +340,7 @@ async function submit(): Promise<void> {
     tabs.close(route.path);
     tabs.open({
       path: detailPath,
-      titleKey: saved.displayName,
+      titleKey: t("library.detailTabTitle", { name: saved.displayName }),
       literalTitle: true,
       affix: false,
       componentName: "LibraryKolDetailPage"
@@ -348,39 +353,6 @@ async function submit(): Promise<void> {
     notifyError(error);
   } finally {
     saving.value = false;
-  }
-}
-
-/**
- * Deletes the creator from its edit form; super administrators only (requirement 1.2.5 ④,
- * 2026-11-10). The form tab and any tab of the creator close, and the list reloads.
- */
-async function removeKol(): Promise<void> {
-  const id = editingId.value;
-  if (!id) return;
-  const name = form.displayName.trim() || form.kolUsername.trim();
-  try {
-    await ElMessageBox.confirm(t("library.confirmDelete", { name }), t("library.deleteTitle"), {
-      type: "warning",
-      confirmButtonText: t("common.delete"),
-      cancelButtonText: t("common.cancel")
-    });
-  } catch {
-    return;
-  }
-  try {
-    await deleteLibraryKol(id);
-    ElMessage.success(t("library.deleted"));
-    const detail = `/kol-library/kols/${id}`;
-    for (const path of tabs.tabs
-      .map(tab => tab.path)
-      .filter(path => path === detail || path.startsWith(`${detail}/`))) {
-      tabs.close(path);
-    }
-    tabs.refresh("/kol-library/kols");
-    await router.push("/kol-library/kols");
-  } catch (error) {
-    notifyError(error);
   }
 }
 
@@ -400,7 +372,9 @@ async function openDuplicate(): Promise<void> {
   const path = `/kol-library/kols/${found.id}`;
   tabs.open({
     path,
-    titleKey: found.displayName || t("route.libraryKolDetail"),
+    titleKey: found.displayName
+      ? t("library.detailTabTitle", { name: found.displayName })
+      : "route.libraryKolDetail",
     literalTitle: Boolean(found.displayName),
     affix: false,
     componentName: "LibraryKolDetailPage"
@@ -457,19 +431,8 @@ onMounted(() => {
           @imported="onWorkbookImported"
           @view-list="cancel"
         />
-        <el-button
-          v-if="editing && abilities.canDelete"
-          type="danger"
-          plain
-          data-test="form-delete"
-          @click="removeKol"
-        >
-          {{ t("common.delete") }}
-        </el-button>
       </header>
 
-      <!-- Requirement 1.2.5 ④ (2026-11-10): three second-level tabs, styled like the creator
-           list / assignment tabs; cards hold one column each (norm 13 §3.5). -->
       <el-tabs v-model="activeTab" class="form-tabs" data-test="form-tabs">
         <el-tab-pane :label="t('library.formTab.basic')" name="basic" data-test="tab-basic">
           <div class="form-tabs__cards">
@@ -543,20 +506,26 @@ onMounted(() => {
                     >
                       {{ tag }}
                     </el-tag>
-                    <el-input
-                      v-model="tagInput"
-                      maxlength="20"
-                      class="tags-editor__input"
-                      data-test="tag-input"
-                      :placeholder="t('library.field.tagPlaceholder')"
-                      @keyup.enter.prevent="addTag"
-                    />
-                    <el-button data-test="tag-add" @click="addTag">
-                      {{ t("library.addTag") }}
-                    </el-button>
+                    <div class="tags-editor__entry">
+                      <el-input
+                        v-model="tagInput"
+                        maxlength="20"
+                        class="tags-editor__input"
+                        data-test="tag-input"
+                        :placeholder="t('library.field.tagPlaceholder')"
+                        @keyup.enter.prevent="addTag"
+                      />
+                      <el-button data-test="tag-add" @click="addTag">
+                        {{ t("library.addTag") }}
+                      </el-button>
+                    </div>
                   </div>
                 </el-form-item>
-                <el-form-item :label="t('library.field.remark')" prop="remark">
+                <el-form-item
+                  class="form-card__wide"
+                  :label="t('library.field.remark')"
+                  prop="remark"
+                >
                   <el-input
                     v-model="form.remark"
                     type="textarea"
@@ -613,7 +582,11 @@ onMounted(() => {
             <el-card shadow="never" class="form-card" data-test="section-audience">
               <template #header>{{ t("library.formSection.audience") }}</template>
               <div class="form-card__grid">
-                <el-form-item :label="t('library.field.audienceCountry')" prop="audienceCountry">
+                <el-form-item
+                  :label="t('library.field.audienceCountry')"
+                  prop="audienceCountry"
+                  class="form-card__wide"
+                >
                   <el-input
                     v-model="form.audienceCountry"
                     maxlength="64"
@@ -630,6 +603,18 @@ onMounted(() => {
                     />
                   </el-select>
                 </el-form-item>
+                <el-form-item :label="t('library.field.audienceAgeShare')" prop="audienceAgeShare">
+                  <el-input
+                    v-model="form.audienceAgeShare"
+                    type="number"
+                    min="0"
+                    max="100"
+                    step="0.01"
+                    data-test="audience-age-share"
+                  >
+                    <template #suffix>%</template>
+                  </el-input>
+                </el-form-item>
                 <el-form-item :label="t('library.field.audienceGender')" prop="audienceGender">
                   <el-select v-model="form.audienceGender" clearable data-test="audience-gender">
                     <el-option
@@ -639,6 +624,21 @@ onMounted(() => {
                       :value="option.value"
                     />
                   </el-select>
+                </el-form-item>
+                <el-form-item
+                  :label="t('library.field.audienceGenderShare')"
+                  prop="audienceGenderShare"
+                >
+                  <el-input
+                    v-model="form.audienceGenderShare"
+                    type="number"
+                    min="0"
+                    max="100"
+                    step="0.01"
+                    data-test="audience-gender-share"
+                  >
+                    <template #suffix>%</template>
+                  </el-input>
                 </el-form-item>
               </div>
             </el-card>
@@ -694,6 +694,21 @@ onMounted(() => {
                   />
                 </el-select>
               </el-form-item>
+              <el-form-item :label="t('library.field.sampleType')" prop="sampleType">
+                <el-select
+                  v-model="form.sampleType"
+                  clearable
+                  :value-on-clear="null"
+                  data-test="sample-type"
+                >
+                  <el-option
+                    v-for="option in LIBRARY_SAMPLE_TYPES"
+                    :key="option.value"
+                    :label="libraryOptionLabel('sampleType', option.value)"
+                    :value="option.value"
+                  />
+                </el-select>
+              </el-form-item>
               <el-form-item :label="t('library.field.trackingNo')" prop="trackingNo">
                 <el-input v-model="form.trackingNo" maxlength="64" data-test="tracking-no" />
               </el-form-item>
@@ -705,7 +720,11 @@ onMounted(() => {
                   data-test="sample-date"
                 />
               </el-form-item>
-              <el-form-item :label="t('library.field.followUpRemark')" prop="followUpRemark">
+              <el-form-item
+                class="form-card__wide"
+                :label="t('library.field.followUpRemark')"
+                prop="followUpRemark"
+              >
                 <el-input
                   v-model="form.followUpRemark"
                   type="textarea"
@@ -785,7 +804,7 @@ onMounted(() => {
   display: flex;
   flex-direction: column;
   gap: var(--tcrm-space-4);
-  max-width: 960px;
+  min-width: 0;
 }
 .form-page__duplicate {
   margin-bottom: var(--tcrm-space-2);
@@ -798,9 +817,9 @@ onMounted(() => {
 .form-page__header {
   display: flex;
   flex-wrap: wrap;
-  gap: var(--tcrm-space-2);
   align-items: center;
   justify-content: space-between;
+  gap: var(--tcrm-space-2);
 }
 .form-page__title {
   margin: 0;
@@ -812,11 +831,17 @@ onMounted(() => {
   flex-direction: column;
   gap: var(--tcrm-space-4);
 }
-/* The creator being entered, read-only at the top of the outreach tab. */
+.form-card {
+  container-type: inline-size;
+}
+.form-card__grid,
 .form-card__identity {
-  display: flex;
-  flex-wrap: wrap;
-  gap: var(--tcrm-space-2) var(--tcrm-space-6);
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  column-gap: var(--tcrm-space-5);
+}
+.form-card__identity {
+  row-gap: var(--tcrm-space-2);
   margin: 0 0 var(--tcrm-space-4);
 }
 .form-card__identity div {
@@ -830,11 +855,17 @@ onMounted(() => {
   margin: 0;
   word-break: break-all;
 }
-/* Norm 13 §3.5: one column, fields at a readable width (at most 640px, §3.10). */
-.form-card__grid {
-  display: grid;
-  grid-template-columns: minmax(0, 640px);
-  gap: 0 var(--tcrm-space-4);
+.form-card__wide {
+  grid-column: 1 / -1;
+}
+.form-card__grid :deep(.el-date-editor.el-input) {
+  width: 100%;
+}
+@container (max-width: 600px) {
+  .form-card__grid,
+  .form-card__identity {
+    grid-template-columns: minmax(0, 1fr);
+  }
 }
 .tags-editor {
   display: flex;
@@ -843,8 +874,15 @@ onMounted(() => {
   gap: var(--tcrm-space-2);
   width: 100%;
 }
+.tags-editor__entry {
+  display: flex;
+  flex: 1 1 240px;
+  gap: var(--tcrm-space-2);
+  min-width: 0;
+}
 .tags-editor__input {
-  width: 200px;
+  flex: 1;
+  min-width: 0;
 }
 .form-page__actions {
   display: flex;

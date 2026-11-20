@@ -16,8 +16,9 @@ const props = withDefaults(
     hasMore?: boolean;
     hideTitle?: boolean;
     title?: string;
+    inlineActions?: boolean;
   }>(),
-  { chips: () => [], hasMore: false, hideTitle: false, title: undefined }
+  { chips: () => [], hasMore: false, hideTitle: false, title: undefined, inlineActions: false }
 );
 
 const emit = defineEmits<{
@@ -50,7 +51,7 @@ function onEnter(event: KeyboardEvent): void {
   <section class="list-search">
     <header v-if="pageTitle" class="list-search__header">
       <h1>{{ pageTitle }}</h1>
-      <div v-if="$slots.actions" class="list-search__page-actions">
+      <div v-if="$slots.actions && !inlineActions" class="list-search__page-actions">
         <slot name="actions" />
       </div>
     </header>
@@ -77,7 +78,7 @@ function onEnter(event: KeyboardEvent): void {
           >
             {{ expanded ? t("search.collapse") : t("search.expand") }}
           </el-button>
-          <div v-if="$slots.actions && !pageTitle" class="list-search__extra">
+          <div v-if="$slots.actions && (inlineActions || !pageTitle)" class="list-search__extra">
             <slot name="actions" />
           </div>
         </div>
@@ -153,6 +154,14 @@ function onEnter(event: KeyboardEvent): void {
   /* Element Plus never emits an inline margin here on this form (labels sit on top, no
      label-width): a plain declaration is enough (review R-22). */
   margin-left: 0;
+}
+/* Task 156: one width for every filter control in the search row, text inputs and dropdowns
+   alike. A page's `.filter-w-*` class still works elsewhere but must not make a select here
+   narrower than the inputs next to it. Date range pickers keep their own width. */
+.list-search__form :deep(.el-input),
+.list-search__form :deep(.el-select),
+.list-search__form :deep(.el-cascader) {
+  width: 100%;
 }
 .list-search__row,
 .list-search__actions,

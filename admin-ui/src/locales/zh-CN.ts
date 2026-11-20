@@ -258,7 +258,7 @@ const zhCN = {
       transactionItemId: "成交商品ID",
       quantity: "数量",
       orderPaidAmount: "销售额",
-      refundAmount: "同批退款金额",
+      refundAmount: "退款金额",
       netTransactionAmount: "净销售额",
       flowNo: "流水号",
       settlementTime: "结算时间",
@@ -274,7 +274,8 @@ const zhCN = {
         creatorCounts:
           "有成交达人数按所选期间本店支付订单的归属达人去重。总达人数包含这些达人和期间内有本店专属商品链接的达人。",
         orderPaidAmount: "该订单商品行分摊到的实付金额，同一订单的其他商品行分别显示。",
-        refundAmount: "该商品行在支付日起 30 个自然日内完结的成功退款金额。",
+        refundAmount:
+          "同批退款口径：该商品行支付日起 30 个北京时间自然日内完结的成功退款金额，支付日计第 1 天。",
         refundUnits: "当前微店退款记录未提供可核实的退款件数时显示「—」。",
         netTransactionAmount: "该订单商品行的实付金额扣除该行的成功退款。",
         soldProducts: "所选期间内，在该店铺产生支付成交的 SPU 数与 SKU 数，按各自口径去重。",
@@ -1164,22 +1165,32 @@ const zhCN = {
     editTitle: "编辑档案",
     editProfile: "编辑档案",
     editTabTitle: "编辑档案：{name}",
+    detailTabTitle: "详细信息：{name}",
     workbook: {
       download: "下载模板",
       upload: "上传表格",
       title: "批量导入达人",
       guide:
-        "请在 Excel 模板的「达人导入」工作表填写新达人。平台和达人 ID 已存在时，该行会提示重复。",
-      rules: "请填写高亮列。支持 .xlsx，最多 200 行、2 MB。",
+        "请在 Excel 模板的「达人导入」工作表从 B 列开始填写，每位达人占一列。平台和达人 ID 已存在时会提示重复。",
+      rules: "请填写高亮字段。支持 .xlsx，最多 200 位达人、2 MB。",
       file: "选择 Excel 表格",
       submit: "开始导入",
       result: "新增 {created} 条，失败 {failed} 条。",
       row: "第 {row} 行",
+      recordColumn: "{column} 列",
       invalidCell: "「{column}」填写有误，请核对模板中的格式和示例",
       viewList: "查看达人列表"
     },
+    overview: {
+      account: "达人账号基础信息",
+      quality: "质量和分级",
+      audience: "粉丝画像",
+      status: "当前状态",
+      engagementRate: "互动率"
+    },
     updateFollowUp: "更新跟进",
     view: "查看",
+    viewDetails: "查看明细",
     backToList: "返回达人列表",
     notFound: "该达人不存在或已被删除",
     saved: "档案已保存",
@@ -1242,6 +1253,8 @@ const zhCN = {
       engagementRate: "互动率（%）",
       audienceCountry: "国家/地区",
       audienceAgeRange: "年龄段",
+      audienceAgeShare: "年龄占比（%）",
+      audienceGenderShare: "性别占比（%）",
       audienceGender: "性别",
       contact: "联系方式",
       contactPlaceholder: "国家区号 + 号码",
@@ -1258,6 +1271,8 @@ const zhCN = {
       sampleStatus: "寄样状态",
       trackingNo: "寄样单号",
       sampleDate: "寄样日期",
+      sampleType: "样品类型",
+      libraryEntryDate: "达人入库时间",
       followUpRemark: "跟进备注"
     },
     validation: {
@@ -1277,17 +1292,39 @@ const zhCN = {
       contents: "带货数据"
     },
     metric: {
+      costBreakdown: "佣金{commission} + 样品成本{sample} + 坑位费{slot}",
       contentCount: "内容条数",
       clicks: "累计点击量",
       orders: "累计出单量",
       gmv: "累计带货GMV",
-      totalCost: "累计总投入成本",
+      totalCost: "累计投入成本",
       roi: "累计ROI"
     },
+    weekly: {
+      title: "数据明细",
+      updatedAt: "最近数据更新时间",
+      note: "该视频累计数据，含已有历史累计及已保存的周数据",
+      week: "时间",
+      selectWeek: "选择自然周",
+      integer: "整数",
+      decimal: "最多两位小数",
+      submit: "提交本周数据",
+      locked: "提交后该行锁定，并自动新增一行",
+      invalid: "请填写自然周、非负整数及最多两位小数的 GMV",
+      empty: "暂未录入周度数据",
+      noTitle: "未填写视频标题"
+    },
     content: {
+      titleRequired: "请输入内容标题",
+      formRequired: "请选择内容形式",
+      sampleStatus: "样品状态",
+      remark: "备注",
+      viewTitle: "基础信息",
+      publishTitle: "内容标题",
       publishDate: "发布日期",
       contentForm: "内容形式",
       publishUrl: "发布内容链接",
+      publishTitleColumn: "发布内容标题",
       clicks: "点击量",
       orders: "出单量",
       gmv: "带货GMV",
@@ -1295,6 +1332,7 @@ const zhCN = {
       sampleCost: "样品成本",
       slotFee: "坑位费",
       commissionRate: "佣金比例（%）",
+      commissionRateColumn: "佣金比例",
       estimatedCommission: "预估佣金",
       totalCost: "总投入成本",
       actualRoi: "实际ROI",
@@ -1377,15 +1415,15 @@ const zhCN = {
       PHOTO_SHOOT: "寄拍"
     },
     audienceAge: {
-      AGE_18_24: "18~24",
-      AGE_25_34: "25~34",
-      AGE_35_44: "35~44",
-      AGE_45_54: "45~54",
-      AGE_55_PLUS: "55+"
+      AGE_18_24: "18~24岁",
+      AGE_25_34: "25~34岁",
+      AGE_35_44: "35~44岁",
+      AGE_45_54: "45~54岁",
+      AGE_55_PLUS: "55岁及以上"
     },
     audienceGender: {
-      MOSTLY_FEMALE: "女性为主",
-      MOSTLY_MALE: "男性为主",
+      MOSTLY_FEMALE: "女性",
+      MOSTLY_MALE: "男性",
       BALANCED: "均衡"
     }
   },
@@ -1505,6 +1543,16 @@ const zhCN = {
     disabledNotOwned: "仅负责该达人的商务可操作",
     disabledCommissionApproved: "达人审核通过后才能调整佣金",
     editProfileTitle: "资料编辑 - {code}（{name}）",
+    /** Profile dialog tabs and the read-only / edit switch (task 156). */
+    tabProfile: "达人资料",
+    tabInviter: "邀请人资料",
+    inviterHint: "邀请人由达人所属商务自动带出，不可修改",
+    inviterAccountsHint: "两个账号按达人单独记录，不随邀请人带出；同一商务对不同达人可使用不同账号",
+    bdDiscord: "Discord 账号",
+    bdDiscordPlaceholder: "负责该达人的商务 Discord 账号",
+    bdWhatsapp: "WhatsApp 账号",
+    bdWhatsappPlaceholder: "负责该达人的商务 WhatsApp 账号",
+    editProfile: "编辑",
     /** Super-administrator password reset (task 147); the generated password is shown once. */
     resetPassword: "重置密码",
     resetPasswordTitle: "重置达人密码",

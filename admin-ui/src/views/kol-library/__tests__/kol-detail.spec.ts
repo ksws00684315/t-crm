@@ -1,5 +1,5 @@
 import { flushPromises, mount } from "@vue/test-utils";
-import ElementPlus from "element-plus";
+import ElementPlus, { ElMessageBox } from "element-plus";
 import { createPinia, setActivePinia } from "pinia";
 import { createMemoryHistory, createRouter } from "vue-router";
 import { beforeEach, describe, expect, it, vi } from "vitest";
@@ -78,7 +78,7 @@ const content: LibraryContentVO = {
   updateTime: "2026-10-02T00:00:00Z"
 };
 
-async function mountDetail() {
+async function mountDetail(role: "SUPER_ADMIN" | "STAFF" = "SUPER_ADMIN") {
   saveSession({
     token: "tok",
     expiresAt: Date.now() + 60_000,
@@ -87,9 +87,9 @@ async function mountDetail() {
       username: "owner",
       nickname: "Owner",
       email: null,
-      role: "SUPER_ADMIN",
+      role,
       postTemplate: null,
-      permissions: [],
+      permissions: role === "STAFF" ? ["kol-library:view", "kol-library:edit"] : [],
       dataScope: "ALL",
       tenantId: "9",
       tenantName: "B 公司",
@@ -97,9 +97,7 @@ async function mountDetail() {
       status: 1,
       lastLoginTime: null,
       createTime: "2026-10-01T00:00:00Z",
-      companies: [
-        { tenantId: "9", tenantName: "B 公司", role: "SUPER_ADMIN", edition: "KOL_LIBRARY" }
-      ]
+      companies: [{ tenantId: "9", tenantName: "B 公司", role, edition: "KOL_LIBRARY" }]
     }
   });
   setActivePinia(createPinia());
@@ -110,7 +108,7 @@ async function mountDetail() {
     global: { plugins: [ElementPlus, i18n, router] }
   });
   await flushPromises();
-  return wrapper;
+  return { wrapper, router };
 }
 
 describe("library creator detail", () => {
@@ -121,15 +119,15 @@ describe("library creator detail", () => {
   });
 
   it("loads the contents after the profile, so the table is filled on a fresh page", async () => {
-    const wrapper = await mountDetail();
+    const { wrapper } = await mountDetail();
     expect(libraryApi.getLibraryKol).toHaveBeenCalledWith("11");
     // Without waiting for the profile the contents were skipped and never asked for again.
     expect(libraryApi.listLibraryContents).toHaveBeenCalledWith("11");
     wrapper.unmount();
   });
 
-  it("shows the follow-up remark, no cooperation stage and no delete (2026-11-10/11)", async () => {
-    const wrapper = await mountDetail();
+  it("shows the follow-up remark and hides deletion from a staff editor", async () => {
+    const { wrapper } = await mountDetail("STAFF");
     const text = wrapper.text();
     expect(text).toContain("跟进备注");
     expect(text).toContain("call on friday");
@@ -138,9 +136,30 @@ describe("library creator detail", () => {
     wrapper.unmount();
   });
 
+  it("deletes from the detail header, closes both creator tabs and refreshes the list", async () => {
+    vi.mocked(libraryApi.deleteLibraryKol).mockResolvedValue(null);
+    const confirm = vi.spyOn(ElMessageBox, "confirm").mockResolvedValue("confirm" as never);
+    const { wrapper, router } = await mountDetail();
+    const tabs = useTabsStore();
+    for (const path of ["/kol-library/kols", "/kol-library/kols/11", "/kol-library/kols/11/edit"]) {
+      tabs.open({ path, titleKey: path, literalTitle: true, affix: false, componentName: "X" });
+    }
+    const refresh = vi.spyOn(tabs, "refresh");
+    const button = wrapper.get('[data-test="detail-delete"]');
+    expect(button.text()).toBe("删除达人");
+    await button.trigger("click");
+    await vi.waitFor(() => expect(router.currentRoute.value.path).toBe("/kol-library/kols"));
+    expect(libraryApi.deleteLibraryKol).toHaveBeenCalledWith("11");
+    expect(confirm.mock.calls[0][0]).toContain("Beauty by Amy");
+    expect(tabs.tabs.map(tab => tab.path)).toEqual(["/kol-library/kols"]);
+    expect(refresh).toHaveBeenCalledWith("/kol-library/kols");
+    confirm.mockRestore();
+    wrapper.unmount();
+  });
+
   it("edits the follow-up remark in the follow-up dialog", async () => {
     vi.mocked(libraryApi.updateLibraryFollowUp).mockResolvedValue(profile);
-    const wrapper = await mountDetail();
+    const { wrapper } = await mountDetail();
     await wrapper.find('[data-test="detail-follow-up"]').trigger("click");
     await flushPromises();
     const remark = wrapper.find<HTMLTextAreaElement>('textarea[data-test="follow-up-remark"]');

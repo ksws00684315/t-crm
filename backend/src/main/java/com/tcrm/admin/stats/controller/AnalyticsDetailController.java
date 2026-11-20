@@ -1,6 +1,7 @@
 package com.tcrm.admin.stats.controller;
 
 import cn.dev33.satoken.annotation.SaCheckPermission;
+import com.tcrm.admin.order.api.OrderEvidenceApi.DetailSort;
 import com.tcrm.admin.order.api.OrderEvidenceApi.Kind;
 import com.tcrm.admin.order.api.OrderEvidenceApi.ProductBreakdown;
 import com.tcrm.admin.order.api.OrderEvidenceApi.ProductGroup;
@@ -62,7 +63,9 @@ public class AnalyticsDetailController {
             keyword == null || keyword.isBlank() ? null : keyword.strip(),
             activity.kind(),
             activity.page(),
-            activity.size()));
+            activity.size(),
+            activity.sortBy(),
+            activity.sortDirection()));
   }
 
   @GetMapping("/best-sellers/breakdowns")
@@ -73,7 +76,9 @@ public class AnalyticsDetailController {
       @RequestParam(required = false) @Size(max = 100) String keyword,
       @RequestParam ProductBreakdown group,
       @RequestParam(required = false) Integer page,
-      @RequestParam(required = false) Integer size) {
+      @RequestParam(required = false) Integer size,
+      @RequestParam(required = false) DetailSort sortBy,
+      @RequestParam(required = false) String sortDirection) {
     return R.ok(
         details.productBreakdown(
             filters.toFilter(),
@@ -81,7 +86,9 @@ public class AnalyticsDetailController {
             keyword == null || keyword.isBlank() ? null : keyword.strip(),
             group,
             page,
-            size));
+            size,
+            sortBy,
+            sortDirection));
   }
 
   @GetMapping("/kol-ranking/details")
@@ -109,8 +116,12 @@ public class AnalyticsDetailController {
       @RequestParam @Positive long entityId,
       @RequestParam(required = false) Integer page,
       @RequestParam(required = false) Integer size,
-      @RequestParam(defaultValue = "true") boolean currentTeam) {
-    return R.ok(details.inviterCreators(filters.toFilter(), entityId, page, size, currentTeam));
+      @RequestParam(defaultValue = "true") boolean currentTeam,
+      @RequestParam(required = false) DetailSort sortBy,
+      @RequestParam(required = false) String sortDirection) {
+    return R.ok(
+        details.inviterCreators(
+            filters.toFilter(), entityId, page, size, currentTeam, sortBy, sortDirection));
   }
 
   private R<Detail> query(
@@ -128,8 +139,11 @@ public class AnalyticsDetailController {
             null,
             activity.kind(),
             activity.page(),
-            activity.size()));
+            activity.size(),
+            activity.sortBy(),
+            activity.sortDirection()));
   }
 
-  public record ActivityQuery(Kind kind, Integer page, Integer size) {}
+  public record ActivityQuery(
+      Kind kind, Integer page, Integer size, DetailSort sortBy, String sortDirection) {}
 }
