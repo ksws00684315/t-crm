@@ -238,7 +238,9 @@ public class AnalyticsDetailService {
     return result.map(
         row -> {
           var creator = directory.get(row.code());
-          if (creator == null) return row;
+          if (creator == null) {
+            return row;
+          }
           String inviter = creator.bdUserId() == null ? null : owners.get(creator.bdUserId());
           return row.withCreator(creator.name(), creator.kolCode(), inviter);
         });
