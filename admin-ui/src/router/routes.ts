@@ -84,41 +84,41 @@ export const routes: RouteRecordRaw[] = [
           {
             path: "shop-performance",
             name: "AnalyticsShopPerformance",
-            component: () => import("@/views/common/ComingSoon.vue"),
+            component: () => import("@/views/analytics/AnalyticsPage.vue"),
             meta: {
               title: "route.shopPerformance",
               permission: "dashboard:shop",
-              componentName: "ComingSoonPage"
+              componentName: "AnalyticsPage"
             }
           },
           {
             path: "best-sellers",
             name: "AnalyticsBestSellers",
-            component: () => import("@/views/common/ComingSoon.vue"),
+            component: () => import("@/views/analytics/AnalyticsPage.vue"),
             meta: {
               title: "route.bestSellers",
               permission: "dashboard:shop",
-              componentName: "ComingSoonPage"
+              componentName: "AnalyticsPage"
             }
           },
           {
             path: "kol-ranking",
             name: "AnalyticsKolRanking",
-            component: () => import("@/views/common/ComingSoon.vue"),
+            component: () => import("@/views/analytics/AnalyticsPage.vue"),
             meta: {
               title: "route.kolRanking",
               permission: "dashboard:kol",
-              componentName: "ComingSoonPage"
+              componentName: "AnalyticsPage"
             }
           },
           {
             path: "inviter-performance",
             name: "AnalyticsInviterPerformance",
-            component: () => import("@/views/common/ComingSoon.vue"),
+            component: () => import("@/views/analytics/AnalyticsPage.vue"),
             meta: {
               title: "route.inviterPerformance",
               permission: "dashboard:team",
-              componentName: "ComingSoonPage"
+              componentName: "AnalyticsPage"
             }
           }
         ]

@@ -13,6 +13,7 @@ import static org.mockito.Mockito.when;
 import com.baomidou.mybatisplus.core.MybatisConfiguration;
 import com.baomidou.mybatisplus.core.metadata.TableInfoHelper;
 import com.tcrm.admin.integration.api.WeidianBusinessApi.RefundDetailResponse;
+import com.tcrm.admin.order.api.OrderStatsDateChangedEvent;
 import com.tcrm.admin.order.mapper.OrderItemMapper;
 import com.tcrm.admin.order.mapper.OrderMapper;
 import com.tcrm.admin.order.mapper.OrderSettlementFlowMapper;
@@ -20,6 +21,8 @@ import com.tcrm.admin.order.mapper.RefundMapper;
 import com.tcrm.admin.order.model.OrderDO;
 import com.tcrm.admin.order.model.OrderItemDO;
 import com.tcrm.admin.order.model.RefundDO;
+import com.tcrm.admin.shared.CurrentTenantResolver;
+import com.tcrm.admin.shared.TenantScope;
 import com.tcrm.admin.shared.TestTransactions;
 import java.math.BigDecimal;
 import java.time.Instant;
@@ -28,6 +31,7 @@ import org.apache.ibatis.builder.MapperBuilderAssistant;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
+import org.springframework.context.ApplicationEventPublisher;
 import tools.jackson.databind.json.JsonMapper;
 
 class OrderWriterTest {
@@ -36,6 +40,8 @@ class OrderWriterTest {
   private final RefundMapper refunds = mock(RefundMapper.class);
   private final OrderAttribution attribution = mock(OrderAttribution.class);
   private final OrderSettlementFlowMapper settlementFlows = mock(OrderSettlementFlowMapper.class);
+  private final ApplicationEventPublisher events = mock(ApplicationEventPublisher.class);
+  private final CurrentTenantResolver tenantResolver = mock(CurrentTenantResolver.class);
   private final OrderCommissionSync commissionSync =
       new OrderCommissionSync(
           mock(org.springframework.context.ApplicationEventPublisher.class),
@@ -43,7 +49,44 @@ class OrderWriterTest {
           settlementFlows,
           orders);
   private final OrderWriter writer =
-      new OrderWriter(orders, items, refunds, attribution, commissionSync, settlementFlows);
+      new OrderWriter(
+          orders,
+          items,
+          refunds,
+          attribution,
+          commissionSync,
+          settlementFlows,
+          events,
+          tenantResolver);
+
+  @Test
+  void shouldMarkFormerStatisticsDay_whenPaymentTimeMoves() {
+    when(tenantResolver.currentLoginTenantId()).thenReturn(null);
+    var previous = order();
+    previous.setPayTime(Instant.parse("2026-11-02T15:00:00Z"));
+    var next = order();
+    next.setPayTime(Instant.parse("2026-11-02T17:00:00Z"));
+    when(orders.selectOne(any())).thenReturn(previous);
+    when(items.selectList(any())).thenReturn(List.of());
+
+    TestTransactions.template()
+        .executeWithoutResult(status -> writer.save(new OrderPayloadDTO(next, List.of())));
+
+    verify(events).publishEvent(new OrderStatsDateChangedEvent(1L, 10L, previous.getPayTime()));
+  }
+
+  @Test
+  void shouldUseCompanyScopeWhenInsertDoesNotPopulateTenantOnTheOrder() {
+    var order = order();
+    order.setTenantId(null);
+    TenantScope.runCompany(
+        8L,
+        () ->
+            TestTransactions.template()
+                .executeWithoutResult(
+                    status -> writer.save(new OrderPayloadDTO(order, List.of()))));
+    verify(events).publishEvent(new OrderStatsDateChangedEvent(8L, 10L, null));
+  }
 
   @BeforeAll
   static void metadata() {

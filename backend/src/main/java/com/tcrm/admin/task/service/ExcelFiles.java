@@ -9,6 +9,7 @@ import cn.idev.excel.write.handler.SheetWriteHandler;
 import cn.idev.excel.write.handler.context.SheetWriteHandlerContext;
 import com.tcrm.admin.shared.BusinessException;
 import com.tcrm.admin.shared.ErrorCode;
+import com.tcrm.admin.task.api.ExcelExportApi;
 import com.tcrm.admin.task.api.ImportFileDTO;
 import com.tcrm.admin.task.api.ImportTaskApi;
 import java.io.ByteArrayInputStream;
@@ -29,7 +30,7 @@ import org.springframework.stereotype.Component;
  * trimmed text, and writing workbooks with formula-injection escaping.
  */
 @Component
-public class ExcelFiles {
+public class ExcelFiles implements ExcelExportApi {
   /** Upload size limit; Spring multipart is configured with the same value. */
   public static final long MAX_BYTES = 20L * 1024 * 1024;
 
@@ -162,6 +163,22 @@ public class ExcelFiles {
   /** Writes one sheet with a header row; every cell is escaped against formula injection. */
   public byte[] write(List<String> headers, List<List<String>> rows) {
     return write(headers, rows, Set.of());
+  }
+
+  @Override
+  public byte[] export(List<List<String>> metadata, List<String> headers, List<List<String>> rows) {
+    List<List<String>> contents = new ArrayList<>(metadata);
+    contents.add(headers);
+    contents.addAll(rows);
+    var escaped =
+        contents.stream().map(row -> row.stream().map(ExcelFiles::escape).toList()).toList();
+    var out = new ByteArrayOutputStream();
+    FastExcel.write(out)
+        .excelType(ExcelTypeEnum.XLSX)
+        .needHead(false)
+        .sheet(SHEET)
+        .doWrite(escaped);
+    return out.toByteArray();
   }
 
   /**

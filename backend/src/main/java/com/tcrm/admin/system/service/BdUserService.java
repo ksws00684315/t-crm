@@ -76,6 +76,13 @@ public class BdUserService implements BdUserApi {
   }
 
   @Override
+  public List<Long> findMemberIdsByKeyword(String keyword) {
+    return keyword == null || keyword.isBlank()
+        ? List.of()
+        : members.findMemberIdsByKeyword(tenantId(), keyword.strip());
+  }
+
+  @Override
   public List<BdUserDTO> listByIds(Collection<Long> ids) {
     if (ids == null || ids.isEmpty()) {
       return List.of();

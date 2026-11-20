@@ -43,8 +43,19 @@ public class ProductAccessService implements ProductAccessApi {
         .toList();
   }
 
+  @Override
+  public List<RankingInventory> rankingInventory(RankingInventoryScope scope) {
+    return scope.shopIds().isEmpty() ? List.of() : products.rankingInventory(scope);
+  }
+
   private static ProductRefDTO toDto(ProductDO row) {
     return new ProductRefDTO(
-        row.getId(), row.getProductCode(), row.getName(), row.getImageUrl(), row.getStatus());
+        row.getId(),
+        row.getProductCode(),
+        row.getName(),
+        row.getImageUrl(),
+        row.getStatus(),
+        row.getCategory(),
+        row.getWeidianItemId());
   }
 }

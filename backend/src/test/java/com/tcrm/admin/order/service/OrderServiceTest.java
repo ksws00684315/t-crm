@@ -112,7 +112,8 @@ class OrderServiceTest {
               refunds,
               mock(OrderSettlementFlowMapper.class),
               orders),
-          commissionChain);
+          commissionChain,
+          mock(org.springframework.context.ApplicationEventPublisher.class));
 
   @BeforeAll
   static void metadata() {

@@ -1,7 +1,10 @@
 package com.tcrm.admin.kol.api;
 
+import com.tcrm.admin.system.api.BdUserDTO;
+import java.time.Instant;
 import java.util.Collection;
 import java.util.List;
+import java.util.Map;
 
 /** KOL lookups for other modules; product must not depend on kol service/mapper/model. */
 public interface KolApi {
@@ -30,6 +33,18 @@ public interface KolApi {
    * design capacity is a few hundred KOLs.
    */
   List<KolRefDTO> listAll();
+
+  /** Counts visible KOLs enabled at any time in the period; null if history is incomplete. */
+  Long countEnabledDuring(long tenantId, Collection<Long> visibleIds, Instant from, Instant until);
+
+  /** Current pending review count for the visible creator ids. */
+  long countPendingReview(Collection<Long> ids);
+
+  /** Social accounts and display relation status for the scoped dashboard identities. */
+  Map<Long, AnalyticsProfileDTO> analyticsProfiles(
+      Collection<Long> ids, Map<Long, BdUserDTO> owners);
+
+  record AnalyticsProfileDTO(List<String> handles, String primaryPlatform, String relationStatus) {}
 
   /**
    * Pages the IDs of undeleted KOLs that use the link template, in ascending id order (task 11
