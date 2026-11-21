@@ -23,7 +23,13 @@ import { readPageSize } from "@/utils/table-prefs";
 defineOptions({ name: "CopyJobPage" });
 
 const CHANNELS = ["WEIDIAN"] as const;
-const JOB_STATUSES = ["processing", "completed", "partial_failed", "failed"] as const;
+const JOB_STATUSES = [
+  "processing",
+  "completed",
+  "partial_failed",
+  "failed",
+  "HAS_FAILURE"
+] as const;
 
 const { t } = useI18n();
 const route = useRoute();
@@ -65,6 +71,8 @@ function channelText(channel: string | null | undefined): string {
 
 function jobStatusText(status: string): string {
   switch (status) {
+    case "HAS_FAILURE":
+      return t("workbench.jobs");
     case "processing":
       return t("copyJob.jobStatus.processing");
     case "completed":
@@ -283,11 +291,20 @@ function rowActions(row: CopyJobVO) {
  * path, the page is kept alive), so watch the route instead of reading it once on mount.
  */
 watch(
-  () => route.query.jobCode,
-  jobCode => {
+  [() => route.name, () => route.query.jobCode, () => route.query.status],
+  ([routeName, jobCode, status]) => {
+    if (routeName && routeName !== "ProductTasks") return;
+    if (status === "HAS_FAILURE" || status === "processing") {
+      query.jobCode = "";
+      query.targetChannel = "";
+      query.status = status;
+      search();
+      return;
+    }
     const wanted = typeof jobCode === "string" ? jobCode.trim() : "";
     if (!wanted || wanted === query.jobCode) return;
     query.jobCode = wanted;
+    if (query.status === "HAS_FAILURE" || query.status === "processing") query.status = "";
     search();
   },
   { immediate: true }
@@ -295,7 +312,12 @@ watch(
 
 onMounted(() => {
   // The immediate route watch above already searched when a jobCode came with the URL.
-  if (!query.jobCode) void load();
+  if (
+    !route.query.jobCode &&
+    route.query.status !== "HAS_FAILURE" &&
+    route.query.status !== "processing"
+  )
+    void load();
 });
 </script>
 

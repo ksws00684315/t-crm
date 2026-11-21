@@ -95,6 +95,15 @@ public class KolService {
     this.tokens = tokens;
   }
 
+  public long workbenchCreatorCount(Instant from, Instant asOf) {
+    var user = current.user();
+    return kols.selectCount(
+        new LambdaQueryWrapper<KolDO>()
+            .eq(user.ownScope(), KolDO::getBdUserId, user.id())
+            .ge(from != null, KolDO::getCreateTime, from)
+            .lt(KolDO::getCreateTime, asOf));
+  }
+
   public PageResult<KolDTO> page(KolFilterDTO filter) {
     AccountDTO user = current.user();
     Long bd = user.ownScope() ? null : filter.bdUserId();
@@ -493,6 +502,30 @@ public class KolService {
                 .apply("lower(email) = {0}", email)
                 .ne(exceptId != null, KolDO::getId, exceptId))
         > 0;
+  }
+
+  /** A self-registered creator's first BD assignment records the registration-code owner. */
+  public Map<Long, String> registrationInviters(List<KolDTO> visibleApplicants) {
+    var ids =
+        visibleApplicants.stream()
+            .filter(row -> Integer.valueOf(2).equals(row.registerSource()))
+            .map(KolDTO::id)
+            .toList();
+    if (ids.isEmpty()) {
+      return Map.of();
+    }
+    Map<Long, Long> inviterIds = new HashMap<>();
+    history
+        .selectList(
+            new LambdaQueryWrapper<KolBdHistoryDO>()
+                .in(KolBdHistoryDO::getKolId, ids)
+                .isNull(KolBdHistoryDO::getCreateBy)
+                .orderByAsc(KolBdHistoryDO::getStartTime, KolBdHistoryDO::getId))
+        .forEach(row -> inviterIds.putIfAbsent(row.getKolId(), row.getBdUserId()));
+    var names = bdNames(inviterIds.values().stream());
+    Map<Long, String> result = new HashMap<>();
+    inviterIds.forEach((kolId, bdId) -> result.put(kolId, names.get(bdId)));
+    return result;
   }
 
   private Map<Long, String> bdNames(Stream<Long> ids) {

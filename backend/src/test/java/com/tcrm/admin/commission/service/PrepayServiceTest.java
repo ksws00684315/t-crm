@@ -773,6 +773,19 @@ class PrepayServiceTest {
   }
 
   @Test
+  void pendingTasksIncludeOnlyStagesTheUserCanProcess() {
+    service.page(
+        user("prepay:review", "prepay:pay"),
+        new PrepayService.Filter(null, null, "ACTION_REQUIRED", 1, 10));
+    assertThat(pageCalls)
+        .singleElement()
+        .satisfies(
+            call ->
+                assertThat(call.query().statuses())
+                    .containsExactly("PENDING_OPERATIONS_REVIEW", "APPROVED"));
+  }
+
+  @Test
   void shouldListFinanceTasksAcrossBdScopeButBindCompanyAndFilters() {
     when(kols.getByCode("KOL-test")).thenReturn(kol(5L));
     var result =
@@ -787,7 +800,7 @@ class PrepayServiceTest {
               assertThat(call.company()).isEqualTo(COMPANY);
               assertThat(call.query().prepayNo()).isEqualTo("PP-test");
               assertThat(call.query().kolId()).isEqualTo(KOL);
-              assertThat(call.query().status()).isEqualTo("PAID");
+              assertThat(call.query().statuses()).containsExactly("PAID");
               assertThat(call.query().kolIds()).isNull();
               assertThat(call.query().limit()).isEqualTo(10);
               assertThat(call.query().offset()).isEqualTo(10L);

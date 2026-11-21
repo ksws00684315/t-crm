@@ -7,4 +7,9 @@ import java.util.List;
  * creators; company isolation is applied by the tenant plugin, not by this object.
  */
 public record PrepayPageQuery(
-    String prepayNo, Long kolId, String status, List<Long> kolIds, int limit, long offset) {}
+    String prepayNo,
+    Long kolId,
+    List<String> statuses,
+    List<Long> kolIds,
+    int limit,
+    long offset) {}

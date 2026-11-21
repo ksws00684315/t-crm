@@ -29,7 +29,12 @@ const route = useRoute();
 const router = useRouter();
 const me = useUserStore();
 const abilities = computed(() => prepayAbilities(me.user));
-const filters = reactive({ prepayNo: "", kolCode: "", status: "" as PrepayStatus | "" });
+const filters = reactive({
+  prepayNo: "",
+  kolCode: "",
+  status: (route.query.status === "ACTION_REQUIRED" ? "ACTION_REQUIRED" : "") as
+    PrepayStatus | "ACTION_REQUIRED" | ""
+});
 const applied = ref({ ...filters });
 const page = ref(1);
 const size = ref(readPageSize("prepay-tasks", 20));
@@ -64,9 +69,12 @@ const chips = computed<SearchChip[]>(() =>
     .map(([key, value]) => ({
       key,
       label: t(`prepay.${key === "prepayNo" ? "number" : key === "status" ? "statusLabel" : key}`),
-      text: key === "status" ? t(`prepay.status.${value}`) : value
+      text: key === "status" ? statusLabel(value) : value
     }))
 );
+function statusLabel(value: string) {
+  return value === "ACTION_REQUIRED" ? t("workbench.pendingPrepays") : t(`prepay.status.${value}`);
+}
 function params() {
   return {
     prepayNo: applied.value.prepayNo || undefined,
@@ -191,6 +199,13 @@ watch(
   },
   { immediate: true }
 );
+watch(
+  () => route.query.status,
+  status => {
+    filters.status = status === "ACTION_REQUIRED" ? status : "";
+    search();
+  }
+);
 onMounted(load);
 </script>
 <template>
@@ -215,10 +230,10 @@ onMounted(load);
             data-test="prepay-filter-status"
             class="filter-w-md"
             ><el-option
-              v-for="status in PREPAY_STATUSES"
+              v-for="status in ['ACTION_REQUIRED', ...PREPAY_STATUSES]"
               :key="status"
               :value="status"
-              :label="t(`prepay.status.${status}`)" /></el-select
+              :label="statusLabel(status)" /></el-select
         ></el-form-item>
       </template>
     </ListSearch>

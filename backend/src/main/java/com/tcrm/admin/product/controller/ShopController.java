@@ -37,13 +37,20 @@ public class ShopController {
       @RequestParam(required = false) String shopCode,
       @RequestParam(required = false) String shopName,
       @RequestParam(required = false) String channel,
+      @RequestParam(defaultValue = "false") boolean authException,
+      @RequestParam(defaultValue = "false") boolean enabledOnly,
       @RequestParam(defaultValue = "1") @Min(1) int page,
       @RequestParam(defaultValue = "20") @Min(1) @Max(100) int size) {
     if (page < 1 || size < 1 || size > 100) {
       throw new com.tcrm.admin.shared.BusinessException(
           com.tcrm.admin.shared.ErrorCode.COMMON_VALIDATION_FAILED);
     }
-    var result = shops.page(shopCode, shopName, channel, page, size);
+    var result =
+        authException
+            ? shops.page(shopCode, shopName, channel, true, page, size)
+            : enabledOnly
+                ? shops.page(shopCode, shopName, channel, false, true, page, size)
+                : shops.page(shopCode, shopName, channel, page, size);
     return R.ok(
         new PageResult<>(
             result.items().stream().map(ShopVO::from).toList(), result.total(), page, size));

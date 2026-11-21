@@ -9,7 +9,8 @@ import {
   type FormRules,
   type MessageHandler
 } from "element-plus";
-import { computed, h, onMounted, reactive, ref } from "vue";
+import { computed, h, onMounted, reactive, ref, watch } from "vue";
+import { useRoute } from "vue-router";
 import { useI18n } from "vue-i18n";
 import {
   checkShopApis,
@@ -47,6 +48,9 @@ import { readPageSize } from "@/utils/table-prefs";
 defineOptions({ name: "ShopListPage" });
 
 const { t } = useI18n();
+const route = useRoute();
+const enabledOnly = ref(route?.query.enabledOnly === "1");
+const authException = ref(route?.query.authException === "1");
 const userStore = useUserStore();
 const access = computed(() => accessOf(userStore.user));
 const canManage = computed(() => access.value.isSuperAdmin);
@@ -154,6 +158,16 @@ const columns = computed<DataColumn[]>(() => {
 
 const chips = computed<SearchChip[]>(() => {
   const result: SearchChip[] = [];
+  if (authException.value) {
+    result.push({
+      key: "authException",
+      label: t("workbench.authExceptions"),
+      text: t("workbench.authExceptions")
+    });
+  }
+  if (enabledOnly.value) {
+    result.push({ key: "enabledOnly", label: t("common.status"), text: t("common.enabled") });
+  }
   if (applied.value.shopCode) {
     result.push({ key: "shopCode", label: t("shop.code"), text: applied.value.shopCode });
   }
@@ -178,6 +192,8 @@ async function load() {
       shopCode: applied.value.shopCode || undefined,
       shopName: applied.value.shopName || undefined,
       channel: applied.value.channel || undefined,
+      ...(enabledOnly.value ? { enabledOnly: true } : {}),
+      ...(authException.value ? { authException: true } : {}),
       page: page.value,
       size: size.value
     });
@@ -202,13 +218,14 @@ function search() {
 }
 
 function reset() {
-  query.shopCode = "";
-  query.shopName = "";
-  query.channel = "";
-  search();
+  authException.value = false;
+  enabledOnly.value = false;
+  resetShopSearch();
 }
 
 function removeChip(key: string) {
+  if (key === "authException") authException.value = false;
+  if (key === "enabledOnly") enabledOnly.value = false;
   if (key === "shopCode") query.shopCode = "";
   if (key === "shopName") query.shopName = "";
   if (key === "channel") query.channel = "";
@@ -530,6 +547,30 @@ function moreActions(row: ShopVO): RowAction[] {
 function runMoreAction(row: ShopVO, key: string): void {
   const action = moreActions(row).find(item => item.key === key);
   if (action && !action.disabled) action.onClick?.();
+}
+
+watch(
+  () => route?.fullPath,
+  () => {
+    if (route?.name !== "ShopManagement") return;
+    if (
+      !authException.value &&
+      !enabledOnly.value &&
+      route.query.authException !== "1" &&
+      route.query.enabledOnly !== "1"
+    )
+      return;
+    authException.value = route.query.authException === "1";
+    enabledOnly.value = route.query.enabledOnly === "1";
+    resetShopSearch();
+  }
+);
+
+function resetShopSearch() {
+  query.shopCode = "";
+  query.shopName = "";
+  query.channel = "";
+  search();
 }
 
 onMounted(() => {

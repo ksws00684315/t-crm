@@ -99,6 +99,16 @@ const query = computed<RankingQuery>(() => ({
   sortBy: sortBy.value,
   sortDirection: sortDirection.value
 }));
+const exportQuery = computed(() => {
+  const shown = displayedQuery.value;
+  if (loading.value || !shown || !result.value) return undefined;
+  const requested = query.value;
+  const keys = new Set([
+    ...Object.keys(shown),
+    ...Object.keys(requested)
+  ] as (keyof RankingQuery)[]);
+  return [...keys].every(key => shown[key] === requested[key]) ? shown : undefined;
+});
 const metrics = computed(() => result.value?.summary.metrics);
 const displayedSort = computed(() => displayedQuery.value ?? query.value);
 const rows = computed(() => result.value?.ranking.items ?? []);
@@ -730,10 +740,11 @@ function changeSize(next: number): void {
   void load();
 }
 async function download(): Promise<void> {
-  if (exporting.value || loading.value || !displayedQuery.value || !result.value) return;
+  const displayed = exportQuery.value;
+  if (exporting.value || !displayed) return;
   exporting.value = true;
   try {
-    const file = await exportAnalytics(board, displayedQuery.value);
+    const file = await exportAnalytics(board, displayed);
     saveBlob(file.blob, file.fileName ?? `${board}.xlsx`);
   } catch {
     ElMessage.error(t("analytics.exportFailed"));
@@ -743,15 +754,17 @@ async function download(): Promise<void> {
 }
 
 function applyShopShortcut(): boolean {
-  if (!product || route.name !== "AnalyticsBestSellers") {
+  const workbenchRanking =
+    (route.name === "AnalyticsShopPerformance" || route.name === "AnalyticsKolRanking") &&
+    route.query.sortBy === "salesAmount";
+  if (!workbenchRanking && (!product || route.name !== "AnalyticsBestSellers")) {
     lastShopShortcut = undefined;
     return false;
   }
   const { shopId, startDate, endDate } = route.query;
   if (
     route.fullPath === lastShopShortcut ||
-    typeof shopId !== "string" ||
-    !/^[1-9][0-9]{0,18}$/.test(shopId)
+    (!workbenchRanking && (typeof shopId !== "string" || !/^[1-9][0-9]{0,18}$/.test(shopId)))
   )
     return false;
   lastShopShortcut = route.fullPath;
@@ -763,7 +776,15 @@ function applyShopShortcut(): boolean {
     validDates({ startDate, endDate })
       ? { startDate, endDate }
       : undefined;
-  draft.value = { ...(range ?? dates()), shopId };
+  if (workbenchRanking && range) {
+    draft.value = { ...range, affiliateOnly: true };
+    sortBy.value = "salesAmount";
+    sortDirection.value = "desc";
+  } else if (!workbenchRanking) {
+    draft.value = { ...(range ?? dates()), shopId: shopId as string };
+  } else {
+    return false;
+  }
   applied.value = { ...draft.value };
   initialPeriodMode.value = range
     ? range.startDate === range.endDate
@@ -998,6 +1019,7 @@ onUnmounted(stop);
       :page-sizes="[20, 50, 100]"
       :total="Number(result?.ranking.total ?? 0)"
       :exportable="canExport(me.user)"
+      :export-disabled="!exportQuery"
       :exporting="exporting"
       @export="download"
       @refresh="refresh"
@@ -1006,12 +1028,7 @@ onUnmounted(stop);
       @update:size="changeSize"
     >
       <template #title>
-        <div>
-          <h2 class="analytics-ranking__title">{{ t(`analytics.${board}.ranking`) }}</h2>
-          <p v-if="inviter" class="analytics-ranking__hint">
-            {{ t("analytics.inviter-performance.rankingHint") }}
-          </p>
-        </div>
+        <h2 class="analytics-ranking__title">{{ t(`analytics.${board}.ranking`) }}</h2>
       </template>
       <template #toolbar>
         <el-tag v-if="result" effect="light" type="primary">
@@ -1265,23 +1282,18 @@ onUnmounted(stop);
   flex-shrink: 0;
 }
 .conversion-chain__intro h2,
-.conversion-chain__intro p,
-.analytics-ranking__hint {
+.conversion-chain__intro p {
   margin: 0;
 }
 .conversion-chain__intro h2 {
   font-size: var(--tcrm-font-size-section);
 }
-.conversion-chain__intro p,
-.analytics-ranking__hint {
+.conversion-chain__intro p {
   font-size: var(--tcrm-font-size-help);
   line-height: var(--tcrm-line-height-body);
 }
 .conversion-chain__intro p {
   margin-top: var(--tcrm-space-1);
-}
-.analytics-ranking__hint {
-  color: var(--tcrm-color-text-secondary);
 }
 .conversion-chain__step {
   background: linear-gradient(110deg, var(--tcrm-color-muted), var(--tcrm-color-card));

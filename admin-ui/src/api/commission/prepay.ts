@@ -76,7 +76,7 @@ export interface PrepayDetail extends PrepayRow {
 export interface PrepayQuery {
   prepayNo?: string;
   kolCode?: string;
-  status?: PrepayStatus;
+  status?: PrepayStatus | "ACTION_REQUIRED";
   page: number;
   size: number;
 }

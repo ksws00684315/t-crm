@@ -35,6 +35,7 @@ public class FinanceTaskController {
   @SaCheckPermission(
       value = {
         "withdrawal:review",
+        "withdrawal:pay",
         "prepay:review",
         "prepay:finance-review",
         "prepay:pay",

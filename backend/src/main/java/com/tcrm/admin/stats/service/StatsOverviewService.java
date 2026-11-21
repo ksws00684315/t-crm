@@ -49,6 +49,16 @@ public class StatsOverviewService {
     return overview(resolve(filter));
   }
 
+  OrderStatsApi.SalesWindowDTO workbenchSales(FilterDTO filter, Instant asOf) {
+    var resolved = resolve(filter);
+    return orders.salesWindow(resolved.scope(), resolved.period().from(), asOf);
+  }
+
+  OrderStatsApi.CommissionWindowDTO workbenchCommission(FilterDTO filter, Instant asOf) {
+    var resolved = resolve(filter);
+    return orders.commissionWindow(resolved.scope(), resolved.period().from(), asOf);
+  }
+
   boolean canViewCommission() {
     return canView("commission:view");
   }
@@ -93,7 +103,8 @@ public class StatsOverviewService {
             null,
             matchedCreators,
             matchedInviters,
-            productKeyword);
+            productKeyword,
+            filter.affiliateOnly());
     return new ResolvedFilter(
         scope,
         period,
@@ -190,7 +201,45 @@ public class StatsOverviewService {
       String channel,
       String creatorKeyword,
       String inviterKeyword,
-      String productKeyword) {
+      String productKeyword,
+      boolean affiliateOnly) {
+    public FilterDTO withAffiliateOnly(boolean enabled) {
+      return new FilterDTO(
+          startDate,
+          endDate,
+          shopId,
+          kolId,
+          inviterId,
+          channel,
+          creatorKeyword,
+          inviterKeyword,
+          productKeyword,
+          enabled);
+    }
+
+    public FilterDTO(
+        LocalDate startDate,
+        LocalDate endDate,
+        Long shopId,
+        Long kolId,
+        Long inviterId,
+        String channel,
+        String creatorKeyword,
+        String inviterKeyword,
+        String productKeyword) {
+      this(
+          startDate,
+          endDate,
+          shopId,
+          kolId,
+          inviterId,
+          channel,
+          creatorKeyword,
+          inviterKeyword,
+          productKeyword,
+          false);
+    }
+
     public FilterDTO(
         LocalDate startDate,
         LocalDate endDate,

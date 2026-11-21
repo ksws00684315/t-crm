@@ -2,12 +2,16 @@ package com.tcrm.admin.order.mapper;
 
 import com.baomidou.mybatisplus.annotation.InterceptorIgnore;
 import com.tcrm.admin.order.api.OrderStatsApi.BestCreatorDTO;
+import com.tcrm.admin.order.api.OrderStatsApi.CommissionWindowDTO;
 import com.tcrm.admin.order.api.OrderStatsApi.CreatorCommissionDTO;
 import com.tcrm.admin.order.api.OrderStatsApi.InviterCommissionDTO;
 import com.tcrm.admin.order.api.OrderStatsApi.RankDimension;
 import com.tcrm.admin.order.api.OrderStatsApi.RankFactsDTO;
+import com.tcrm.admin.order.api.OrderStatsApi.SalesWindowDTO;
 import com.tcrm.admin.order.api.OrderStatsApi.ScopeDTO;
 import com.tcrm.admin.order.api.OrderStatsApi.TotalsDTO;
+import com.tcrm.admin.order.api.OrderStatsApi.WorkbenchRankDTO;
+import java.math.BigDecimal;
 import java.time.Instant;
 import java.util.List;
 import org.apache.ibatis.annotations.Mapper;
@@ -56,6 +60,7 @@ public interface OrderStatsMapper {
       <if test="scope.productKeyword != null">
         AND EXISTS (SELECT 1 FROM product_items matched WHERE matched.id = i.id)
       </if>
+      <if test="scope.affiliateOnly">AND i.kol_id IS NOT NULL</if>
       """;
 
   String MATCHED_REFUND =
@@ -63,6 +68,11 @@ public interface OrderStatsMapper {
       <if test="scope.productKeyword != null">
         AND EXISTS (SELECT 1 FROM product_items matched WHERE matched.id = r.order_item_id
           AND matched.order_id = r.order_id)
+      </if>
+      <if test="scope.affiliateOnly">
+        AND EXISTS (SELECT 1 FROM crm_order_item line
+          WHERE line.tenant_id = #{scope.tenantId} AND NOT line.is_deleted
+            AND line.id = r.order_item_id AND line.order_id = r.order_id AND line.kol_id IS NOT NULL)
       </if>
       """;
 
@@ -77,19 +87,25 @@ public interface OrderStatsMapper {
       scoped_orders AS NOT MATERIALIZED (
         SELECT o.id, o.shop_id, o.kol_id, o.bd_user_id, o.pay_time,
         <choose>
-          <when test="scope.productKeyword != null">matched.amount</when>
+          <when test="scope.affiliateOnly or scope.productKeyword != null">matched.amount</when>
           <otherwise>o.pay_amount</otherwise>
         </choose>
         AS pay_amount, o.update_time
         FROM crm_order o
-        <if test="scope.productKeyword != null">
+        <if test="scope.affiliateOnly or scope.productKeyword != null">
           JOIN LATERAL (
             SELECT COALESCE(SUM(i.pay_amount), 0) AS amount
-            FROM product_items i WHERE i.order_id = o.id HAVING COUNT(*) &gt; 0
+            FROM crm_order_item i WHERE i.order_id = o.id AND i.tenant_id = #{scope.tenantId}
+              AND NOT i.is_deleted
+      """
+          + MATCHED_ITEM
+          + """
+            HAVING COUNT(*) &gt; 0
           ) matched ON TRUE
         </if>
         WHERE o.tenant_id = #{scope.tenantId} AND NOT o.is_deleted
           AND o.pay_time IS NOT NULL
+        <if test="scope.affiliateOnly">AND o.attribution_status = 'ATTRIBUTED'</if>
         <if test="scope.ownerId != null">AND o.bd_user_id = #{scope.ownerId}</if>
         <if test="scope.shopId != null">AND o.shop_id = #{scope.shopId}</if>
         <if test="scope.kolId != null">AND o.kol_id = #{scope.kolId}</if>
@@ -256,6 +272,100 @@ public interface OrderStatsMapper {
       """)
   List<InviterCommissionDTO> inviterCommissions(
       @Param("scope") ScopeDTO scope, @Param("from") Instant from, @Param("until") Instant until);
+
+  @InterceptorIgnore(tenantLine = "true")
+  @Select(
+      SCOPED_PAID_ORDERS
+          + """
+      commission_orders AS (
+        SELECT p.id, BOOL_AND(s.id IS NOT NULL) AS verified,
+          SUM(s.accrued_commission_cny) AS accrued,
+          BOOL_OR(s.accrued_commission_cny &gt; COALESCE(s.released_commission_cny, 0)) AS unsettled
+        FROM paid p
+        JOIN crm_order_item i ON i.order_id = p.id AND i.tenant_id = #{scope.tenantId}
+          AND NOT i.is_deleted AND i.kol_id IS NOT NULL
+        LEFT JOIN crm_commission_item_state s ON s.order_item_id = i.id AND s.order_id = p.id
+          AND s.tenant_id = i.tenant_id AND s.kol_id = i.kol_id AND s.verified AND NOT s.is_deleted
+        GROUP BY p.id
+      )
+      SELECT CASE WHEN COUNT(*) FILTER (WHERE NOT verified) = 0
+        THEN COALESCE(SUM(accrued) FILTER (WHERE unsettled), 0) END
+      FROM commission_orders
+      </script>
+      """)
+  BigDecimal unsettledCommission(
+      @Param("scope") ScopeDTO scope, @Param("from") Instant from, @Param("until") Instant until);
+
+  @InterceptorIgnore(tenantLine = "true")
+  @Select(
+      SCOPED_ORDERS
+          + """
+      SELECT COALESCE(SUM(pay_amount), 0) AS total_amount, COUNT(*) AS total_orders,
+        COALESCE(SUM(pay_amount) FILTER (WHERE pay_time &gt;= #{dayStart}), 0) AS today_amount,
+        COUNT(*) FILTER (WHERE pay_time &gt;= #{dayStart}) AS today_orders
+      FROM scoped_orders WHERE pay_time &lt; #{asOf}
+      </script>
+      """)
+  SalesWindowDTO salesWindow(
+      @Param("scope") ScopeDTO scope,
+      @Param("dayStart") Instant dayStart,
+      @Param("asOf") Instant asOf);
+
+  @InterceptorIgnore(tenantLine = "true")
+  @Select(
+      SCOPED_ORDERS
+          + """
+      , commission_lines AS (
+        SELECT p.pay_time, s.id, s.accrued_commission_cny
+        FROM scoped_orders p
+        JOIN crm_order_item i ON i.order_id = p.id AND i.tenant_id = #{scope.tenantId}
+          AND NOT i.is_deleted AND i.kol_id IS NOT NULL
+        LEFT JOIN crm_commission_item_state s ON s.order_item_id = i.id AND s.order_id = p.id
+          AND s.tenant_id = i.tenant_id AND s.kol_id = i.kol_id AND s.verified AND NOT s.is_deleted
+        WHERE p.pay_time &lt; #{asOf}
+      )
+      SELECT CASE WHEN COUNT(*) FILTER (WHERE id IS NULL) = 0
+          THEN COALESCE(SUM(accrued_commission_cny), 0) END AS total_amount,
+        CASE WHEN COUNT(*) FILTER (WHERE id IS NULL AND pay_time &gt;= #{dayStart}) = 0
+          THEN COALESCE(SUM(accrued_commission_cny) FILTER (WHERE pay_time &gt;= #{dayStart}), 0)
+        END AS today_amount
+      FROM commission_lines
+      </script>
+      """)
+  CommissionWindowDTO commissionWindow(
+      @Param("scope") ScopeDTO scope,
+      @Param("dayStart") Instant dayStart,
+      @Param("asOf") Instant asOf);
+
+  @InterceptorIgnore(tenantLine = "true")
+  @Select(
+      SCOPED_ORDERS
+          + """
+      <choose>
+        <when test="dimension.name() == 'SHOP'">
+          SELECT p.shop_id AS entity_id, COUNT(*) AS quantity, SUM(p.pay_amount) AS amount
+          FROM scoped_orders p WHERE p.pay_time &lt; #{asOf}
+          <if test="from != null">AND p.pay_time &gt;= #{from}</if>
+          GROUP BY p.shop_id
+        </when>
+        <otherwise>
+          SELECT p.kol_id AS entity_id, SUM(i.quantity) AS quantity, SUM(i.pay_amount) AS amount
+          FROM scoped_orders p
+          JOIN crm_order_item i ON i.order_id = p.id AND i.tenant_id = #{scope.tenantId}
+            AND NOT i.is_deleted AND i.kol_id IS NOT NULL
+          WHERE p.pay_time &lt; #{asOf} AND p.kol_id IS NOT NULL
+          <if test="from != null">AND p.pay_time &gt;= #{from}</if>
+          GROUP BY p.kol_id
+        </otherwise>
+      </choose>
+      ORDER BY amount DESC NULLS LAST, entity_id
+      </script>
+      """)
+  List<WorkbenchRankDTO> workbenchRanks(
+      @Param("scope") ScopeDTO scope,
+      @Param("dimension") RankDimension dimension,
+      @Param("from") Instant from,
+      @Param("asOf") Instant asOf);
 
   String COHORT_REFUND_WINDOW =
       """

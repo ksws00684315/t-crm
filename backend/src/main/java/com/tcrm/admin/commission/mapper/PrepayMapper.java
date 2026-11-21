@@ -145,7 +145,9 @@ public interface PrepayMapper {
       <where>
         <if test="q.prepayNo != null">AND prepay_no = #{q.prepayNo}</if>
         <if test="q.kolId != null">AND kol_id = #{q.kolId}</if>
-        <if test="q.status != null">AND status = #{q.status}</if>
+        <if test="q.statuses != null">AND status IN
+          <foreach collection="q.statuses" item="status" open="(" separator="," close=")">#{status}</foreach>
+        </if>
         <if test="q.kolIds != null">
           AND kol_id IN
           <foreach collection="q.kolIds" item="id" open="(" separator="," close=")">#{id}</foreach>
@@ -163,7 +165,9 @@ public interface PrepayMapper {
       <where>
         <if test="q.prepayNo != null">AND prepay_no = #{q.prepayNo}</if>
         <if test="q.kolId != null">AND kol_id = #{q.kolId}</if>
-        <if test="q.status != null">AND status = #{q.status}</if>
+        <if test="q.statuses != null">AND status IN
+          <foreach collection="q.statuses" item="status" open="(" separator="," close=")">#{status}</foreach>
+        </if>
         <if test="q.kolIds != null">
           AND kol_id IN
           <foreach collection="q.kolIds" item="id" open="(" separator="," close=")">#{id}</foreach>

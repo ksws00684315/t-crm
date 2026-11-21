@@ -200,6 +200,17 @@ describe("installGuard with the real route table", () => {
     expect((await navigate(superAdmin, "/platform/tenants")).path).toBe("/403");
   });
 
+  it("opens the workbench withdrawal destination for a payment-only account", async () => {
+    const payer: AbilitySubject = {
+      role: "STAFF",
+      dataScope: "ALL",
+      permissions: ["withdrawal:pay"]
+    };
+    expect((await navigate(payer, "/fund/payouts?status=ACTION_REQUIRED")).name).toBe(
+      "FundPayouts"
+    );
+  });
+
   it("declares access with a permission code, superAdmin or platformAdmin", () => {
     const layout = routes.find(route => route.path === "/");
     const flags = (layout?.children ?? []).map(route => [
@@ -258,10 +269,10 @@ describe("installGuard with the real route table", () => {
       // The chain page opens in its own tab from the order list (task 40 §4).
       ["orders/:id/chain", "order:view", false]
     ]);
-    // Payouts need commission visibility alone (task 82); prepays also accept the prepay roles.
+    // The withdrawal and prepay queues each accept their own action permissions.
     const fund = layout?.children?.find(route => route.path === "fund");
     expect(fund?.children?.map(route => route.meta?.permission ?? null)).toEqual([
-      ["commission:view"],
+      ["commission:view", "withdrawal:review", "withdrawal:pay"],
       ["commission:view", "prepay:review", "prepay:finance-review", "prepay:pay"],
       "commission:view",
       "commission:view"
