@@ -393,8 +393,9 @@ async function submitPayment() {
             :key="stage"
             :class="{ current: index === progress, complete: index < progress }"
           >
-            <span class="step-dot">{{ index + 1 }}</span
-            ><span>{{ t(`prepay.status.${stage}`) }}</span>
+            <span class="step-dot">{{ index + 1 }}</span><span>{{
+              t(`prepay.status.${stage}`)
+            }}</span>
           </li>
         </ol>
         <el-tabs v-model="activeTab">
@@ -430,10 +431,10 @@ async function submitPayment() {
                 :key="index"
                 :timestamp="formatInstant(item.time)"
               >
-                <strong>{{ t(`prepay.action.${item.action}`) }}</strong
-                ><span class="history-person">{{
-                  person(item.operatorName, item.operatorRole)
-                }}</span>
+                <strong>{{ t(`prepay.action.${item.action}`) }}</strong><span
+                  class="history-person"
+                  >{{ person(item.operatorName, item.operatorRole) }}</span
+                >
                 <p v-if="item.reason" class="record-reason">{{ item.reason }}</p>
               </el-timeline-item>
             </el-timeline>

@@ -68,12 +68,15 @@ class LibraryKolServiceTest {
         null,
         null,
         null,
+        null,
+        null,
         List.of(),
         null,
         outreach,
         owner,
         null,
         "NOT_SENT",
+        null,
         null,
         null,
         followUpRemark);
@@ -183,12 +186,18 @@ class LibraryKolServiceTest {
     service.updateFollowUp(
         7L,
         new LibraryFollowUpCommand(
-            "COOPERATING", LocalDate.of(2026, 11, 5), "SHIPPED", "SF1", null, " ship by friday "));
+            "COOPERATING",
+            LocalDate.of(2026, 11, 5),
+            "SHIPPED",
+            "GIFT",
+            "SF1",
+            null,
+            " ship by friday "));
 
     ArgumentCaptor<Wrapper<LibraryKolDO>> update = ArgumentCaptor.forClass(Wrapper.class);
     verify(kols).update(isNull(), update.capture());
     var wrapper = (LambdaUpdateWrapper<LibraryKolDO>) update.getValue();
-    assertThat(wrapper.getSqlSet()).contains("follow_up_remark");
+    assertThat(wrapper.getSqlSet()).contains("follow_up_remark", "sample_type");
     assertThat(wrapper.getParamNameValuePairs()).containsValue("ship by friday");
   }
 }

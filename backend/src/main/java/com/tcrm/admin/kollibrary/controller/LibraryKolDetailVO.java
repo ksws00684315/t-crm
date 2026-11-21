@@ -21,6 +21,8 @@ public record LibraryKolDetailVO(
     String audienceCountry,
     String audienceAgeRange,
     String audienceGender,
+    BigDecimal audienceAgeShare,
+    BigDecimal audienceGenderShare,
     String contact,
     String contentQuality,
     String salesPotential,
@@ -32,6 +34,7 @@ public record LibraryKolDetailVO(
     String followUpOwner,
     LocalDate lastContactDate,
     String sampleStatus,
+    String sampleType,
     String trackingNo,
     LocalDate sampleDate,
     String followUpRemark,
@@ -49,7 +52,10 @@ public record LibraryKolDetailVO(
       long orders,
       BigDecimal gmv,
       BigDecimal totalCost,
-      BigDecimal roi) {}
+      BigDecimal roi,
+      BigDecimal commissionCost,
+      BigDecimal sampleCost,
+      BigDecimal slotFee) {}
 
   public static LibraryKolDetailVO from(LibraryKolDTO.Detail dto) {
     LibraryKolDTO.Totals t = dto.totals();
@@ -67,6 +73,8 @@ public record LibraryKolDetailVO(
         dto.audienceCountry(),
         dto.audienceAgeRange(),
         dto.audienceGender(),
+        dto.audienceAgeShare(),
+        dto.audienceGenderShare(),
         dto.contact(),
         dto.contentQuality(),
         dto.salesPotential(),
@@ -78,11 +86,21 @@ public record LibraryKolDetailVO(
         dto.followUpOwner(),
         dto.lastContactDate(),
         dto.sampleStatus(),
+        dto.sampleType(),
         dto.trackingNo(),
         dto.sampleDate(),
         dto.followUpRemark(),
         dto.createTime(),
         dto.updateTime(),
-        new TotalsVO(t.contentCount(), t.clicks(), t.orders(), t.gmv(), t.totalCost(), t.roi()));
+        new TotalsVO(
+            t.contentCount(),
+            t.clicks(),
+            t.orders(),
+            t.gmv(),
+            t.totalCost(),
+            t.roi(),
+            t.commissionCost(),
+            t.sampleCost(),
+            t.slotFee()));
   }
 }

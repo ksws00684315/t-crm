@@ -127,6 +127,25 @@ describe("finance permissions and state transitions", () => {
     );
   });
 
+  it("keeps the preview config version numeric and increments it on save", () => {
+    const api = createFinanceDemo();
+    const config = api.getConfig("SUPER_ADMIN", "data");
+    const saved = api.saveConfig("SUPER_ADMIN", "data", { ...config, minimum: "300.00" });
+    expect(saved.version).toBe(config.version + 1);
+    expect(typeof saved.version).toBe("number");
+  });
+
+  it("replaces a legacy preview config label with a numeric version", () => {
+    const api = createFinanceDemo();
+    const saved = api.snapshot();
+    saved.config.version = "CFG-2026-10-V1" as unknown as number;
+    api.hydrate(saved);
+    const config = api.getConfig("SUPER_ADMIN", "data");
+    expect(config.version).toBe(1);
+    const next = api.saveConfig("SUPER_ADMIN", "data", { ...config, minimum: "300.00" });
+    expect(next.version).toBe(2);
+  });
+
   it("redacts the response of a successful business-development review", () => {
     const api = createFinanceDemo();
     const result = api.review("BD", "data", "102371", "APPROVE", "t1023_review");

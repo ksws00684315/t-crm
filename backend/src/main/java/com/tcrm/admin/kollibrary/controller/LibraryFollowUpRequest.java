@@ -12,11 +12,18 @@ public record LibraryFollowUpRequest(
     @Size(max = 16) String outreachStatus,
     LocalDate lastContactDate,
     @Size(max = 16) String sampleStatus,
+    @Size(max = 16) String sampleType,
     @Size(max = 64) String trackingNo,
     LocalDate sampleDate,
     @Size(max = 1000) String followUpRemark) {
   public LibraryFollowUpCommand toCommand() {
     return new LibraryFollowUpCommand(
-        outreachStatus, lastContactDate, sampleStatus, trackingNo, sampleDate, followUpRemark);
+        outreachStatus,
+        lastContactDate,
+        sampleStatus,
+        sampleType,
+        trackingNo,
+        sampleDate,
+        followUpRemark);
   }
 }

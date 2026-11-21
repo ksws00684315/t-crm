@@ -467,8 +467,7 @@ function savePassword() {
                   type="primary"
                   :loading="payoutBusy || qrUploading"
                   @click="savePayout"
-                  >{{ t("common.save") }}</el-button
-                ><RouterLink to="/payout-accounts">{{
+                  >{{ t("common.save") }}</el-button><RouterLink to="/payout-accounts">{{
                   t("account.managePayoutAccounts")
                 }}</RouterLink>
               </div>

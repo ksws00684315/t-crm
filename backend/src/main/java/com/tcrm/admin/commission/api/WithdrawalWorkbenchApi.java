@@ -19,7 +19,9 @@ public class WithdrawalWorkbenchApi {
   }
 
   public long pendingPrepays(AccountDTO user) {
-    return prepays.page(user, new PrepayService.Filter(null, null, "ACTION_REQUIRED", 1, 1)).total();
+    return prepays
+        .page(user, new PrepayService.Filter(null, null, "ACTION_REQUIRED", 1, 1))
+        .total();
   }
 
   public Pending pending(AccountDTO user) {

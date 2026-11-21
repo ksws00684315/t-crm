@@ -26,6 +26,8 @@ function detail(overrides: Partial<KolDetailVO> = {}): KolDetailVO {
     ],
     bdUserId: null,
     bdUserName: null,
+    bdDiscord: null,
+    bdWhatsapp: null,
     defaultRate: null,
     status: 1,
     remark: null,

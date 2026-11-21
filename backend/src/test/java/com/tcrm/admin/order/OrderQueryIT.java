@@ -308,6 +308,7 @@ class OrderQueryIT {
         .andExpect(jsonPath("$.data.shops[0].id").value("10"));
     for (String board : List.of("best-sellers", "kol-ranking", "inviter-performance")) {
       String path = "/admin-api/stats/" + board;
+      boolean product = "best-sellers".equals(board);
       mvc.perform(get(path)).andExpect(status().isUnauthorized());
       mvc.perform(
               get(path)
@@ -325,10 +326,9 @@ class OrderQueryIT {
                   .param("endDate", "2026-10-16")
                   .header("X-Admin-Token", admin))
           .andExpect(status().isOk())
-          .andExpect(jsonPath("$.data.sortBy").value("netSalesAmount"))
+          .andExpect(jsonPath("$.data.sortBy").value(product ? "salesAmount" : "netSalesAmount"))
           .andExpect(jsonPath("$.data.summary.metrics.paidOrderCount").value("1"))
-          .andExpect(
-              jsonPath("$.data.ranking.total").value("best-sellers".equals(board) ? "2" : "1"));
+          .andExpect(jsonPath("$.data.ranking.total").value(product ? "2" : "1"));
       byte[] exported =
           mvc.perform(
                   get(path + "/exports")

@@ -105,8 +105,9 @@ const paymentColumns = computed<DataColumn[]>(() =>
               }}</template>
               <template #cell-actualAmount="{ row }">{{
                 formatAmountWithCurrency(row.actualAmount, row.actualCurrency)
-              }}</template
-              ><template #cell-actualCurrency="{ row }">{{ row.actualCurrency }}</template>
+              }}</template><template #cell-actualCurrency="{ row }">{{
+                row.actualCurrency
+              }}</template>
               <template #cell-paidAt="{ row }">{{ formatInstant(row.paidAt) }}</template>
               <template #cell-deduct="{ row }">{{
                 row.type === "PREPAY" ? t(row.deduct ? "finance.yes" : "finance.no") : "—"

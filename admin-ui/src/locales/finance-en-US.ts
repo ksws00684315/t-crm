@@ -230,6 +230,7 @@ export default {
   thresholdNote:
     "Minimum {minimum} CNY; withdrawable {available} CNY. Frozen, withdrawing, deducted prepayments and incomplete details affect eligibility.",
   validAmount: "Enter a positive amount with at most two decimal places",
+  validFreezeDays: "Enter freeze days between 0 and 365",
   belowMinimum: "Amount is below the minimum withdrawal threshold",
   insufficient:
     "Insufficient withdrawable balance. Check frozen, withdrawing and deducted prepayments.",

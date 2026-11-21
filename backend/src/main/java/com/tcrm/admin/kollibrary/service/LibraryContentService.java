@@ -8,16 +8,22 @@ import com.tcrm.admin.kollibrary.model.LibraryContentForm;
 import com.tcrm.admin.kollibrary.model.LibraryKolContentDO;
 import com.tcrm.admin.kollibrary.model.LibraryKolDO;
 import com.tcrm.admin.kollibrary.model.LibraryOption;
-import com.tcrm.admin.kollibrary.model.LibrarySampleType;
+import com.tcrm.admin.kollibrary.model.LibrarySampleStatus;
 import com.tcrm.admin.security.api.CurrentUserContext;
 import com.tcrm.admin.shared.BusinessException;
 import com.tcrm.admin.shared.ErrorCode;
 import java.math.BigDecimal;
+import java.time.DayOfWeek;
 import java.time.Instant;
+import java.time.LocalDate;
+import java.util.ArrayList;
+import java.util.Comparator;
 import java.util.List;
 import java.util.Locale;
+import java.util.Objects;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import tools.jackson.databind.ObjectMapper;
 
 /**
  * Content records of a library creator (requirement 1.2.3). Every record belongs to the creator in
@@ -30,16 +36,19 @@ public class LibraryContentService {
   private final LibraryKolMapper kols;
   private final LibraryKolService creators;
   private final CurrentUserContext current;
+  private final ObjectMapper json;
 
   public LibraryContentService(
       LibraryKolContentMapper contents,
       LibraryKolMapper kols,
       LibraryKolService creators,
-      CurrentUserContext current) {
+      CurrentUserContext current,
+      ObjectMapper json) {
     this.contents = contents;
     this.kols = kols;
     this.creators = creators;
     this.current = current;
+    this.json = json;
   }
 
   /** All records of one creator, newest publication first. */
@@ -73,7 +82,7 @@ public class LibraryContentService {
 
   @Transactional(rollbackFor = Exception.class)
   public LibraryContentDTO update(Long kolId, Long contentId, LibraryContentCommand command) {
-    require(kolId, contentId);
+    lock(kolId, contentId);
     LibraryKolContentDO row = new LibraryKolContentDO();
     apply(row, command);
     contents.update(
@@ -82,16 +91,15 @@ public class LibraryContentService {
             .eq(LibraryKolContentDO::getId, contentId)
             .eq(LibraryKolContentDO::getKolId, kolId)
             .set(LibraryKolContentDO::getPublishUrl, row.getPublishUrl())
+            .set(LibraryKolContentDO::getPublishTitle, row.getPublishTitle())
             .set(LibraryKolContentDO::getPublishDate, row.getPublishDate())
             .set(LibraryKolContentDO::getContentForm, row.getContentForm())
-            .set(LibraryKolContentDO::getClicks, row.getClicks())
-            .set(LibraryKolContentDO::getOrders, row.getOrders())
-            .set(LibraryKolContentDO::getGmv, row.getGmv())
-            .set(LibraryKolContentDO::getSampleType, row.getSampleType())
+            .set(LibraryKolContentDO::getSampleStatus, row.getSampleStatus())
             .set(LibraryKolContentDO::getSampleCost, row.getSampleCost())
             .set(LibraryKolContentDO::getSlotFee, row.getSlotFee())
             .set(LibraryKolContentDO::getCommissionRate, row.getCommissionRate())
             .set(LibraryKolContentDO::getNextAction, row.getNextAction())
+            .set(LibraryKolContentDO::getRemark, row.getRemark())
             .set(LibraryKolContentDO::getUpdateBy, current.id())
             .set(LibraryKolContentDO::getUpdateTime, Instant.now()));
     touchCreator(kolId);
@@ -105,6 +113,116 @@ public class LibraryContentService {
     contents.deleteById(contentId);
     touchCreator(kolId);
   }
+
+  public List<WeeklyData> weeklyData(Long kolId, Long contentId) {
+    require(kolId, contentId);
+    return readWeeklyData(contentId);
+  }
+
+  @Transactional(rollbackFor = Exception.class)
+  public List<WeeklyData> appendWeek(
+      Long kolId, Long contentId, LocalDate weekStart, Long clicks, Long orders, BigDecimal gmv) {
+    return saveWeek(kolId, contentId, weekStart, clicks, orders, gmv, false);
+  }
+
+  @Transactional(rollbackFor = Exception.class)
+  public List<WeeklyData> updateWeek(
+      Long kolId, Long contentId, LocalDate weekStart, Long clicks, Long orders, BigDecimal gmv) {
+    return saveWeek(kolId, contentId, weekStart, clicks, orders, gmv, true);
+  }
+
+  private List<WeeklyData> saveWeek(
+      Long kolId,
+      Long contentId,
+      LocalDate weekStart,
+      Long clicks,
+      Long orders,
+      BigDecimal gmv,
+      boolean editing) {
+    LibraryKolContentDO content = lock(kolId, contentId);
+    var history = new ArrayList<>(readWeeklyData(contentId));
+    WeeklyData previous =
+        history.stream().filter(row -> row.weekStart().equals(weekStart)).findFirst().orElse(null);
+    LocalDate currentWeek =
+        LocalDate.now(java.time.ZoneId.of("Asia/Shanghai"))
+            .with(java.time.temporal.TemporalAdjusters.previousOrSame(DayOfWeek.MONDAY));
+    if (weekStart == null
+        || weekStart.getDayOfWeek() != DayOfWeek.MONDAY
+        || (!editing
+            && (weekStart.isBefore(currentWeek.minusWeeks(9)) || weekStart.isAfter(currentWeek)))
+        || (previous != null) != editing
+        || clicks == null
+        || orders == null
+        || gmv == null
+        || gmv.precision() - gmv.scale() > 12
+        || gmv.scale() > 2) {
+      throw new BusinessException(ErrorCode.COMMON_VALIDATION_FAILED);
+    }
+    WeeklyData entry =
+        new WeeklyData(
+            weekStart, nonNegative(clicks), nonNegative(orders), amount(gmv), Instant.now());
+    history.removeIf(row -> row.weekStart().equals(weekStart));
+    history.add(entry);
+    history.sort(Comparator.comparing(WeeklyData::weekStart));
+    // Keep totals entered before weekly tracking. A correction replaces just that week's values.
+    long totalClicks = Objects.requireNonNullElse(content.getClicks(), 0L);
+    long totalOrders = Objects.requireNonNullElse(content.getOrders(), 0L);
+    BigDecimal totalGmv = Objects.requireNonNullElse(content.getGmv(), BigDecimal.ZERO);
+    try {
+      if (previous != null) {
+        totalClicks = Math.subtractExact(totalClicks, previous.clicks());
+        totalOrders = Math.subtractExact(totalOrders, previous.orders());
+        totalGmv = totalGmv.subtract(previous.gmv());
+      }
+      totalClicks = Math.addExact(totalClicks, entry.clicks());
+      totalOrders = Math.addExact(totalOrders, entry.orders());
+      totalGmv = totalGmv.add(entry.gmv());
+    } catch (ArithmeticException e) {
+      throw new BusinessException(ErrorCode.COMMON_VALIDATION_FAILED);
+    }
+    if (totalGmv.precision() - totalGmv.scale() > 12) {
+      throw new BusinessException(ErrorCode.COMMON_VALIDATION_FAILED);
+    }
+    contents.saveWeeklyData(contentId, json.writeValueAsString(history));
+    contents.update(
+        null,
+        new LambdaUpdateWrapper<LibraryKolContentDO>()
+            .eq(LibraryKolContentDO::getId, contentId)
+            .set(LibraryKolContentDO::getClicks, totalClicks)
+            .set(LibraryKolContentDO::getOrders, totalOrders)
+            .set(LibraryKolContentDO::getGmv, totalGmv)
+            .set(LibraryKolContentDO::getUpdateBy, current.id())
+            .set(LibraryKolContentDO::getUpdateTime, entry.updatedAt()));
+    touchCreator(kolId);
+    return List.copyOf(history);
+  }
+
+  private LibraryKolContentDO lock(Long kolId, Long contentId) {
+    creators.require(kolId);
+    LibraryKolContentDO content =
+        contents.selectOne(
+            new LambdaQueryWrapper<LibraryKolContentDO>()
+                .eq(LibraryKolContentDO::getId, contentId)
+                .eq(LibraryKolContentDO::getKolId, kolId)
+                .last("FOR UPDATE"));
+    if (content == null) {
+      throw new BusinessException(ErrorCode.COMMON_NOT_FOUND);
+    }
+    return content;
+  }
+
+  private List<WeeklyData> readWeeklyData(Long contentId) {
+    String data = contents.weeklyData(contentId);
+    if (data == null) {
+      throw new BusinessException(ErrorCode.COMMON_NOT_FOUND);
+    }
+    return java.util.Arrays.stream(json.readValue(data, WeeklyData[].class))
+        .sorted(Comparator.comparing(WeeklyData::weekStart))
+        .toList();
+  }
+
+  public record WeeklyData(
+      LocalDate weekStart, Long clicks, Long orders, BigDecimal gmv, Instant updatedAt) {}
 
   /** The record when it belongs to this creator of this company; otherwise 404. */
   private LibraryKolContentDO require(Long kolId, Long contentId) {
@@ -129,6 +247,10 @@ public class LibraryContentService {
   /** Validates the manual fields into {@code row}. */
   private static void apply(LibraryKolContentDO row, LibraryContentCommand command) {
     row.setPublishUrl(httpUrl(command.publishUrl()));
+    row.setPublishTitle(LibraryKolService.strip(command.publishTitle()));
+    if (row.getPublishTitle() == null || row.getPublishTitle().length() > 200) {
+      throw new BusinessException(ErrorCode.COMMON_VALIDATION_FAILED);
+    }
     if (command.publishDate() == null) {
       throw new BusinessException(ErrorCode.COMMON_VALIDATION_FAILED);
     }
@@ -136,19 +258,18 @@ public class LibraryContentService {
     row.setContentForm(
         LibraryOption.of(LibraryContentForm.class, command.contentForm())
             .orElseThrow(() -> new BusinessException(ErrorCode.COMMON_VALIDATION_FAILED)));
-    row.setClicks(nonNegative(command.clicks()));
-    row.setOrders(nonNegative(command.orders()));
-    row.setGmv(amount(command.gmv()));
-    row.setSampleType(
-        LibraryKolService.blank(command.sampleType())
+    row.setSampleStatus(
+        LibraryKolService.blank(command.sampleStatus())
             ? null
-            : LibraryOption.of(LibrarySampleType.class, command.sampleType())
+            : LibraryOption.of(LibrarySampleStatus.class, command.sampleStatus())
                 .orElseThrow(() -> new BusinessException(ErrorCode.COMMON_VALIDATION_FAILED)));
     row.setSampleCost(amount(command.sampleCost()));
     row.setSlotFee(amount(command.slotFee()));
     row.setCommissionRate(percent(command.commissionRate()));
     row.setNextAction(LibraryKolService.strip(command.nextAction()));
-    if (row.getNextAction() != null && row.getNextAction().length() > 1000) {
+    row.setRemark(LibraryKolService.strip(command.remark()));
+    if ((row.getNextAction() != null && row.getNextAction().length() > 1000)
+        || (row.getRemark() != null && row.getRemark().length() > 1000)) {
       throw new BusinessException(ErrorCode.COMMON_VALIDATION_FAILED);
     }
   }
@@ -160,6 +281,8 @@ public class LibraryContentService {
     return new LibraryContentDTO(
         row.getId(),
         row.getPublishUrl(),
+        row.getPublishTitle(),
+        row.getWeeklyData() != null && !row.getWeeklyData().equals("[]"),
         row.getPublishDate(),
         row.getContentForm() == null ? null : row.getContentForm().name(),
         row.getClicks(),
@@ -173,6 +296,8 @@ public class LibraryContentService {
         metrics.totalCost(),
         metrics.actualRoi(),
         row.getNextAction(),
+        row.getRemark(),
+        row.getSampleStatus() == null ? null : row.getSampleStatus().name(),
         row.getUpdateTime());
   }
 

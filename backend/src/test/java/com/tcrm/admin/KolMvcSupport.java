@@ -32,6 +32,7 @@ public final class KolMvcSupport {
             .setIsReadCookie(false)
             .setIsReadBody(false)
             .setIsPrint(false));
+    SaManager.putStpLogic(StpKolUtil.STP);
     SaManager.setSaTokenDao(new SaTokenDaoDefaultImpl());
     SaManager.setSaTokenContext(new SaTokenContextForSpringInJakartaServlet());
     var builder = JsonMapper.builder();

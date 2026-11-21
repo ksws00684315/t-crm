@@ -1,5 +1,5 @@
 import { DOMWrapper, flushPromises, mount, type VueWrapper } from "@vue/test-utils";
-import ElementPlus, { ElMessage, ElMessageBox } from "element-plus";
+import ElementPlus, { ElMessage } from "element-plus";
 import { createPinia, setActivePinia } from "pinia";
 import { createMemoryHistory, createRouter } from "vue-router";
 import { beforeEach, describe, expect, it, vi } from "vitest";
@@ -35,6 +35,8 @@ const detail: LibraryKolDetailVO = {
   audienceCountry: null,
   audienceAgeRange: "AGE_25_34",
   audienceGender: "FEMALE" as never,
+  audienceAgeShare: "20",
+  audienceGenderShare: "80",
   contact: "+1 555 0100",
   contentQuality: "HIGH",
   salesPotential: null,
@@ -185,12 +187,19 @@ describe("creator library form", () => {
       "备注"
     ]);
     expect(labels("section-account-type")).toEqual(["内容类目", "近期平均播放量", "互动率（%）"]);
-    expect(labels("section-audience")).toEqual(["国家/地区", "年龄段", "性别"]);
+    expect(labels("section-audience")).toEqual([
+      "国家/地区",
+      "年龄段",
+      "年龄占比（%）",
+      "性别",
+      "性别占比（%）"
+    ]);
     expect(labels("tab-follow-up")).toEqual([
       "建联状态",
       "跟进负责人",
       "最近沟通时间",
       "寄样状态",
+      "样品类型",
       "寄样单号",
       "寄样日期",
       "跟进备注"
@@ -332,7 +341,7 @@ describe("creator library form", () => {
     expect(payload.countryCode).toBe("US");
     expect(payload).not.toHaveProperty("cooperationStage");
     expect(tabs.tabs.map(tab => tab.path)).toEqual(["/kol-library/kols/11"]);
-    expect(tabs.tabs[0].titleKey).toBe("Beauty by Amy");
+    expect(tabs.tabs[0].titleKey).toBe("详细信息：Beauty by Amy");
     await vi.waitFor(() => expect(router.currentRoute.value.path).toBe("/kol-library/kols/11"));
     wrapper.unmount();
   });
@@ -364,6 +373,20 @@ describe("creator library form", () => {
     wrapper.unmount();
   });
 
+  it("allows manual changes to both optional audience percentages", async () => {
+    const { wrapper } = await mountAt("/kol-library/kols/11/edit");
+    await fill(wrapper, "audience-age-share", "25");
+    await fill(wrapper, "audience-gender-share", "75");
+    await save(wrapper);
+    await eventually(() =>
+      expect(libraryApi.updateLibraryKol).toHaveBeenCalledWith(
+        "11",
+        expect.objectContaining({ audienceAgeShare: "25", audienceGenderShare: "75" })
+      )
+    );
+    wrapper.unmount();
+  });
+
   it("loads the stored profile when editing and saves it back", async () => {
     const { wrapper } = await mountAt("/kol-library/kols/11/edit");
     expect(libraryApi.getLibraryKol).toHaveBeenCalledWith("11");
@@ -372,6 +395,8 @@ describe("creator library form", () => {
     expect(textareaOf(wrapper, "follow-up-remark").element.value).toBe("call on friday");
     await fill(wrapper, "display-name", "Beauty by Amy II");
     await save(wrapper);
+    expect(inputOf(wrapper, "audience-age-share").element.value).toBe("20");
+    expect(inputOf(wrapper, "audience-gender-share").element.value).toBe("80");
     await eventually(() => expect(libraryApi.updateLibraryKol).toHaveBeenCalled());
     expect(libraryApi.updateLibraryKol).toHaveBeenCalledWith(
       "11",
@@ -406,39 +431,10 @@ describe("creator library form", () => {
     wrapper.unmount();
   });
 
-  it("offers delete only in the edit form and only to a super administrator", async () => {
-    const created = await mountAt("/kol-library/kols/new");
-    expect(created.wrapper.find('[data-test="form-delete"]').exists()).toBe(false);
-    created.wrapper.unmount();
-
-    setActivePinia(createPinia());
-    const sub = await mountAt("/kol-library/kols/11/edit", "STAFF");
-    expect(sub.wrapper.find('[data-test="form-delete"]').exists()).toBe(false);
-    sub.wrapper.unmount();
-
-    setActivePinia(createPinia());
-    const admin = await mountAt("/kol-library/kols/11/edit");
-    expect(admin.wrapper.find('[data-test="form-delete"]').exists()).toBe(true);
-    admin.wrapper.unmount();
-  });
-
-  it("deletes from the edit form, closes the creator tabs and refreshes the list", async () => {
-    vi.mocked(libraryApi.deleteLibraryKol).mockReset().mockResolvedValue(null);
-    const confirm = vi.spyOn(ElMessageBox, "confirm").mockResolvedValue("confirm" as never);
-    const tabs = useTabsStore();
-    for (const path of ["/kol-library/kols", "/kol-library/kols/11", "/kol-library/kols/11/edit"]) {
-      tabs.open({ path, titleKey: path, literalTitle: true, affix: false, componentName: "X" });
-    }
-    const refresh = vi.spyOn(tabs, "refresh");
-    const { wrapper, router } = await mountAt("/kol-library/kols/11/edit");
-    await wrapper.find('[data-test="form-delete"]').trigger("click");
-    await eventually(() => expect(libraryApi.deleteLibraryKol).toHaveBeenCalledWith("11"));
-    expect(confirm.mock.calls[0][0]).toContain("Beauty by Amy");
-    await eventually(() => expect(router.currentRoute.value.path).toBe("/kol-library/kols"));
-    expect(tabs.tabs.map(tab => tab.path)).not.toContain("/kol-library/kols/11");
-    expect(tabs.tabs.map(tab => tab.path)).not.toContain("/kol-library/kols/11/edit");
-    expect(refresh).toHaveBeenCalledWith("/kol-library/kols");
-    confirm.mockRestore();
+  it("keeps deletion off the edit form for a super administrator", async () => {
+    const { wrapper } = await mountAt("/kol-library/kols/11/edit");
+    expect(wrapper.find('[data-test="form-delete"]').exists()).toBe(false);
+    expect(wrapper.text()).not.toContain("删除达人");
     wrapper.unmount();
   });
 

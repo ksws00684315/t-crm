@@ -80,7 +80,11 @@ public class WorkbenchService {
     var sales =
         read(canShop || canCreator, "sales", unavailable, () -> stats.workbenchSales(filter, now));
     var topShops =
-        read(canShop, "topShops", unavailable, () -> ranks(user, Ranking.SHOP, 1, 5, null, now).items());
+        read(
+            canShop,
+            "topShops",
+            unavailable,
+            () -> ranks(user, Ranking.SHOP, 1, 5, null, now).items());
     var topCreators =
         read(
             canCreator,
@@ -102,8 +106,7 @@ public class WorkbenchService {
         permissions.contains("prepay:review")
             || permissions.contains("prepay:finance-review")
             || permissions.contains("prepay:pay");
-    var prepays =
-        read(canPrepay, "prepays", unavailable, () -> withdrawal.pendingPrepays(user));
+    var prepays = read(canPrepay, "prepays", unavailable, () -> withdrawal.pendingPrepays(user));
     var payouts = read(canWithdrawal, "payouts", unavailable, () -> withdrawal.pending(user));
 
     boolean canCommission = (canShop || canCreator) && permissions.contains("commission:view");

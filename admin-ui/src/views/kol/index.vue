@@ -603,6 +603,13 @@ onMounted(async () => {
   align-items: stretch;
   gap: var(--tcrm-space-2);
 }
+/* Task 156: the invite and prepay buttons keep one width. Element Plus adds a left margin between
+   sibling buttons, which offsets the second one inside this stacked column; both fill the column
+   so the column's max-content width is also each button's width. */
+.kol-page-actions :deep(.el-button) {
+  width: 100%;
+  margin-left: 0;
+}
 .kol-tabs :deep(.el-tab-pane) {
   display: flex;
   flex-direction: column;

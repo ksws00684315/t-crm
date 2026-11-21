@@ -11,6 +11,8 @@ import java.time.LocalDate;
 public record LibraryContentVO(
     Long id,
     String publishUrl,
+    String publishTitle,
+    boolean hasWeeklyData,
     LocalDate publishDate,
     String contentForm,
     Long clicks,
@@ -24,12 +26,16 @@ public record LibraryContentVO(
     BigDecimal totalCost,
     BigDecimal actualRoi,
     String nextAction,
+    String remark,
+    String sampleStatus,
     Instant updateTime) {
 
   public static LibraryContentVO from(LibraryContentDTO dto) {
     return new LibraryContentVO(
         dto.id(),
         dto.publishUrl(),
+        dto.publishTitle(),
+        dto.hasWeeklyData(),
         dto.publishDate(),
         dto.contentForm(),
         dto.clicks(),
@@ -43,6 +49,8 @@ public record LibraryContentVO(
         dto.totalCost(),
         dto.actualRoi(),
         dto.nextAction(),
+        dto.remark(),
+        dto.sampleStatus(),
         dto.updateTime());
   }
 }

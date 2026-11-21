@@ -774,10 +774,15 @@ class PrepayServiceTest {
 
   @Test
   void pendingTasksIncludeOnlyStagesTheUserCanProcess() {
-    service.page(user("prepay:review", "prepay:pay"),
+    service.page(
+        user("prepay:review", "prepay:pay"),
         new PrepayService.Filter(null, null, "ACTION_REQUIRED", 1, 10));
-    assertThat(pageCalls).singleElement().satisfies(call ->
-        assertThat(call.query().statuses()).containsExactly("PENDING_OPERATIONS_REVIEW", "APPROVED"));
+    assertThat(pageCalls)
+        .singleElement()
+        .satisfies(
+            call ->
+                assertThat(call.query().statuses())
+                    .containsExactly("PENDING_OPERATIONS_REVIEW", "APPROVED"));
   }
 
   @Test

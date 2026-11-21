@@ -468,7 +468,11 @@ export function createFinanceDemo() {
           });
         }
       }
-      config = structuredClone(state.config);
+      // Old preview snapshots stored the version as a label; keep the rule version numeric.
+      config = structuredClone({
+        ...state.config,
+        version: Number.isInteger(state.config.version) ? state.config.version : seedConfig.version
+      });
       idempotency.clear();
       for (const [key, value] of state.idempotency) idempotency.set(key, value);
     },
@@ -506,7 +510,7 @@ export function createFinanceDemo() {
       )
         financeError(400);
       if (value.version !== config.version) financeError(409, "COMMON_CONFLICT");
-      config = structuredClone({ ...value, version: `${config.version}-NEXT` });
+      config = structuredClone({ ...value, version: config.version + 1 });
       return structuredClone(config);
     },
     settlements: (role: FinanceRole, scenario: Scenario, query: SettlementQuery) => {

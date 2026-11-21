@@ -13,7 +13,7 @@ import java.time.LocalDate;
  * calculated by {@code LibraryMetrics} and never stored, so a rule change cannot leave stale
  * values.
  */
-@TableName("crm_library_kol_content")
+@TableName(value = "crm_library_kol_content", autoResultMap = true)
 public class LibraryKolContentDO extends BaseEntity {
   /** Set on insert only; a row never changes its company. */
   @TableField(updateStrategy = FieldStrategy.NEVER)
@@ -22,6 +22,29 @@ public class LibraryKolContentDO extends BaseEntity {
   private Long kolId;
 
   private String publishUrl;
+  private String publishTitle;
+
+  @TableField(
+      insertStrategy = FieldStrategy.NEVER,
+      updateStrategy = FieldStrategy.NEVER,
+      typeHandler = JsonbStringTypeHandler.class)
+  private String weeklyData;
+
+  public String getWeeklyData() {
+    return weeklyData;
+  }
+
+  public void setWeeklyData(String value) {
+    this.weeklyData = value;
+  }
+
+  public String getPublishTitle() {
+    return publishTitle;
+  }
+
+  public void setPublishTitle(String value) {
+    this.publishTitle = value;
+  }
 
   private LocalDate publishDate;
 
@@ -50,6 +73,25 @@ public class LibraryKolContentDO extends BaseEntity {
 
   @TableField(updateStrategy = FieldStrategy.ALWAYS)
   private String nextAction;
+
+  private String remark;
+  private LibrarySampleStatus sampleStatus;
+
+  public String getRemark() {
+    return remark;
+  }
+
+  public void setRemark(String value) {
+    this.remark = value;
+  }
+
+  public LibrarySampleStatus getSampleStatus() {
+    return sampleStatus;
+  }
+
+  public void setSampleStatus(LibrarySampleStatus value) {
+    this.sampleStatus = value;
+  }
 
   public Long getTenantId() {
     return tenantId;

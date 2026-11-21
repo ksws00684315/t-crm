@@ -1,6 +1,7 @@
 package com.tcrm.admin.kollibrary.controller;
 
 import com.tcrm.admin.kollibrary.service.LibraryContentCommand;
+import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Size;
 import java.math.BigDecimal;
@@ -11,29 +12,27 @@ import java.time.LocalDate;
  * service derives them, so the screen and the API can never disagree about the formula.
  */
 public record LibraryContentRequest(
-    @Size(max = 512) String publishUrl,
+    @NotBlank @Size(max = 512) String publishUrl,
+    @NotBlank @Size(max = 200) String publishTitle,
     @NotNull LocalDate publishDate,
-    @Size(max = 16) String contentForm,
-    Long clicks,
-    Long orders,
-    BigDecimal gmv,
-    @Size(max = 16) String sampleType,
+    @NotBlank @Size(max = 16) String contentForm,
+    @Size(max = 16) String sampleStatus,
     BigDecimal sampleCost,
     BigDecimal slotFee,
     BigDecimal commissionRate,
-    @Size(max = 1000) String nextAction) {
+    @Size(max = 1000) String nextAction,
+    @Size(max = 1000) String remark) {
   public LibraryContentCommand toCommand() {
     return new LibraryContentCommand(
         publishUrl,
+        publishTitle,
         publishDate,
         contentForm,
-        clicks,
-        orders,
-        gmv,
-        sampleType,
+        sampleStatus,
         sampleCost,
         slotFee,
         commissionRate,
-        nextAction);
+        nextAction,
+        remark);
   }
 }

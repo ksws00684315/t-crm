@@ -83,8 +83,9 @@ async function submit(next: "APPROVE" | "REJECT") {
       </ol>
       <el-descriptions :column="2" border class="application-info">
         <el-descriptions-item :label="t('finance.creator')">
-          <strong>{{ withdrawal.kolName }}</strong
-          ><small class="identity-id">{{ withdrawal.kolCode }}</small>
+          <strong>{{ withdrawal.kolName }}</strong><small class="identity-id">{{
+            withdrawal.kolCode
+          }}</small>
         </el-descriptions-item>
         <el-descriptions-item :label="t('finance.assignedBd')">{{
           withdrawal.bdName || "—"

@@ -99,8 +99,10 @@ public class ProductLinkController {
   public record ConvertRequest(
       @NotBlank @Size(max = 128) String token,
       @Size(max = 64) String callerPlatform,
-      // Hard ceiling equals the system-config maximum; the effective limit is checked in service.
-      @NotEmpty @Size(max = 5000) List<ConvertItemRequest> items) {}
+      // No fixed ceiling here: the system configuration product-links.max-convert-items decides
+      // (task 155), and the service rejects a larger batch before touching any data. The request
+      // body size limit of the reverse proxy is the transport guard.
+      @NotEmpty List<ConvertItemRequest> items) {}
 
   public record ConvertItemRequest(
       @Size(max = 16) String sourceChannelCode,

@@ -72,6 +72,8 @@ class KolControllerTest {
         List.of(new SocialAccountDTO("TikTok", "@a", null, 9007199254740993L, false)),
         5L,
         "bd5",
+        "bd5#0001",
+        "+447700900123",
         new BigDecimal("0.155"),
         1,
         null,
@@ -113,6 +115,8 @@ class KolControllerTest {
         .andExpect(jsonPath("$.data.items[0].id").value("9007199254740993"))
         .andExpect(jsonPath("$.data.items[0].bdUserId").value("5"))
         .andExpect(jsonPath("$.data.items[0].bdUserName").value("bd5"))
+        .andExpect(jsonPath("$.data.items[0].bdDiscord").value("bd5#0001"))
+        .andExpect(jsonPath("$.data.items[0].bdWhatsapp").value("+447700900123"))
         .andExpect(jsonPath("$.data.items[0].defaultRate").value("0.1550"))
         .andExpect(
             jsonPath("$.data.items[0].socialAccounts[0].followers").value("9007199254740993"))
@@ -320,6 +324,29 @@ class KolControllerTest {
     verifyNoInteractions(kols);
   }
 
+  @Test
+  void shouldRejectOverlongBdAccount_whenEditing() throws Exception {
+    String body = "{\"name\":\"A\",\"socialAccounts\":[],\"bdDiscord\":\"" + "d".repeat(65) + "\"}";
+    mvc.perform(
+            json(put(BASE + "/11"), body)
+                .header(AdminMvcSupport.TOKEN_HEADER, as(Role.SUPER_ADMIN, DataScope.ALL)))
+        .andExpect(status().isBadRequest())
+        .andExpect(jsonPath("$.errorCode").value("COMMON_VALIDATION_FAILED"))
+        .andExpect(jsonPath("$.data[0].field").value("bdDiscord"));
+    verifyNoInteractions(kols);
+  }
+
+  @Test
+  void shouldStoreBlankBdAccountsAsNull_whenEditing() throws Exception {
+    String body = "{\"name\":\"A\",\"socialAccounts\":[],\"bdDiscord\":\"  \",\"bdWhatsapp\":\"\"}";
+    mvc.perform(
+            json(put(BASE + "/11"), body)
+                .header(AdminMvcSupport.TOKEN_HEADER, as(Role.SUPER_ADMIN, DataScope.ALL)))
+        .andExpect(status().isOk());
+    verify(kols)
+        .update(11L, new EditKolCommand("A", null, null, List.of(), null, null, null, null));
+  }
+
   void shouldReportPathParameterName_whenIdIsBelowMinimum() throws Exception {
     mvc.perform(
             json(put(BASE + "/0"), VALID)
@@ -363,10 +390,16 @@ class KolControllerTest {
     mvc.perform(
             json(
                     put(BASE + "/11"),
-                    "{\"name\":\"A\",\"country\":\"gb\",\"socialAccounts\":[],\"remark\":null,\"whatsapp\":null}")
+                    "{\"name\":\"A\",\"country\":\"gb\",\"socialAccounts\":[],\"remark\":null,"
+                        + "\"whatsapp\":null,\"bdDiscord\":\"bd5#0001\","
+                        + "\"bdWhatsapp\":\"+447700900123\"}")
                 .header(AdminMvcSupport.TOKEN_HEADER, token))
         .andExpect(status().isOk());
-    verify(kols).update(11L, new EditKolCommand("A", null, "gb", List.of(), null, null));
+    verify(kols)
+        .update(
+            11L,
+            new EditKolCommand(
+                "A", null, "gb", List.of(), null, null, "bd5#0001", "+447700900123"));
     mvc.perform(
             json(put(BASE + "/11/status"), "{\"status\":0}")
                 .header(AdminMvcSupport.TOKEN_HEADER, token))

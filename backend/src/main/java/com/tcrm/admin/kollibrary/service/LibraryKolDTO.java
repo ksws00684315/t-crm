@@ -28,7 +28,10 @@ public record LibraryKolDTO(
       long orders,
       BigDecimal gmv,
       BigDecimal totalCost,
-      BigDecimal roi) {}
+      BigDecimal roi,
+      BigDecimal commissionCost,
+      BigDecimal sampleCost,
+      BigDecimal slotFee) {}
 
   /** Full profile for the detail page and the edit form, with its totals. */
   public record Detail(
@@ -45,6 +48,8 @@ public record LibraryKolDTO(
       String audienceCountry,
       String audienceAgeRange,
       String audienceGender,
+      BigDecimal audienceAgeShare,
+      BigDecimal audienceGenderShare,
       String contact,
       String contentQuality,
       String salesPotential,
@@ -56,6 +61,7 @@ public record LibraryKolDTO(
       String followUpOwner,
       LocalDate lastContactDate,
       String sampleStatus,
+      String sampleType,
       String trackingNo,
       LocalDate sampleDate,
       String followUpRemark,

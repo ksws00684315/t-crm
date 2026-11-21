@@ -9,6 +9,8 @@ import com.tcrm.admin.shared.AuditLog;
 import com.tcrm.admin.shared.R;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.Min;
+import java.math.BigDecimal;
+import java.time.LocalDate;
 import java.util.List;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -57,6 +59,39 @@ public class KolLibraryContentController {
       @Valid @RequestBody LibraryContentRequest r) {
     return R.ok(LibraryContentVO.from(contents.update(kolId, contentId, r.toCommand())));
   }
+
+  @GetMapping("/{contentId}/weekly-data")
+  @SaCheckPermission("kol-library:view")
+  public R<List<LibraryContentService.WeeklyData>> weeklyData(
+      @PathVariable @Min(1) Long kolId, @PathVariable @Min(1) Long contentId) {
+    return R.ok(contents.weeklyData(kolId, contentId));
+  }
+
+  @PostMapping("/{contentId}/weekly-data")
+  @SaCheckPermission("kol-library:edit")
+  @AuditLog(module = "Kol library", action = "Append weekly content data")
+  public R<List<LibraryContentService.WeeklyData>> appendWeek(
+      @PathVariable @Min(1) Long kolId,
+      @PathVariable @Min(1) Long contentId,
+      @Valid @RequestBody WeeklyDataRequest data) {
+    return R.ok(
+        contents.appendWeek(
+            kolId, contentId, data.weekStart(), data.clicks(), data.orders(), data.gmv()));
+  }
+
+  @PutMapping("/{contentId}/weekly-data")
+  @SaCheckPermission("kol-library:edit")
+  @AuditLog(module = "Kol library", action = "Edit weekly content data")
+  public R<List<LibraryContentService.WeeklyData>> updateWeek(
+      @PathVariable @Min(1) Long kolId,
+      @PathVariable @Min(1) Long contentId,
+      @Valid @RequestBody WeeklyDataRequest data) {
+    return R.ok(
+        contents.updateWeek(
+            kolId, contentId, data.weekStart(), data.clicks(), data.orders(), data.gmv()));
+  }
+
+  public record WeeklyDataRequest(LocalDate weekStart, Long clicks, Long orders, BigDecimal gmv) {}
 
   /** Super administrators only (P1-15). */
   @DeleteMapping("/{contentId}")

@@ -11,6 +11,7 @@ public record LibraryFollowUpCommand(
     String outreachStatus,
     LocalDate lastContactDate,
     String sampleStatus,
+    String sampleType,
     String trackingNo,
     LocalDate sampleDate,
     String followUpRemark) {}

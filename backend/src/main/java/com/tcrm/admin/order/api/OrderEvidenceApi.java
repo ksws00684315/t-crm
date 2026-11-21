@@ -14,6 +14,14 @@ public interface OrderEvidenceApi {
     REFUNDS
   }
 
+  enum DetailSort {
+    PAID_ORDER_COUNT,
+    UNITS,
+    SALES_AMOUNT,
+    REFUND_AMOUNT,
+    NET_SALES_AMOUNT
+  }
+
   record Selection(
       ScopeDTO scope,
       Long creator,
@@ -102,6 +110,9 @@ public interface OrderEvidenceApi {
 
   PageResult<EvidenceRow> page(Selection selection, Kind kind, int page, int size);
 
+  PageResult<EvidenceRow> sortedActivity(
+      Selection selection, Kind kind, int page, int size, DetailSort sortBy, boolean ascending);
+
   List<DailyAmount> daily(Selection selection);
 
   record ProductOrderCounts(long paidOrders, long refundedOrders) {}
@@ -110,4 +121,12 @@ public interface OrderEvidenceApi {
 
   PageResult<ProductGroup> productGroups(
       Selection selection, ProductBreakdown group, int page, int size);
+
+  PageResult<ProductGroup> sortedProductGroups(
+      Selection selection,
+      ProductBreakdown group,
+      int page,
+      int size,
+      DetailSort sortBy,
+      boolean ascending);
 }

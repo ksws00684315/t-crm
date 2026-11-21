@@ -1400,7 +1400,7 @@ public class WithdrawalService {
   public PageResult<FinanceTask> financeTasks(AccountDTO user, FinanceFilter filter) {
     long tenantId = requireTenant(user);
     String type = taskTypeOrNull(filter.type());
-    requireFinanceTaskPermission(user, type);
+    requireFinanceTaskPermission(user);
     requirePage(filter.page(), filter.size());
     String status =
         "ACTION_REQUIRED".equals(filter.status()) && "COMMISSION".equals(type)
@@ -1920,10 +1920,10 @@ public class WithdrawalService {
     }
   }
 
-  private static void requireFinanceTaskPermission(AccountDTO user, String type) {
+  private static void requireFinanceTaskPermission(AccountDTO user) {
     if (user.role() != Role.SUPER_ADMIN
         && !user.permissions().contains("withdrawal:review")
-        && !("COMMISSION".equals(type) && user.permissions().contains("withdrawal:pay"))
+        && !user.permissions().contains("withdrawal:pay")
         && !user.permissions().contains("prepay:review")
         && !user.permissions().contains("prepay:finance-review")
         && !user.permissions().contains("prepay:pay")

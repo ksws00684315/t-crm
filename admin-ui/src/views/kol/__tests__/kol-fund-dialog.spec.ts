@@ -20,6 +20,8 @@ const kol: KolVO = {
   ],
   bdUserId: "1",
   bdUserName: "BD Five",
+  bdDiscord: null,
+  bdWhatsapp: null,
   defaultRate: null,
   status: 1,
   remark: null,
