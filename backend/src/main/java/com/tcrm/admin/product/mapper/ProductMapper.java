@@ -6,11 +6,14 @@ import com.tcrm.admin.product.api.ProductAccessApi.RankingInventory;
 import com.tcrm.admin.product.api.ProductAccessApi.RankingInventoryScope;
 import com.tcrm.admin.product.model.ProductDO;
 import com.tcrm.admin.product.model.PromoProductRow;
+import java.math.BigDecimal;
+import java.time.Instant;
 import java.util.Collection;
 import java.util.List;
 import org.apache.ibatis.annotations.Mapper;
 import org.apache.ibatis.annotations.Param;
 import org.apache.ibatis.annotations.Select;
+import org.apache.ibatis.annotations.Update;
 
 @Mapper
 public interface ProductMapper extends BaseMapper<ProductDO> {
@@ -126,4 +129,33 @@ public interface ProductMapper extends BaseMapper<ProductDO> {
    */
   @Select("SELECT 1 FROM pg_advisory_xact_lock(hashtextextended(#{key}, 0))")
   Integer lockShopItem(@Param("key") String key);
+
+  /** Id of the soft-deleted product row for this shop item, if any (its code stays occupied). */
+  @Select(
+      """
+      SELECT id FROM crm_product
+      WHERE shop_id = #{shopId} AND weidian_item_id = #{weidianItemId} AND is_deleted = TRUE
+      ORDER BY id DESC
+      LIMIT 1
+      """)
+  Long findDeletedShopItemId(
+      @Param("shopId") Long shopId, @Param("weidianItemId") String weidianItemId);
+
+  /** Revives a soft-deleted product in place, keeping its code; image only set when provided. */
+  @Update(
+      """
+      UPDATE crm_product
+      SET is_deleted = FALSE,
+          name = #{name},
+          price = #{price},
+          image_url = COALESCE(#{imageUrl, jdbcType=VARCHAR}, image_url),
+          update_time = #{updateTime}
+      WHERE id = #{id} AND is_deleted = TRUE
+      """)
+  int reviveDeletedShopItem(
+      @Param("id") Long id,
+      @Param("name") String name,
+      @Param("price") BigDecimal price,
+      @Param("imageUrl") String imageUrl,
+      @Param("updateTime") Instant updateTime);
 }
