@@ -4,6 +4,7 @@ import com.baomidou.mybatisplus.annotation.InterceptorIgnore;
 import com.tcrm.admin.order.api.OrderStatsApi.BestCreatorDTO;
 import com.tcrm.admin.order.api.OrderStatsApi.CommissionWindowDTO;
 import com.tcrm.admin.order.api.OrderStatsApi.CreatorCommissionDTO;
+import com.tcrm.admin.order.api.OrderStatsApi.CreatorCommissionTotal;
 import com.tcrm.admin.order.api.OrderStatsApi.InviterCommissionDTO;
 import com.tcrm.admin.order.api.OrderStatsApi.RankDimension;
 import com.tcrm.admin.order.api.OrderStatsApi.RankFactsDTO;
@@ -85,7 +86,7 @@ public interface OrderStatsMapper {
           + PRODUCT_ITEMS
           + """
       scoped_orders AS NOT MATERIALIZED (
-        SELECT o.id, o.shop_id, o.kol_id, o.bd_user_id, o.pay_time,
+        SELECT o.id, o.shop_id, o.kol_id, o.bd_user_id, o.pay_time, o.weidian_order_id,
         <choose>
           <when test="scope.affiliateOnly or scope.productKeyword != null">matched.amount</when>
           <otherwise>o.pay_amount</otherwise>
@@ -177,6 +178,23 @@ public interface OrderStatsMapper {
       </script>
       """)
   long creatorSpuCount(
+      @Param("scope") ScopeDTO scope, @Param("from") Instant from, @Param("until") Instant until);
+
+  @InterceptorIgnore(tenantLine = "true")
+  @Select(
+      SCOPED_ORDERS
+          + """
+      SELECT ROUND(SUM(f.amount_raw), 2)
+      FROM scoped_orders o
+      JOIN crm_order_settlement_flow f ON f.shop_id = o.shop_id AND f.weidian_order_id = o.weidian_order_id
+        AND (f.order_id IS NULL OR f.order_id = o.id)
+        AND f.tenant_id = #{scope.tenantId} AND NOT f.is_deleted
+      WHERE f.query_type = 'INCOME_DETAIL' AND f.trade_sub_type IN ('货款收入', '退款')
+        AND f.trade_time &gt;= #{from} AND f.trade_time &lt; #{until}
+      HAVING COUNT(*) &gt; 0 AND COUNT(*) = COUNT(f.amount_raw)
+      </script>
+      """)
+  BigDecimal scopedSettlement(
       @Param("scope") ScopeDTO scope, @Param("from") Instant from, @Param("until") Instant until);
 
   /**
@@ -366,6 +384,17 @@ public interface OrderStatsMapper {
       @Param("dimension") RankDimension dimension,
       @Param("from") Instant from,
       @Param("asOf") Instant asOf);
+
+  @InterceptorIgnore(tenantLine = "true")
+  @Select(
+      COMMISSION_ORDERS
+          + """
+      SELECT creator_id, SUM(CASE WHEN unsettled THEN accrued ELSE released END) AS total
+      FROM commission_orders WHERE inviter_id IS NOT NULL GROUP BY creator_id
+      </script>
+      """)
+  List<CreatorCommissionTotal> inviterCreatorCommissions(
+      @Param("scope") ScopeDTO scope, @Param("from") Instant from, @Param("until") Instant until);
 
   String COHORT_REFUND_WINDOW =
       """

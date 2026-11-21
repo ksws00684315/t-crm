@@ -164,7 +164,6 @@ const enUS: MessageSchema = {
     salesAmount: "Sales",
     cohortRefundAmount: "Successful refunds for paid orders",
     completedRefundAmount: "Refund amount",
-    riskTitle: "Refund risk",
     amountRefundRate: "Amount refund rate",
     periodRefundedOrderRate: "Period refunded order ratio",
     averageOrderAmount: "Average order amount",
@@ -423,11 +422,32 @@ const enUS: MessageSchema = {
       rankingCount: "{count} creator | {count} creators",
       netCommission: "Estimated commission for the period",
       keyword: "Creator name / code / social",
+      drawer: {
+        inviter: "Inviter {name}",
+        status: "Creator status {status}",
+        commissionRate: "Commission rate {rate}",
+        totalCommission: "Total creator commission",
+        orderRefundTime: "Order no. / refund time",
+        headers: {
+          orderNo: "Weidian order number and payment time in Beijing time.",
+          orderRefundTime: "Weidian order number and refund completion time in Beijing time.",
+          refundUnits: "A dash indicates that the refund record has no verified quantity.",
+          salesAmount: "The amount paid for the original order item.",
+          refundAmount:
+            "Successful refunds for the order item within 30 Beijing calendar days of payment.",
+          netTransactionAmount:
+            "The amount paid for the item less successful refunds within 30 Beijing calendar days of payment."
+        }
+      },
       definitions: {
         identity:
           "Creator name, primary social platform, social accounts and creator ID. The platform is omitted when unset.",
         relationship:
           "Current assigned inviter and the relationship status shown in the creator directory.",
+        settlementAmount:
+          "Attributed order proceeds less refund deductions posted during the selected period. A dash indicates missing settlement records.",
+        totalCommission:
+          "Verified commission accrued on the creator’s order items paid during the selected period. A dash indicates missing commission records.",
         paidOrderCount:
           "Distinct paid orders attributed to this creator during the selected period.",
         units: "Total units purchased across SKUs on orders paid during the selected period.",
@@ -454,6 +474,9 @@ const enUS: MessageSchema = {
     },
     "inviter-performance": {
       detailTitle: "Inviter performance details",
+      creatorRanking: "Creator ranking",
+      creatorIdentity: "Creator name / ID",
+      effectiveCreators: "Currently active creators",
       selling: "Inviters with sales",
       active: "Active inviters {value}",
       identity: "Inviter",
@@ -483,6 +506,8 @@ const enUS: MessageSchema = {
       },
       definitions: {
         identity: "The inviter’s name and account.",
+        settlementAmount:
+          "Attributed order proceeds less refund deductions posted during the selected period. A dash indicates a product filter or missing settlement records.",
         status: "Whether the inviter’s account is enabled.",
         creatorCounts:
           "Enabled creators currently assigned to this inviter, followed by creators originally invited by this inviter.",

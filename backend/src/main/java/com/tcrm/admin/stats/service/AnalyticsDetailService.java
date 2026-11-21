@@ -113,7 +113,9 @@ public class AnalyticsDetailService {
             board == Board.SHOP ? shopOverview(resolved, selection) : null,
             board == Board.PRODUCT && overview.canView("order:view")
                 ? evidence.productOrderCounts(selection)
-                : null)
+                : null,
+            board == Board.CREATOR ? creatorOverview(selection) : null,
+            board == Board.INVITER ? inviterOverview(selection) : null)
         : new Detail(
             resolved.period(),
             null,
@@ -127,7 +129,71 @@ public class AnalyticsDetailService {
                     !ranking.descending())
                 : evidence.page(selection, activity, ranking.page(), ranking.size()),
             null,
+            null,
+            null,
             null);
+  }
+
+  private CreatorOverview creatorOverview(Selection selection) {
+    var scope = selection.scope();
+    long creatorId = selection.creator();
+    boolean canViewOrders = overview.canView("order:view");
+    var counts = canViewOrders ? evidence.productOrderCounts(selection) : null;
+    if (scope.visibleShopIds().isEmpty()
+        || creatorId == 0L
+        || (scope.kolId() != null && scope.kolId() != creatorId)) {
+      return new CreatorOverview(null, null, counts);
+    }
+    var creatorScope =
+        new ScopeDTO(
+            scope.tenantId(),
+            scope.ownerId(),
+            scope.shopId(),
+            creatorId,
+            scope.inviterId(),
+            scope.visibleShopIds(),
+            scope.matchedKolIds(),
+            scope.matchedInviterIds(),
+            scope.productKeyword());
+    var settlement = canViewOrders ? settlementFor(creatorScope, selection) : null;
+    var commission =
+        overview.canViewCommission()
+            ? orders.creatorCommission(creatorScope, selection.from(), selection.until())
+            : null;
+    return new CreatorOverview(settlement, commission == null ? null : commission.total(), counts);
+  }
+
+  private InviterOverview inviterOverview(Selection selection) {
+    if (!overview.canView("order:view")) {
+      return new InviterOverview(null, null);
+    }
+    var scope = forInviter(selection.scope(), selection.inviter());
+    var settlement = selection.inviter() == 0L ? null : settlementFor(scope, selection);
+    return new InviterOverview(settlement, evidence.productOrderCounts(selection));
+  }
+
+  private BigDecimal settlementFor(ScopeDTO scope, Selection selection) {
+    // Whole-order ledger postings cannot be assigned to selected product lines.
+    return scope.visibleShopIds().isEmpty() || scope.productKeyword() != null
+        ? null
+        : orders.scopedSettlement(scope, selection.from(), selection.until());
+  }
+
+  private static ScopeDTO forInviter(ScopeDTO scope, long inviterId) {
+    if ((scope.ownerId() != null && scope.ownerId() != inviterId)
+        || (scope.inviterId() != null && scope.inviterId() != inviterId)) {
+      throw new BusinessException(ErrorCode.COMMON_NOT_FOUND);
+    }
+    return new ScopeDTO(
+        scope.tenantId(),
+        scope.ownerId(),
+        scope.shopId(),
+        scope.kolId(),
+        inviterId,
+        scope.visibleShopIds(),
+        scope.matchedKolIds(),
+        scope.matchedInviterIds(),
+        scope.productKeyword());
   }
 
   private ShopOverview shopOverview(
@@ -303,25 +369,8 @@ public class AnalyticsDetailService {
     var ranking = StatsRanking.resolve(page, size, sortDirection);
     var resolved = overview.resolve(filters);
     var original = resolved.scope();
-    if ((original.ownerId() != null && original.ownerId() != inviterId)
-        || (original.inviterId() != null && original.inviterId() != inviterId)) {
-      throw new BusinessException(ErrorCode.COMMON_NOT_FOUND);
-    }
-    var visible = shops.listShops().stream().map(ShopAccessDTO::id).toList();
-    if (original.shopId() != null && !visible.contains(original.shopId())) {
-      throw new BusinessException(ErrorCode.COMMON_NOT_FOUND);
-    }
-    var scope =
-        new ScopeDTO(
-            original.tenantId(),
-            original.ownerId(),
-            original.shopId(),
-            original.kolId(),
-            inviterId,
-            visible,
-            original.matchedKolIds(),
-            original.matchedInviterIds(),
-            original.productKeyword());
+    var selection = select(resolved, Board.INVITER, inviterId, null, null);
+    var scope = forInviter(selection.scope(), inviterId);
     var period = resolved.period();
     var facts = orders.rankFacts(scope, RankDimension.KOL, period.from(), period.until());
     var metricsById =
@@ -355,6 +404,30 @@ public class AnalyticsDetailService {
                 .stream()
                 .collect(Collectors.toMap(BdUserDTO::id, Function.identity()))
             : Map.<Long, BdUserDTO>of();
+    boolean showCommission = !currentTeam && !ids.isEmpty() && overview.canViewCommission();
+    var rateIds =
+        showCommission
+            ? directory.stream()
+                .filter(k -> original.ownerId() == null || Objects.equals(k.bdUserId(), inviterId))
+                .map(KolRefDTO::id)
+                .toList()
+            : List.<Long>of();
+    var rates =
+        rateIds.isEmpty()
+            ? Map.<Long, BigDecimal>of()
+            : creators.listRatesByIds(rateIds).stream()
+                .filter(rate -> rate.rateText() != null)
+                .collect(
+                    Collectors.toMap(
+                        rate -> rate.kolId(), rate -> new BigDecimal(rate.rateText())));
+    var commissionTotals =
+        showCommission
+            ? orders.inviterCreatorCommissions(scope, period.from(), period.until()).stream()
+                .collect(
+                    Collectors.toMap(
+                        OrderStatsApi.CreatorCommissionTotal::creatorId,
+                        OrderStatsApi.CreatorCommissionTotal::total))
+            : Map.<Long, BigDecimal>of();
     var rows =
         ids.stream()
             .map(
@@ -371,6 +444,8 @@ public class AnalyticsDetailService {
                           ? null
                           : creator.enabled(),
                       creatorMetrics(metricsById.get(id)),
+                      rates.get(id),
+                      commissionTotals.get(id),
                       transferred,
                       owner == null
                           ? null
@@ -428,15 +503,24 @@ public class AnalyticsDetailService {
       String code,
       Boolean enabled,
       MetricsDTO metrics,
+      BigDecimal commissionRate,
+      BigDecimal totalEstimatedCommission,
       boolean transferred,
       String currentInviter) {}
 
   public record ShopOverview(BigDecimal settlementAmount, ShopCreatorCounts creatorCounts) {}
+
+  public record CreatorOverview(
+      BigDecimal settlementAmount, BigDecimal totalCommission, ProductOrderCounts orderCounts) {}
+
+  public record InviterOverview(BigDecimal settlementAmount, ProductOrderCounts orderCounts) {}
 
   public record Detail(
       StatsPeriod period,
       List<DailyAmount> daily,
       PageResult<EvidenceRow> activity,
       ShopOverview shopOverview,
-      ProductOrderCounts productOrderCounts) {}
+      ProductOrderCounts productOrderCounts,
+      CreatorOverview creatorOverview,
+      InviterOverview inviterOverview) {}
 }

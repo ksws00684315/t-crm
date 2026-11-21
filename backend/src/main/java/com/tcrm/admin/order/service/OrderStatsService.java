@@ -84,6 +84,11 @@ public class OrderStatsService implements OrderStatsApi {
   }
 
   @Override
+  public BigDecimal scopedSettlement(ScopeDTO scope, Instant from, Instant until) {
+    return mapper.scopedSettlement(scope, from, until);
+  }
+
+  @Override
   public CreatorCommissionDTO creatorCommission(ScopeDTO scope, Instant from, Instant until) {
     return mapper.creatorCommission(scope, from, until);
   }
@@ -92,6 +97,12 @@ public class OrderStatsService implements OrderStatsApi {
   public List<InviterCommissionDTO> inviterCommissions(
       ScopeDTO scope, Instant from, Instant until) {
     return mapper.inviterCommissions(scope, from, until);
+  }
+
+  @Override
+  public List<CreatorCommissionTotal> inviterCreatorCommissions(
+      ScopeDTO scope, Instant from, Instant until) {
+    return mapper.inviterCreatorCommissions(scope, from, until);
   }
 
   @Override
