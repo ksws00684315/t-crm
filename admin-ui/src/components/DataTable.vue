@@ -71,6 +71,7 @@ const props = withDefaults(
     scrollWithPage?: boolean;
     /** Shows the toolbar Export button (P0-1); the page does the fetching and file save. */
     exportable?: boolean;
+    exportDisabled?: boolean;
     exporting?: boolean;
     /** Adds a current-page selection column (P0-2). Selection never spans pages. */
     selectable?: boolean;
@@ -539,7 +540,7 @@ function canMove(index: number, delta: -1 | 1): boolean {
           v-if="exportable"
           class="data-table__export"
           :loading="exporting"
-          :disabled="total === 0"
+          :disabled="exportDisabled || total === 0"
           data-test="export"
           @click="emit('export')"
         >

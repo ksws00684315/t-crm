@@ -30,6 +30,9 @@ const zhCN = {
     rankLast30Days: "近30天",
     rankAllTime: "累计",
     rankPeriod: "排行时间",
+    rankLoadFailed: "排行榜加载失败。",
+    rankShowingPage: "当前显示第 {page} 页。",
+    rankRetry: "重试",
     collapseRanking: "收起",
     enabledShops: "启用店铺",
     name: "名称",
@@ -428,7 +431,6 @@ const zhCN = {
       conversionSubtitle: "从累计邀请到本期成交",
       bestCreator: "最佳达人",
       commissionAccess: "当前账号无佣金查看权限",
-      rankingHint: "点击「详情」查看该邀请人的期间贡献与当前团队。",
       terms: {
         activeInviters: "有效邀请人",
         totalInviters: "总邀请人",
