@@ -420,7 +420,9 @@ public class ProductLinkService {
         views.add(new ResolveItemView(channel, productId, "pending", null, null, null, null));
         continue;
       }
-      if (CopyJobItemDO.STATUS_SUCCESS.equals(row.getStatus())) {
+      if (CopyJobItemDO.STATUS_SUCCESS.equals(row.getStatus())
+          || CopyJobItemDO.STATUS_SKIPPED.equals(row.getStatus())) {
+        // skipped rows already own the copy: the external contract only knows success (ADR-019).
         views.add(
             new ResolveItemView(
                 channel,
@@ -453,13 +455,19 @@ public class ProductLinkService {
   }
 
   private JobItemView toJobItemView(CopyJobItemDO row, String storeId) {
+    // skipped rows already own the copy: the external contract only knows success (ADR-019).
+    String status =
+        CopyJobItemDO.STATUS_SKIPPED.equals(row.getStatus())
+            ? CopyJobItemDO.STATUS_SUCCESS
+            : row.getStatus();
+    boolean resolved = CopyJobItemDO.STATUS_SUCCESS.equals(status);
     return new JobItemView(
         row.getSourceChannel(),
         row.getSourceProductId(),
-        row.getStatus(),
-        CopyJobItemDO.STATUS_SUCCESS.equals(row.getStatus()) ? CHANNEL_WEIDIAN : null,
+        status,
+        resolved ? CHANNEL_WEIDIAN : null,
         row.getTargetItemId(),
-        CopyJobItemDO.STATUS_SUCCESS.equals(row.getStatus()) ? storeId : null,
+        resolved ? storeId : null,
         row.getErrorMessage());
   }
 

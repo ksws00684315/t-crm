@@ -92,6 +92,8 @@ function itemStatusText(status: string): string {
       return t("copyJob.itemStatus.pending");
     case "success":
       return t("copyJob.itemStatus.success");
+    case "skipped":
+      return t("copyJob.itemStatus.skipped");
     case "failed":
       return t("copyJob.itemStatus.failed");
     default:

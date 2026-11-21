@@ -1934,6 +1934,7 @@ const enUS: MessageSchema = {
     itemStatus: {
       pending: "Pending",
       success: "Success",
+      skipped: "Skipped",
       failed: "Failed"
     }
   },

@@ -9,6 +9,7 @@ import java.time.Instant;
 public class CopyJobItemDO {
   public static final String STATUS_PENDING = "pending";
   public static final String STATUS_SUCCESS = "success";
+  public static final String STATUS_SKIPPED = "skipped";
   public static final String STATUS_FAILED = "failed";
 
   @TableId private Long id;

@@ -91,7 +91,7 @@ class CopyJobWorkerTest {
   }
 
   @Test
-  void shouldSucceedWithoutCopyOrQuota_whenOwnExclusiveItem() {
+  void shouldSkipWithoutCopyOrQuota_whenOwnExclusiveItem() {
     CopyJobDO job = job(1L, 10L, 20L, 5L);
     CopyJobItemDO row = pending(100L, "90001");
     stubJob(job, row);
@@ -104,9 +104,10 @@ class CopyJobWorkerTest {
 
     verify(copies, never()).copy(anyLong(), any(), anyLong());
     verify(tokens, never()).consume(anyLong(), anyInt());
-    verify(items).update(eq(null), any());
     ArgumentCaptor<Wrapper<CopyJobItemDO>> cap = ArgumentCaptor.forClass(Wrapper.class);
     verify(items).update(eq(null), cap.capture());
+    assertThat(((LambdaUpdateWrapper<?>) cap.getValue()).getParamNameValuePairs().values())
+        .contains("skipped", "90001");
   }
 
   @Test
@@ -171,7 +172,7 @@ class CopyJobWorkerTest {
     ArgumentCaptor<Wrapper<CopyJobItemDO>> cap = ArgumentCaptor.forClass(Wrapper.class);
     verify(items).update(eq(null), cap.capture());
     assertThat(((LambdaUpdateWrapper<?>) cap.getValue()).getParamNameValuePairs().values())
-        .contains("90005", 6L);
+        .contains("skipped", "90005", 6L);
   }
 
   @Test
@@ -313,6 +314,8 @@ class CopyJobWorkerTest {
     verify(tokens, never()).consume(anyLong(), anyInt());
     ArgumentCaptor<Wrapper<CopyJobItemDO>> cap = ArgumentCaptor.forClass(Wrapper.class);
     verify(items).update(eq(null), cap.capture());
+    assertThat(((LambdaUpdateWrapper<?>) cap.getValue()).getParamNameValuePairs().values())
+        .contains("skipped", "90001");
     assertThat(((Update<?, ?>) cap.getValue()).getSqlSet()).contains("source_shop_id");
   }
 
@@ -348,6 +351,7 @@ class CopyJobWorkerTest {
     when(copies.probe(6L, "10001"))
         .thenReturn(Optional.of(new ProbedItem("10001", "Src", BigDecimal.ONE, null, true)));
     when(products.selectOne(any())).thenReturn(null);
+    when(products.findDeletedShopItemId(anyLong(), any())).thenReturn(null);
     when(codes.next()).thenReturn("P000001");
     when(products.insert(org.mockito.ArgumentMatchers.<ProductDO>any()))
         .thenAnswer(
@@ -367,6 +371,36 @@ class CopyJobWorkerTest {
     ArgumentCaptor<ProductDO> registered = ArgumentCaptor.forClass(ProductDO.class);
     verify(products).insert(registered.capture());
     assertThat(registered.getValue().getShopId()).isEqualTo(6L);
+    verify(copies).copy(6L, "10001", 5L);
+  }
+
+  @Test
+  void shouldReviveSoftDeletedProduct_whenProbedSourceWasDeleted() {
+    // Task 157: a converted link of a soft-deleted (converged) listing must revive the original
+    // row with its code instead of registering a duplicate under a fresh P-code.
+    CopyJobDO job = job(1L, 10L, 20L, 5L);
+    CopyJobItemDO row = pending(100L, "10001");
+    stubJob(job, row);
+    when(kolItems.findCurrentByWeidianItem("10001")).thenReturn(null);
+    when(shops.selectList(any())).thenReturn(List.of(shop(6L)));
+    when(products.selectList(any())).thenReturn(List.of());
+    when(copies.probe(6L, "10001"))
+        .thenReturn(
+            Optional.of(
+                new ProbedItem("10001", "Src", BigDecimal.ONE, "https://img.example/a.jpg", true)));
+    when(products.selectOne(any())).thenReturn(null);
+    when(products.findDeletedShopItemId(6L, "10001")).thenReturn(77L);
+    when(products.reviveDeletedShopItem(eq(77L), eq("Src"), any(), any(), any())).thenReturn(1);
+    when(products.selectById(77L)).thenAnswer(inv -> product(77L, 6L, "10001"));
+    when(kolItems.findCurrentByKolProduct(10L, 77L)).thenReturn(null);
+    when(tokens.consume(20L, 1)).thenReturn(true);
+    when(copies.copy(6L, "10001", 5L)).thenReturn(new CopyResult("90001", null));
+    when(kolItems.insert(org.mockito.ArgumentMatchers.<KolItemDO>any())).thenReturn(1);
+
+    worker.processJob(1L);
+
+    verify(products, never()).insert(org.mockito.ArgumentMatchers.<ProductDO>any());
+    verify(products).reviveDeletedShopItem(eq(77L), eq("Src"), any(), any(), any());
     verify(copies).copy(6L, "10001", 5L);
   }
 
@@ -539,6 +573,7 @@ class CopyJobWorkerTest {
                     "https://wd.geilicdn.com/a.jpg",
                     false)));
     when(products.selectOne(any())).thenReturn(null);
+    when(products.findDeletedShopItemId(anyLong(), any())).thenReturn(null);
     when(codes.next()).thenReturn("P000001");
     AtomicInteger productId = new AtomicInteger(50);
     when(products.insert(org.mockito.ArgumentMatchers.<ProductDO>any()))
@@ -581,6 +616,7 @@ class CopyJobWorkerTest {
         .thenReturn(
             Optional.of(new ProbedItem("10001", "Src", new BigDecimal("9.9"), null, false)));
     when(products.selectOne(any())).thenReturn(null);
+    when(products.findDeletedShopItemId(anyLong(), any())).thenReturn(null);
     when(codes.next()).thenReturn("P000001");
     when(products.insert(org.mockito.ArgumentMatchers.<ProductDO>any()))
         .thenAnswer(

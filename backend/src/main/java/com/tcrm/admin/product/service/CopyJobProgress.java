@@ -27,12 +27,14 @@ public class CopyJobProgress {
     int fail = 0;
     int pending = 0;
     for (CopyJobItemDO row : items.listByJob(jobId)) {
-      if (CopyJobItemDO.STATUS_SUCCESS.equals(row.getStatus())) {
-        success++;
-      } else if (CopyJobItemDO.STATUS_FAILED.equals(row.getStatus())) {
+      if (CopyJobItemDO.STATUS_FAILED.equals(row.getStatus())) {
         fail++;
-      } else {
+      } else if (CopyJobItemDO.STATUS_PENDING.equals(row.getStatus())) {
         pending++;
+      } else {
+        // skipped (already-owned) items resolve without error and count toward success like copies,
+        // so the script's "resolved >= total" completion check keeps working (ADR-019).
+        success++;
       }
     }
     String status;
