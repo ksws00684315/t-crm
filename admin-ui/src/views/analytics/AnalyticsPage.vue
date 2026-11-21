@@ -20,8 +20,7 @@ import {
   User,
   Tickets,
   TrendCharts,
-  Wallet,
-  Warning
+  Wallet
 } from "@element-plus/icons-vue";
 import { analyticsOptions, exportAnalytics, queryAnalytics } from "@/api/analytics";
 import type {
@@ -939,19 +938,6 @@ onUnmounted(stop);
         </div>
       </div>
     </section>
-    <section v-else-if="creator" class="analytics-topic">
-      <h2>{{ t("analytics.riskTitle") }}</h2>
-      <div class="topic-grid topic-grid--two">
-        <MetricCard
-          :label="label('amountRefundRate')"
-          :icon="Warning"
-          tone="amber"
-          :value="percent(metrics?.amountRefundRate)"
-          :hint="t('analytics.kol-ranking.definitions.amountRefundRate')"
-          :detail="`${display('completedRefundAmount', metrics?.completedRefundAmount)} / ${display('salesAmount', metrics?.salesAmount)}`"
-        />
-      </div>
-    </section>
     <section
       v-else-if="inviter"
       class="conversion-chain"
@@ -1231,26 +1217,8 @@ onUnmounted(stop);
   gap: var(--tcrm-space-4);
 }
 .analytics-cards--inviter {
+  --metric-note-column: 2 / -1;
   --metric-note-indent: 0px;
-}
-.analytics-topic {
-  min-width: 0;
-  display: grid;
-  gap: var(--tcrm-space-3);
-}
-.analytics-topic h2 {
-  color: var(--tcrm-color-text);
-  font-size: var(--tcrm-font-size-section);
-  line-height: var(--tcrm-line-height-section);
-  font-weight: 600;
-  margin: 0;
-}
-.topic-grid {
-  display: grid;
-  gap: var(--tcrm-space-4);
-}
-.topic-grid--two {
-  grid-template-columns: repeat(2, minmax(0, 1fr));
 }
 .conversion-chain {
   display: grid;
@@ -1606,7 +1574,6 @@ onUnmounted(stop);
 }
 @media (max-width: 600px) {
   .analytics-cards,
-  .topic-grid,
   .ledger-comparison {
     grid-template-columns: minmax(0, 1fr);
   }

@@ -130,6 +130,7 @@ class OrderStatsIT {
           (9, 4, 3, '货款收入', '2026-11-03T09:00:00Z', NULL, 'INCOME_DETAIL')
         ) fixture(id, tenant, shop, subtype, posted, amount, query_type)
         """);
+    jdbc.update("UPDATE crm_order_settlement_flow SET order_id = 1 WHERE id = 1");
     var configuration =
         new Configuration(new Environment("t144", new JdbcTransactionFactory(), source));
     configuration.setMapUnderscoreToCamelCase(true);
@@ -207,6 +208,19 @@ class OrderStatsIT {
 
       var evidence = session.getMapper(OrderEvidenceMapper.class);
       var scope = new ScopeDTO(4, 9L, 1L, 11L, null, java.util.List.of(1L));
+      assertThat(mapper.scopedSettlement(scope, FROM, UNTIL)).isEqualByComparingTo("80.50");
+      var inviterScope = new ScopeDTO(4, null, 1L, null, 9L, java.util.List.of(1L));
+      assertThat(mapper.scopedSettlement(inviterScope, FROM, UNTIL)).isEqualByComparingTo("80.50");
+      var anotherOwner = new ScopeDTO(4, 10L, 1L, 11L, null, java.util.List.of(1L));
+      assertThat(mapper.scopedSettlement(anotherOwner, FROM, UNTIL)).isNull();
+      var anotherCreator = new ScopeDTO(4, 9L, 1L, 12L, null, java.util.List.of(1L));
+      assertThat(mapper.scopedSettlement(anotherCreator, FROM, UNTIL)).isNull();
+      var creatorEvidence = new Selection(scope, 11L, null, null, null, FROM, UNTIL);
+      var counts = evidence.productOrderCounts(creatorEvidence);
+      assertThat(counts.paidOrders()).isEqualTo(1);
+      assertThat(counts.refundedOrders()).isEqualTo(1);
+      assertThat(evidence.count(creatorEvidence, Kind.ORDERS)).isEqualTo(2);
+      assertThat(evidence.count(creatorEvidence, Kind.REFUNDS)).isEqualTo(2);
       var shopEvidence = new Selection(scope, null, null, null, null, FROM, UNTIL);
       var productEvidence = new Selection(scope, null, null, "A", null, FROM, UNTIL);
       assertThat(evidence.count(shopEvidence, Kind.ORDERS)).isEqualTo(2);
@@ -740,6 +754,13 @@ class OrderStatsIT {
       var commission = orders.creatorCommission(scoped, FROM, UNTIL);
       assertThat(commission.total()).isEqualByComparingTo("8");
       assertThat(commission.clawback()).isEqualByComparingTo("2");
+      assertThat(orders.inviterCreatorCommissions(scoped, FROM, UNTIL))
+          .singleElement()
+          .satisfies(
+              value -> {
+                assertThat(value.creatorId()).isEqualTo(11L);
+                assertThat(value.total()).isEqualByComparingTo("8");
+              });
       assertThat(orders.inviterCommissions(scoped, FROM, UNTIL))
           .singleElement()
           .satisfies(
@@ -832,6 +853,9 @@ class OrderStatsIT {
                 assertThat(value.estimated()).isZero();
                 assertThat(value.actual()).isEqualByComparingTo("8");
               });
+      assertThat(orders.inviterCreatorCommissions(productScope, FROM, UNTIL))
+          .singleElement()
+          .satisfies(value -> assertThat(value.total()).isEqualByComparingTo("8"));
       assertThat(orders.inviterCommissions(scoped.withProductKeyword("Other"), FROM, UNTIL))
           .isEmpty();
       var evidence = session.getMapper(OrderEvidenceMapper.class);
@@ -849,6 +873,7 @@ class OrderStatsIT {
           """);
       session.clearCache();
       assertThat(orders.inviterCommissions(productScope, FROM, UNTIL)).isEmpty();
+      assertThat(orders.inviterCreatorCommissions(productScope, FROM, UNTIL)).isEmpty();
       assertThat(orders.creatorCommission(productScope, FROM, UNTIL)).isNull();
       assertThat(orders.creatorCommission(new ScopeDTO(4, 10L, null, null, null), FROM, UNTIL))
           .isNull();

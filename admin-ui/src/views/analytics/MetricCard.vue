@@ -181,7 +181,7 @@ const note = computed(() => [props.detail, props.comparison].filter(Boolean).joi
   width: 100%;
 }
 .metric-card--with-terms .metric-card__note {
-  grid-column: 1 / -1;
+  grid-column: var(--metric-note-column, 1 / -1);
   margin-inline-start: var(--metric-note-indent, clamp(0px, calc(100cqw - 240px), 60px));
 }
 .metric-card__state {

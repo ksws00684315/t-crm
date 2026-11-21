@@ -50,14 +50,22 @@ public interface OrderStatsApi {
 
   long creatorSpuCount(ScopeDTO scope, Instant from, Instant until);
 
+  /** Posted settlement for orders matching the supplied scope. */
+  BigDecimal scopedSettlement(ScopeDTO scope, Instant from, Instant until);
+
   /** Read-only CRM commission snapshots for the same paid-order cohort. */
   CreatorCommissionDTO creatorCommission(ScopeDTO scope, Instant from, Instant until);
 
   List<InviterCommissionDTO> inviterCommissions(ScopeDTO scope, Instant from, Instant until);
 
+  List<CreatorCommissionTotal> inviterCreatorCommissions(
+      ScopeDTO scope, Instant from, Instant until);
+
   List<BestCreatorDTO> bestCreators(ScopeDTO scope, Instant from, Instant until);
 
   record InviterCommissionDTO(Long inviterId, BigDecimal estimated, BigDecimal actual) {}
+
+  record CreatorCommissionTotal(Long creatorId, BigDecimal total) {}
 
   record BestCreatorDTO(Long inviterId, Long creatorId, BigDecimal netSalesAmount) {}
 

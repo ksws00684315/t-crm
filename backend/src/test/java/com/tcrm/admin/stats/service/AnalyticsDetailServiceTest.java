@@ -10,12 +10,14 @@ import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
 import com.tcrm.admin.kol.api.KolApi;
+import com.tcrm.admin.kol.api.KolRateDTO;
 import com.tcrm.admin.kol.api.KolRefDTO;
 import com.tcrm.admin.order.api.OrderEvidenceApi;
 import com.tcrm.admin.order.api.OrderEvidenceApi.DetailSort;
 import com.tcrm.admin.order.api.OrderEvidenceApi.Kind;
 import com.tcrm.admin.order.api.OrderEvidenceApi.ProductBreakdown;
 import com.tcrm.admin.order.api.OrderEvidenceApi.ProductGroup;
+import com.tcrm.admin.order.api.OrderEvidenceApi.ProductOrderCounts;
 import com.tcrm.admin.order.api.OrderEvidenceApi.Selection;
 import com.tcrm.admin.order.api.OrderStatsApi;
 import com.tcrm.admin.order.api.OrderStatsApi.RankDimension;
@@ -71,6 +73,65 @@ class AnalyticsDetailServiceTest {
         .isEqualTo(new ScopeDTO(4, 9L, 1L, 11L, null, List.of(1L)));
     assertThat(selection.getValue().productCode()).isEqualTo("SPU");
     assertThat(selection.getValue().keyword()).isEqualTo("Sample");
+  }
+
+  @Test
+  void creatorOverviewScopesFinancialAmountsAndCountsToSelectedCreator() {
+    var filters = filters(1L);
+    when(overview.resolve(filters)).thenReturn(resolved(new ScopeDTO(4, 9L, 1L, null, null)));
+    when(overview.canView("order:view")).thenReturn(true);
+    when(overview.canViewCommission()).thenReturn(true);
+    when(shops.listShops()).thenReturn(List.of(new ShopAccessDTO(1L, "Shop", "remote", 1, "S1")));
+    var scope = new ScopeDTO(4, 9L, 1L, 11L, null, List.of(1L));
+    var period = new StatsPeriod(day, day);
+    var counts = new ProductOrderCounts(1, 2);
+    when(evidence.productOrderCounts(any())).thenReturn(counts);
+    when(orders.scopedSettlement(scope, period.from(), period.until())).thenReturn(BigDecimal.TEN);
+    when(orders.creatorCommission(scope, period.from(), period.until()))
+        .thenReturn(new OrderStatsApi.CreatorCommissionDTO(BigDecimal.ONE, null));
+
+    var result = details.detail(Board.CREATOR, filters, 11L, null, null, null, null, null);
+
+    assertThat(result.creatorOverview().settlementAmount()).isEqualByComparingTo("10");
+    assertThat(result.creatorOverview().totalCommission()).isEqualByComparingTo("1");
+    assertThat(result.creatorOverview().orderCounts()).isEqualTo(counts);
+    var selection = ArgumentCaptor.forClass(Selection.class);
+    verify(evidence).productOrderCounts(selection.capture());
+    assertThat(selection.getValue().creator()).isEqualTo(11L);
+  }
+
+  @Test
+  void creatorOverviewOmitsRestrictedFinancialAmountsAndCounts() {
+    var filters = filters(1L);
+    when(overview.resolve(filters)).thenReturn(resolved(new ScopeDTO(4, 9L, 1L, null, null)));
+    when(shops.listShops()).thenReturn(List.of(new ShopAccessDTO(1L, "Shop", "remote", 1, "S1")));
+
+    var result = details.detail(Board.CREATOR, filters, 11L, null, null, null, null, null);
+
+    assertThat(result.creatorOverview())
+        .isEqualTo(new AnalyticsDetailService.CreatorOverview(null, null, null));
+    verifyNoInteractions(orders);
+  }
+
+  @Test
+  void inviterOverviewUsesScopedSettlementAndEvidenceCounts() {
+    var filters = filters(1L);
+    when(overview.resolve(filters)).thenReturn(resolved(new ScopeDTO(4, 9L, 1L, null, null)));
+    when(overview.canView("order:view")).thenReturn(true);
+    when(shops.listShops()).thenReturn(List.of(new ShopAccessDTO(1L, "Shop", "remote", 1, "S1")));
+    var scope = new ScopeDTO(4, 9L, 1L, null, 9L, List.of(1L));
+    var period = new StatsPeriod(day, day);
+    var counts = new ProductOrderCounts(1, 2);
+    when(evidence.productOrderCounts(any())).thenReturn(counts);
+    when(orders.scopedSettlement(scope, period.from(), period.until())).thenReturn(BigDecimal.TEN);
+
+    var result = details.detail(Board.INVITER, filters, 9L, null, null, null, null, null);
+
+    assertThat(result.inviterOverview())
+        .isEqualTo(new AnalyticsDetailService.InviterOverview(BigDecimal.TEN, counts));
+    var selection = ArgumentCaptor.forClass(Selection.class);
+    verify(evidence).productOrderCounts(selection.capture());
+    assertThat(selection.getValue().inviter()).isEqualTo(9L);
   }
 
   @Test
@@ -168,6 +229,9 @@ class AnalyticsDetailServiceTest {
                     0)));
     when(creators.listByIdsIncludingDeleted(List.of(11L)))
         .thenReturn(List.of(new KolRefDTO(11L, "C11", "Creator", true, 10L)));
+    when(overview.canViewCommission()).thenReturn(true);
+    when(orders.inviterCreatorCommissions(scope, period.from(), period.until()))
+        .thenReturn(List.of(new OrderStatsApi.CreatorCommissionTotal(11L, BigDecimal.TEN)));
 
     assertThat(details.inviterCreators(filters, 9L, 1, 20, false).items())
         .singleElement()
@@ -176,8 +240,49 @@ class AnalyticsDetailServiceTest {
               assertThat(row.transferred()).isTrue();
               assertThat(row.currentInviter()).isNull();
               assertThat(row.enabled()).isNull();
+              assertThat(row.commissionRate()).isNull();
               assertThat(row.metrics().completedRefundAmount()).isEqualByComparingTo("30.00");
+              assertThat(row.totalEstimatedCommission()).isEqualByComparingTo("10");
             });
+  }
+
+  @Test
+  void inviterRankingShowsCurrentRateOnlyWithCommissionPermission() {
+    var filters = filters(null);
+    when(overview.canView("kol:view")).thenReturn(true);
+    when(overview.resolve(filters)).thenReturn(resolved(new ScopeDTO(4, 9L, null, null, null)));
+    when(shops.listShops()).thenReturn(List.of(new ShopAccessDTO(1L, "Shop", "remote", 1, "S1")));
+    var scope = new ScopeDTO(4, 9L, null, null, 9L, List.of(1L));
+    var period = new StatsPeriod(day, day);
+    when(orders.rankFacts(scope, OrderStatsApi.RankDimension.KOL, period.from(), period.until()))
+        .thenReturn(
+            List.of(
+                new OrderStatsApi.RankFactsDTO(
+                    11L,
+                    1,
+                    1,
+                    0,
+                    0,
+                    0,
+                    BigDecimal.TEN,
+                    BigDecimal.ZERO,
+                    BigDecimal.ZERO,
+                    0,
+                    period.from(),
+                    null,
+                    0)));
+    when(creators.listByIdsIncludingDeleted(List.of(11L)))
+        .thenReturn(List.of(new KolRefDTO(11L, "C11", "Creator", true, 9L)));
+    when(creators.listRatesByIds(List.of(11L))).thenReturn(List.of(new KolRateDTO(11L, "0.1500")));
+
+    assertThat(
+            details.inviterCreators(filters, 9L, 1, 20, false).items().getFirst().commissionRate())
+        .isNull();
+    when(overview.canViewCommission()).thenReturn(true);
+    assertThat(
+            details.inviterCreators(filters, 9L, 1, 20, false).items().getFirst().commissionRate())
+        .isEqualByComparingTo("0.15");
+    verify(creators).listRatesByIds(List.of(11L));
   }
 
   @Test

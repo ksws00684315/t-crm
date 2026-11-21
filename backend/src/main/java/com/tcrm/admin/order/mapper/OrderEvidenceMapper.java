@@ -147,7 +147,8 @@ public interface OrderEvidenceMapper {
              i.item_name AS product, i.sku_name AS sku, NULL::integer AS units,
              r.amount, r.finish_time AS event_time,
              o.shop_id, COALESCE(i.kol_id, o.kol_id) AS creator_id, i.reporting_product_id, i.spu_id, i.weidian_item_id AS transaction_item_id,
-             i.sku_id, i.quantity AS sold_units, i.pay_amount AS sales_amount
+             i.sku_id, i.quantity AS sold_units, i.pay_amount AS sales_amount,
+             o.id AS order_id
       FROM scoped_orders o JOIN crm_refund r ON r.order_id = o.id
       <choose>
         <when test="s.productCode != null or s.scope.productKeyword != null">JOIN</when>
@@ -363,17 +364,17 @@ public interface OrderEvidenceMapper {
   @Select(
       SCOPED
           + """
-      refunds AS (
-        SELECT DISTINCT o.id FROM scoped_orders o
-        JOIN crm_refund r ON r.order_id = o.id
-        JOIN distribution_items i ON i.id = r.order_item_id AND i.order_id = o.id
-        WHERE r.tenant_id = #{s.scope.tenantId} AND NOT r.is_deleted AND r.refund_status = 'SUCCESS'
-          AND r.finish_time &gt;= #{s.from} AND r.finish_time &lt; #{s.until}
+      paid AS (
+      """
+          + ORDERS
+          + """
+      ), refunds AS (
+      """
+          + REFUNDS
+          + """
       )
-      SELECT (SELECT COUNT(DISTINCT o.id)
-                FROM scoped_orders o JOIN scoped_items i ON i.order_id = o.id
-                WHERE o.pay_time &gt;= #{s.from} AND o.pay_time &lt; #{s.until}) AS paid_orders,
-             (SELECT COUNT(*) FROM refunds) AS refunded_orders
+      SELECT (SELECT COUNT(DISTINCT order_id) FROM paid) AS paid_orders,
+             (SELECT COUNT(DISTINCT order_id) FROM refunds) AS refunded_orders
       </script>
       """)
   ProductOrderCounts productOrderCounts(@Param("s") Selection selection);

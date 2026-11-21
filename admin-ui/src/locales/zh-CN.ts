@@ -160,7 +160,6 @@ const zhCN = {
     salesAmount: "销售额",
     cohortRefundAmount: "该批订单成功退款",
     completedRefundAmount: "退款金额",
-    riskTitle: "退款风险",
     amountRefundRate: "金额退款率",
     periodRefundedOrderRate: "周期订单退款占比",
     averageOrderAmount: "平均订单价",
@@ -396,9 +395,29 @@ const zhCN = {
       rankingCount: "共 {count} 位达人",
       netCommission: "本期预估佣金",
       keyword: "达人姓名／编号／社媒",
+      drawer: {
+        inviter: "邀请人 {name}",
+        status: "达人状态 {status}",
+        commissionRate: "佣金比例 {rate}",
+        totalCommission: "达人总佣金",
+        orderRefundTime: "订单号／退款时间",
+        headers: {
+          orderNo: "微店订单号及北京时间支付时间。",
+          orderRefundTime: "微店订单号及北京时间退款完结时间。",
+          refundUnits: "微店成功退款记录未提供可核实的退款件数时显示横线。",
+          salesAmount: "原订单商品行的实付金额，未分摊运费。",
+          refundAmount: "该商品行自支付日起 30 个北京时间自然日内完结的成功退款金额。",
+          netTransactionAmount:
+            "原商品行实付金额扣除该行自支付日起 30 个北京时间自然日内完结的成功退款。"
+        }
+      },
       definitions: {
         identity: "展示达人名称、核心社媒平台、社媒账号和达人编号。未设置核心平台时省略括号。",
         relationship: "展示当前归属商务和达人列表中的关系状态。",
+        settlementAmount:
+          "所选期间按入账日期汇总可关联归属该达人的货款收入与退款扣减。缺少可用流水时显示横线。",
+        totalCommission:
+          "所选支付期间内归属该达人的已核实订单佣金合计。未结算取预估，已结算取实际金额，每笔订单只计一次。已提现的佣金仍计入原订单。",
         paidOrderCount: "所选期间内归属该达人且已支付的订单数，同一订单只计一次。",
         units: "累计所选期间内已支付订单下各 SKU 的购买数量。",
         linkCount: "所选期间内有支付成交的达人专属链接数，按链接 ID 去重。",
@@ -417,6 +436,9 @@ const zhCN = {
     },
     "inviter-performance": {
       detailTitle: "邀请人业绩详情",
+      creatorRanking: "达人排行",
+      creatorIdentity: "达人名/ID",
+      effectiveCreators: "当前有效达人",
       selling: "有销售邀请人",
       active: "当前有效邀请人 {value}",
       identity: "邀请人",
@@ -446,6 +468,8 @@ const zhCN = {
       },
       definitions: {
         identity: "展示邀请人姓名和账号。",
+        settlementAmount:
+          "按所选期间的入账日期汇总归属该邀请人的货款及退款扣减。筛选商品或没有可用流水时显示横线。",
         status: "展示邀请人账号的启停状态。",
         creatorCounts: "当前归属该邀请人且启用的达人数，以及由该邀请人首次邀请的历史累计达人数。",
         units: "累计所选期间内归属该邀请人的已支付订单下各 SKU 的购买数量。",

@@ -89,6 +89,7 @@ export interface RankRow {
   weidianShopId?: string;
   shopUpdatedAt?: string;
   refundedOrderCount?: Scalar;
+  effectiveCount?: Scalar | null;
   status?: number;
   name?: string;
   code?: string;
@@ -178,11 +179,26 @@ export interface ShopDetailOverview {
   settlementAmount: Scalar | null;
   creatorCounts: { selling: Scalar; total: Scalar };
 }
+interface OrderCounts {
+  paidOrders: Scalar;
+  refundedOrders: Scalar;
+}
+export interface CreatorDetailOverview {
+  settlementAmount: Scalar | null;
+  totalCommission: Scalar | null;
+  orderCounts: OrderCounts | null;
+}
+export interface InviterDetailOverview {
+  settlementAmount: Scalar | null;
+  orderCounts: OrderCounts | null;
+}
 interface DetailResult {
   daily: DailyAmount[] | null;
   activity: { items: EvidenceRow[]; total: Scalar; page: number; size: number } | null;
   shopOverview?: ShopDetailOverview | null;
-  productOrderCounts?: { paidOrders: Scalar; refundedOrders: Scalar } | null;
+  productOrderCounts?: OrderCounts | null;
+  creatorOverview?: CreatorDetailOverview | null;
+  inviterOverview?: InviterDetailOverview | null;
 }
 export function queryAnalyticsDetail(
   board: Board,
@@ -221,8 +237,8 @@ export interface InviterCreatorRow {
   code: string | null;
   enabled: boolean | null;
   metrics: Metrics;
-  transferred: boolean;
-  currentInviter: string | null;
+  commissionRate?: Scalar | null;
+  totalEstimatedCommission?: Scalar | null;
 }
 
 export function queryInviterCreators(
