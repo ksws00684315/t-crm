@@ -100,6 +100,10 @@ services:
       JAVA_TOOL_OPTIONS: -XX:MaxRAMPercentage=70
       # Fail startup when the database schema is newer than this image (rollback safety, #106).
       TCRM_FLYWAY_IGNORE_MIGRATION_PATTERNS: ${TCRM_FLYWAY_IGNORE_MIGRATION_PATTERNS:-}
+      # Apply a pending migration whose version is older than the recorded history. Needed when a
+      # migration is merged after a later-numbered one (spec 04 forbids editing merged scripts).
+      # Independent of the guard above: the schema-newer-than-image check still fails startup.
+      SPRING_FLYWAY_OUT_OF_ORDER: ${SPRING_FLYWAY_OUT_OF_ORDER:-false}
     expose:
       - "8080"
     depends_on:
