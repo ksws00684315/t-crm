@@ -4,6 +4,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyLong;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -544,6 +545,63 @@ class ProductLinkIT {
             jdbc.queryForObject(
                 "SELECT used FROM crm_kol_copy_token WHERE kol_id = ?", Integer.class, seed.kolA()))
         .isEqualTo(0);
+  }
+
+  @Test
+  void shouldReviveSoftDeletedProduct_whenConvertingItsLink() throws Exception {
+    // Task 157: converting the link of a converged (soft-deleted) listing revives the original
+    // crm_product row with its code instead of registering a duplicate under a fresh P-code.
+    long sourceShopId = createShop("2003", "Revive source shop");
+    long poolShopId = createShop("2004", "Revive pool shop");
+    mvc.perform(put("/admin-api/product/shops/" + poolShopId + "/copy-pool").header(ADMIN, admin))
+        .andExpect(status().isOk());
+    authorizeShop(poolShopId);
+    jdbc.update(
+        """
+        INSERT INTO crm_product(
+          id, product_code, shop_id, weidian_item_id, name, price, price_currency, status,
+          tenant_id, create_time, update_time, is_deleted)
+        VALUES (17201, 'P17B002', ?, '10002', 'Deleted twin', 9.90, 'CNY', 1, 1, now(), now(), TRUE)
+        """,
+        sourceShopId);
+    long kol = createKol("ReviveKol", "revive157@example.com");
+    String token = createToken(kol, 10);
+    when(copies.probe(eq(sourceShopId), eq("10002")))
+        .thenReturn(
+            Optional.of(new ProbedItem("10002", "Revived", new BigDecimal("9.90"), null, true)));
+    when(copies.copy(eq(sourceShopId), eq("10002"), eq(poolShopId)))
+        .thenReturn(new CopyResult("90002", null));
+
+    String jobCode = convert(token, "10002");
+    TestWait.until(
+        Duration.ofSeconds(10),
+        () ->
+            "completed"
+                .equals(
+                    jdbc.queryForObject(
+                        "SELECT status FROM crm_copy_job WHERE job_code = ?",
+                        String.class,
+                        jobCode)),
+        "copy job should complete");
+
+    assertThat(
+            jdbc.queryForObject(
+                "SELECT is_deleted FROM crm_product WHERE product_code = 'P17B002'", Boolean.class))
+        .isFalse();
+    assertThat(
+            jdbc.queryForObject(
+                "SELECT COUNT(*) FROM crm_product WHERE weidian_item_id = '10002'", Integer.class))
+        .isEqualTo(1);
+    assertThat(
+            jdbc.queryForObject(
+                """
+                SELECT COUNT(*) FROM crm_kol_item
+                WHERE kol_id = ? AND product_id = 17201 AND valid_to IS NULL
+                """,
+                Integer.class,
+                kol))
+        .isEqualTo(1);
+    verify(copies).copy(sourceShopId, "10002", poolShopId);
   }
 
   @Test

@@ -202,7 +202,7 @@ public class CopyJobWorker implements ApplicationRunner {
     KolItemDO exclusive = kolItems.findCurrentByWeidianItem(fresh.getSourceProductId());
     if (exclusive != null) {
       if (exclusive.getKolId() != null && exclusive.getKolId().equals(job.getKolId())) {
-        markSuccess(fresh.getId(), exclusive.getWeidianItemId(), null, null);
+        markSkipped(fresh.getId(), exclusive.getWeidianItemId(), null);
         return;
       }
       if (exclusive.getProductId() == null) {
@@ -276,7 +276,7 @@ public class CopyJobWorker implements ApplicationRunner {
     products.lockShopItem(ProductRules.shopItemLockKey(sourceShopId, sourceItemId));
     KolItemDO existing = kolItems.findCurrentByKolProduct(job.getKolId(), productId);
     if (existing != null) {
-      markSuccess(row.getId(), existing.getWeidianItemId(), null, sourceShopId);
+      markSkipped(row.getId(), existing.getWeidianItemId(), sourceShopId);
       return;
     }
     if (!tokens.consume(job.getTokenId(), 1)) {
@@ -394,6 +394,13 @@ public class CopyJobWorker implements ApplicationRunner {
           ProductLinkMessages.SOURCE_INCOMPLETE,
           null);
     }
+    // A soft-deleted row keeps its immutable code: revive it instead of minting a new one, so a
+    // converted link cannot re-grow the catalog with a duplicate listing under a fresh P-code.
+    Long deletedId = products.findDeletedShopItemId(shopId, weidianItemId);
+    if (deletedId != null) {
+      products.reviveDeletedShopItem(deletedId, name, price, imageUrl, Instant.now());
+      return products.selectById(deletedId);
+    }
     Instant now = Instant.now();
     ProductDO product = new ProductDO();
     product.setProductCode(codes.next());
@@ -419,6 +426,23 @@ public class CopyJobWorker implements ApplicationRunner {
             .set(CopyJobItemDO::getStatus, CopyJobItemDO.STATUS_SUCCESS)
             .set(CopyJobItemDO::getTargetItemId, targetItemId)
             .set(CopyJobItemDO::getErrorMessage, warning)
+            .set(CopyJobItemDO::getUpdateTime, Instant.now());
+    if (sourceShopId != null) {
+      update.set(CopyJobItemDO::getSourceShopId, sourceShopId);
+    }
+    items.update(null, update);
+  }
+
+  /**
+   * The KOL already owns this item or an existing copy of the same product: skip without a copy.
+   */
+  private void markSkipped(long itemId, String targetItemId, Long sourceShopId) {
+    LambdaUpdateWrapper<CopyJobItemDO> update =
+        new LambdaUpdateWrapper<CopyJobItemDO>()
+            .eq(CopyJobItemDO::getId, itemId)
+            .eq(CopyJobItemDO::getStatus, CopyJobItemDO.STATUS_PENDING)
+            .set(CopyJobItemDO::getStatus, CopyJobItemDO.STATUS_SKIPPED)
+            .set(CopyJobItemDO::getTargetItemId, targetItemId)
             .set(CopyJobItemDO::getUpdateTime, Instant.now());
     if (sourceShopId != null) {
       update.set(CopyJobItemDO::getSourceShopId, sourceShopId);

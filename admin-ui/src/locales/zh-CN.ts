@@ -1848,6 +1848,7 @@ const zhCN = {
     itemStatus: {
       pending: "待处理",
       success: "成功",
+      skipped: "已跳过",
       failed: "失败"
     }
   },
