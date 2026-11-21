@@ -39,6 +39,7 @@ function initialRankState() {
     result: undefined as Awaited<ReturnType<typeof getWorkbenchRanks>> | undefined,
     loading: false,
     failed: false,
+    requestedPage: 1,
     request: 0
   };
 }
@@ -48,6 +49,7 @@ const rankStates = reactive({ SHOP: initialRankState(), CREATOR: initialRankStat
 async function showRankPage(board: RankBoard, page = 1) {
   const state = rankStates[board];
   const id = ++state.request;
+  state.requestedPage = page;
   state.loading = true;
   state.failed = false;
   try {
@@ -64,6 +66,7 @@ function resetRankResult(board: RankBoard) {
   const state = rankStates[board];
   state.request++;
   state.result = undefined;
+  state.requestedPage = 1;
   state.loading = false;
   state.failed = false;
 }
@@ -100,7 +103,7 @@ async function load() {
       for (const board of rankBoards) {
         const rank = rankStates[board];
         if (!rank.loading && (rank.expanded || rank.period !== "ALL_TIME")) {
-          void showRankPage(board, rank.result?.page);
+          void showRankPage(board, rank.requestedPage);
         }
       }
     }
@@ -521,10 +524,22 @@ const hasContent = computed(
           </div>
           <el-alert
             v-if="panel.state.failed"
-            :title="label('loadFailed')"
+            :title="label('rankLoadFailed')"
             type="error"
             :closable="false"
-          />
+          >
+            <p v-if="panel.state.result && panel.state.result.page !== panel.state.requestedPage">
+              {{ t("workbench.rankShowingPage", { page: panel.state.result.page }) }}
+            </p>
+            <el-button
+              link
+              type="primary"
+              class="workbench__rank-retry"
+              @click="showRankPage(panel.board, panel.state.requestedPage)"
+            >
+              {{ label("rankRetry") }}
+            </el-button>
+          </el-alert>
           <el-skeleton v-if="panel.state.loading && !panel.rows?.length" :rows="3" animated />
           <p v-else-if="missing(panel.key) && !panel.state.result">{{ label("unavailable") }}</p>
           <div
@@ -602,9 +617,16 @@ const hasContent = computed(
   gap: var(--tcrm-space-5);
   --tcrm-font-size-section: 18px;
   --tcrm-line-height-section: 26px;
-  --tcrm-font-size-table: 16px;
-  --tcrm-line-height-table: 25px;
-  font-size: 15px;
+  /* Page exception recorded in spec 13 section 3.6: today 19 px, board labels 18 px, numbers 23 px. */
+  --workbench-font-size-root: 15px;
+  --workbench-font-size-toolbar: 14px;
+  --workbench-font-size-today: 19px;
+  --workbench-font-size-note: 13px;
+  --workbench-font-size-number: 23px;
+  --workbench-font-size-metric-icon: 30px;
+  --workbench-font-size-chevron: 12px;
+  --workbench-font-size-rank-icon: 17px;
+  font-size: var(--workbench-font-size-root);
   line-height: 1.55;
 }
 .workbench__toolbar,
@@ -616,7 +638,7 @@ const hasContent = computed(
 }
 .workbench__toolbar {
   justify-content: space-between;
-  font-size: 14px;
+  font-size: var(--workbench-font-size-toolbar);
   font-variant-numeric: tabular-nums;
 }
 .workbench__refresh {
@@ -657,7 +679,7 @@ const hasContent = computed(
   width: 52px;
   height: 52px;
   border-radius: var(--tcrm-radius-control);
-  font-size: 30px;
+  font-size: var(--workbench-font-size-metric-icon);
 }
 .workbench__metric-icon--blue {
   color: var(--el-color-primary);
@@ -693,7 +715,7 @@ const hasContent = computed(
   font-variant-numeric: tabular-nums;
 }
 .workbench__today {
-  font-size: 19px;
+  font-size: var(--workbench-font-size-today);
   overflow-wrap: anywhere;
 }
 .workbench__today strong {
@@ -709,7 +731,7 @@ const hasContent = computed(
 .workbench__board h2 {
   margin: 0 0 var(--tcrm-space-4);
   padding-inline-start: var(--tcrm-space-2);
-  border-inline-start: 3px solid #2563eb;
+  border-inline-start: 3px solid var(--tcrm-color-primary);
   --tcrm-font-size-section: 20px;
 }
 .workbench__operations,
@@ -742,24 +764,24 @@ const hasContent = computed(
   align-items: center;
   gap: var(--tcrm-space-2);
   margin: 0;
-  font-size: 18px;
+  font-size: var(--tcrm-font-size-section);
   font-weight: 700;
 }
 .workbench__operation h3 .el-icon:not(.workbench__detail-arrow) {
-  color: #2563eb;
+  color: var(--tcrm-color-primary);
 }
 .workbench__operation h3 .workbench__detail-arrow {
   margin-inline-start: auto;
 }
 .workbench__capacity {
-  --workbench-capacity-color: #2563eb;
+  --workbench-capacity-color: var(--tcrm-color-primary);
   display: grid;
   gap: var(--tcrm-space-2);
   overflow-wrap: anywhere;
-  font-size: 13px;
+  font-size: var(--workbench-font-size-note);
 }
 .workbench__capacity--warning {
-  --workbench-capacity-color: #b45309;
+  --workbench-capacity-color: var(--tcrm-color-warning);
 }
 .workbench__capacity :deep(.el-progress-bar__outer) {
   background: #e2e8f0;
@@ -773,7 +795,7 @@ const hasContent = computed(
   align-items: center;
   min-height: 40px;
   padding: 4px 5px;
-  font-size: 18px;
+  font-size: var(--tcrm-font-size-section);
   overflow-wrap: anywhere;
   gap: 5px;
 }
@@ -791,19 +813,19 @@ const hasContent = computed(
 .workbench__detail-arrow {
   flex: none;
   color: #94a3b8;
-  font-size: 12px;
+  font-size: var(--workbench-font-size-chevron);
 }
 .workbench__operation-number {
   color: var(--el-text-color-primary);
-  font-size: 23px;
+  font-size: var(--workbench-font-size-number);
   line-height: 1.2;
   font-variant-numeric: tabular-nums;
 }
 .workbench__number--exception {
-  color: #dc2626;
+  color: var(--tcrm-color-danger);
 }
 .workbench__number--pending {
-  color: #b45309;
+  color: var(--tcrm-color-warning);
 }
 .workbench__rankings {
   grid-template-columns: repeat(2, minmax(0, 1fr));
@@ -833,10 +855,10 @@ const hasContent = computed(
   gap: var(--tcrm-space-2);
   margin: 0;
   padding: var(--tcrm-space-1);
-  font-size: 18px;
+  font-size: var(--tcrm-font-size-section);
 }
 .workbench__rank h2 .el-icon {
-  font-size: 17px;
+  font-size: var(--workbench-font-size-rank-icon);
 }
 .workbench__rank-icon--shop {
   color: var(--el-color-primary);
@@ -893,7 +915,6 @@ const hasContent = computed(
   }
   .workbench__rank-table :deep(.el-table .is-right .cell) {
     padding-inline: 5px;
-    font-size: 13px;
   }
   .workbench__rank-table :deep(.el-table th.is-right .cell) {
     white-space: normal;
@@ -933,6 +954,19 @@ const hasContent = computed(
 @container (max-width: 980px) {
   .workbench__rankings {
     grid-template-columns: minmax(0, 1fr);
+  }
+}
+@media (max-width: 767px) {
+  .workbench__detail,
+  .workbench__rank-controls :deep(.el-button),
+  .workbench__rank-controls :deep(.el-segmented__item),
+  .workbench__rank-retry {
+    min-height: 44px;
+  }
+  .workbench__rank-controls :deep(.el-button),
+  .workbench__rank-controls :deep(.el-segmented__item),
+  .workbench__rank-retry {
+    min-width: 44px;
   }
 }
 @container (max-width: 420px) {

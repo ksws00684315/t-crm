@@ -27,6 +27,9 @@ const enUS: MessageSchema = {
     rankLast30Days: "Last 30 days",
     rankAllTime: "All time",
     rankPeriod: "Ranking period",
+    rankLoadFailed: "Could not load this ranking.",
+    rankShowingPage: "Showing page {page}.",
+    rankRetry: "Retry",
     collapseRanking: "Collapse",
     enabledShops: "Enabled shops",
     name: "Name",
@@ -466,7 +469,6 @@ const enUS: MessageSchema = {
       conversionSubtitle: "From invitations to sales in the period",
       bestCreator: "Top creator",
       commissionAccess: "Your account cannot view commission",
-      rankingHint: "Open Details to see period contributions and the current team.",
       terms: {
         activeInviters: "Active inviters",
         totalInviters: "Total inviters",
