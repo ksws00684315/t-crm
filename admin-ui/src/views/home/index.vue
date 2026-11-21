@@ -617,7 +617,16 @@ const hasContent = computed(
   gap: var(--tcrm-space-5);
   --tcrm-font-size-section: 18px;
   --tcrm-line-height-section: 26px;
-  font-size: 15px;
+  /* Page exception recorded in spec 13 section 3.6: today 19 px, board labels 18 px, numbers 23 px. */
+  --workbench-font-size-root: 15px;
+  --workbench-font-size-toolbar: 14px;
+  --workbench-font-size-today: 19px;
+  --workbench-font-size-note: 13px;
+  --workbench-font-size-number: 23px;
+  --workbench-font-size-metric-icon: 30px;
+  --workbench-font-size-chevron: 12px;
+  --workbench-font-size-rank-icon: 17px;
+  font-size: var(--workbench-font-size-root);
   line-height: 1.55;
 }
 .workbench__toolbar,
@@ -629,7 +638,7 @@ const hasContent = computed(
 }
 .workbench__toolbar {
   justify-content: space-between;
-  font-size: 14px;
+  font-size: var(--workbench-font-size-toolbar);
   font-variant-numeric: tabular-nums;
 }
 .workbench__refresh {
@@ -670,7 +679,7 @@ const hasContent = computed(
   width: 52px;
   height: 52px;
   border-radius: var(--tcrm-radius-control);
-  font-size: 30px;
+  font-size: var(--workbench-font-size-metric-icon);
 }
 .workbench__metric-icon--blue {
   color: var(--el-color-primary);
@@ -706,7 +715,7 @@ const hasContent = computed(
   font-variant-numeric: tabular-nums;
 }
 .workbench__today {
-  font-size: 19px;
+  font-size: var(--workbench-font-size-today);
   overflow-wrap: anywhere;
 }
 .workbench__today strong {
@@ -755,7 +764,7 @@ const hasContent = computed(
   align-items: center;
   gap: var(--tcrm-space-2);
   margin: 0;
-  font-size: 18px;
+  font-size: var(--tcrm-font-size-section);
   font-weight: 700;
 }
 .workbench__operation h3 .el-icon:not(.workbench__detail-arrow) {
@@ -769,7 +778,7 @@ const hasContent = computed(
   display: grid;
   gap: var(--tcrm-space-2);
   overflow-wrap: anywhere;
-  font-size: 13px;
+  font-size: var(--workbench-font-size-note);
 }
 .workbench__capacity--warning {
   --workbench-capacity-color: var(--tcrm-color-warning);
@@ -786,7 +795,7 @@ const hasContent = computed(
   align-items: center;
   min-height: 40px;
   padding: 4px 5px;
-  font-size: 18px;
+  font-size: var(--tcrm-font-size-section);
   overflow-wrap: anywhere;
   gap: 5px;
 }
@@ -804,11 +813,11 @@ const hasContent = computed(
 .workbench__detail-arrow {
   flex: none;
   color: #94a3b8;
-  font-size: 12px;
+  font-size: var(--workbench-font-size-chevron);
 }
 .workbench__operation-number {
   color: var(--el-text-color-primary);
-  font-size: 23px;
+  font-size: var(--workbench-font-size-number);
   line-height: 1.2;
   font-variant-numeric: tabular-nums;
 }
@@ -846,10 +855,10 @@ const hasContent = computed(
   gap: var(--tcrm-space-2);
   margin: 0;
   padding: var(--tcrm-space-1);
-  font-size: 18px;
+  font-size: var(--tcrm-font-size-section);
 }
 .workbench__rank h2 .el-icon {
-  font-size: 17px;
+  font-size: var(--workbench-font-size-rank-icon);
 }
 .workbench__rank-icon--shop {
   color: var(--el-color-primary);
