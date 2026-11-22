@@ -5,6 +5,7 @@ import com.tcrm.admin.order.api.OrderStatsApi.BestCreatorDTO;
 import com.tcrm.admin.order.api.OrderStatsApi.CommissionWindowDTO;
 import com.tcrm.admin.order.api.OrderStatsApi.CreatorCommissionDTO;
 import com.tcrm.admin.order.api.OrderStatsApi.CreatorCommissionTotal;
+import com.tcrm.admin.order.api.OrderStatsApi.CreatorRankingCommission;
 import com.tcrm.admin.order.api.OrderStatsApi.InviterCommissionDTO;
 import com.tcrm.admin.order.api.OrderStatsApi.RankDimension;
 import com.tcrm.admin.order.api.OrderStatsApi.RankFactsDTO;
@@ -220,8 +221,8 @@ public interface OrderStatsMapper {
           AND s.tenant_id = #{scope.tenantId} AND NOT s.is_deleted
         JOIN crm_order_item i ON i.id = s.order_item_id AND i.order_id = p.id
           AND i.tenant_id = #{scope.tenantId} AND NOT i.is_deleted
-        WHERE p.kol_id IS NOT NULL
-          AND p.pay_time &gt;= #{from} AND p.pay_time &lt; #{until}
+        WHERE p.kol_id IS NOT NULL AND p.pay_time &lt; #{until}
+        <if test="from != null">AND p.pay_time &gt;= #{from}</if>
       ), commission_orders AS (
         SELECT inviter_id, creator_id, order_id, SUM(accrued) FILTER (WHERE included) AS accrued,
           SUM(released) FILTER (WHERE included) AS released,
@@ -230,6 +231,19 @@ public interface OrderStatsMapper {
         HAVING BOOL_AND(verified) AND BOOL_OR(included)
       )
       """;
+
+  @InterceptorIgnore(tenantLine = "true")
+  @Select(
+      COMMISSION_ORDERS
+          + """
+      SELECT creator_id,
+        SUM(CASE WHEN unsettled THEN accrued ELSE 0 END) AS estimated,
+        SUM(CASE WHEN unsettled THEN accrued ELSE released END) AS total
+      FROM commission_orders GROUP BY creator_id
+      </script>
+      """)
+  List<CreatorRankingCommission> creatorRankingCommissions(
+      @Param("scope") ScopeDTO scope, @Param("from") Instant from, @Param("until") Instant until);
 
   // This read model uses wallet postings, not mutable release balances, for confirmed deductions.
   @InterceptorIgnore(tenantLine = "true")

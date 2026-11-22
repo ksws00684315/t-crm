@@ -63,7 +63,9 @@ class ShopPerformanceExportTest {
                 901L, "Best example", new BigDecimal("80"), "KOL-EXAMPLE"),
             new BigDecimal("8.25"),
             3L,
-            4L);
+            4L,
+            new AnalyticsRankingService.CreatorMoney(
+                new BigDecimal("12.34"), new BigDecimal("5.00"), new BigDecimal("50.98")));
     var result =
         new AnalyticsRankingService.Result(
             meta,
@@ -135,9 +137,9 @@ class ShopPerformanceExportTest {
             assertThat(data.getCell(1).getStringCellValue()).isEqualTo("Shop / Promoting");
             assertThat(data.getCell(4).getStringCellValue()).isEqualTo("2");
             assertThat(data.getCell(10).getStringCellValue()).isEqualTo("15%");
-            for (int i = 11; i < 14; i++) {
-              assertThat(data.getCell(i).getStringCellValue()).isEmpty();
-            }
+            assertThat(data.getCell(11).getStringCellValue()).isEqualTo("12.34");
+            assertThat(data.getCell(12).getStringCellValue()).isEqualTo("5.00");
+            assertThat(data.getCell(13).getStringCellValue()).isEqualTo("50.98");
           } else {
             assertThat(labels)
                 .containsExactly(

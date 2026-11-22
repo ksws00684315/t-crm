@@ -1,5 +1,6 @@
 package com.tcrm.admin.stats.service;
 
+import com.tcrm.admin.commission.api.CommissionPaymentStatsApi;
 import com.tcrm.admin.kol.api.KolApi;
 import com.tcrm.admin.kol.api.KolOwnershipApi;
 import com.tcrm.admin.kol.api.KolOwnershipDTO;
@@ -51,6 +52,7 @@ public class AnalyticsRankingService {
   private final KolApi creators;
   private final BdUserApi inviters;
   private final KolOwnershipApi ownership;
+  private final CommissionPaymentStatsApi payments;
 
   public AnalyticsRankingService(
       StatsOverviewService overview,
@@ -59,7 +61,8 @@ public class AnalyticsRankingService {
       ProductAccessApi catalog,
       KolApi creators,
       BdUserApi inviters,
-      KolOwnershipApi ownership) {
+      KolOwnershipApi ownership,
+      CommissionPaymentStatsApi payments) {
     this.overview = overview;
     this.orders = orders;
     this.shops = shops;
@@ -67,6 +70,7 @@ public class AnalyticsRankingService {
     this.creators = creators;
     this.inviters = inviters;
     this.ownership = ownership;
+    this.payments = payments;
   }
 
   public enum Board {
@@ -93,16 +97,79 @@ public class AnalyticsRankingService {
         board == Board.PRODUCT
             ? products(scope, productKeyword == null ? keyword : productKeyword)
             : people(board, scope, keyword);
+    var ranking = sorting.slice(data.rows(), comparator);
+    if (board == Board.CREATOR && overview.canViewCommission() && !ranking.items().isEmpty()) {
+      ranking = withCreatorCommissions(ranking, scope);
+    }
     return new Result(
         data.meta(),
         data.summary(),
         data.previous(),
         data.change(),
-        sorting.slice(data.rows(), comparator),
+        ranking,
         data.unavailable(),
         key,
         sorting.descending() ? "desc" : "asc",
         productKeyword == null ? keyword : productKeyword);
+  }
+
+  private PageResult<Row> withCreatorCommissions(
+      PageResult<Row> page, StatsOverviewService.ResolvedFilter filter) {
+    var scope = filter.scope();
+    var ids = page.items().stream().map(Row::entityId).toList();
+    var periodScope =
+        new ScopeDTO(
+            scope.tenantId(),
+            scope.ownerId(),
+            scope.shopId(),
+            scope.kolId(),
+            scope.inviterId(),
+            scope.visibleShopIds(),
+            ids,
+            scope.matchedInviterIds(),
+            scope.productKeyword(),
+            scope.affiliateOnly());
+    var lifetimeScope =
+        new ScopeDTO(
+            scope.tenantId(), scope.ownerId(), null, null, null, scope.visibleShopIds(), ids, null);
+    var period = filter.period();
+    var estimated =
+        orders.creatorRankingCommissions(periodScope, period.from(), period.until()).stream()
+            .collect(
+                Collectors.toMap(
+                    OrderStatsApi.CreatorRankingCommission::creatorId,
+                    OrderStatsApi.CreatorRankingCommission::estimated));
+    var cumulative =
+        orders.creatorRankingCommissions(lifetimeScope, null, Instant.now()).stream()
+            .collect(
+                Collectors.toMap(
+                    OrderStatsApi.CreatorRankingCommission::creatorId,
+                    OrderStatsApi.CreatorRankingCommission::total));
+    var expenseIds = ids;
+    if (scope.ownerId() != null) {
+      var ownedIds =
+          creators.listByBdUserId(scope.ownerId()).stream()
+              .map(KolRefDTO::id)
+              .collect(Collectors.toSet());
+      expenseIds = ids.stream().filter(ownedIds::contains).toList();
+    }
+    var expenses = payments.paidByCreator(expenseIds, period.from(), period.until());
+    var visibleExpenseIds = Set.copyOf(expenseIds);
+    var rows =
+        page.items().stream()
+            .map(
+                row -> {
+                  var id = row.entityId();
+                  return row.withCreatorMoney(
+                      new CreatorMoney(
+                          estimated.get(id),
+                          visibleExpenseIds.contains(id)
+                              ? expenses.getOrDefault(id, BigDecimal.ZERO)
+                              : null,
+                          cumulative.get(id)));
+                })
+            .toList();
+    return new PageResult<>(rows, page.total(), page.page(), page.size());
   }
 
   @Transactional(readOnly = true)
@@ -579,10 +646,11 @@ public class AnalyticsRankingService {
     if (!authorized) {
       fields.add(new UnavailableDTO("commissionRate", "COMMISSION_FORBIDDEN"));
     }
-    String reason = authorized ? "CREATOR_COMMISSION_DASHBOARD_PENDING" : "COMMISSION_FORBIDDEN";
-    for (String field :
-        List.of("estimatedCommission", "commissionExpense", "cumulativeCommission")) {
-      fields.add(new UnavailableDTO(field, reason));
+    if (!authorized) {
+      for (String field :
+          List.of("estimatedCommission", "commissionExpense", "cumulativeCommission")) {
+        fields.add(new UnavailableDTO(field, "COMMISSION_FORBIDDEN"));
+      }
     }
     return List.copyOf(fields);
   }
@@ -820,6 +888,11 @@ public class AnalyticsRankingService {
       BigDecimal commissionBeforeClawback,
       BigDecimal commissionClawback) {}
 
+  public record CreatorMoney(
+      BigDecimal estimatedCommission,
+      BigDecimal commissionExpense,
+      BigDecimal cumulativeCommission) {}
+
   public record Row(
       String id,
       String name,
@@ -846,7 +919,8 @@ public class AnalyticsRankingService {
       BestCreator bestCreator,
       BigDecimal totalEstimatedCommission,
       Long onSaleShopCount,
-      Long linkedCreatorCount) {
+      Long linkedCreatorCount,
+      CreatorMoney creatorMoney) {
     public Row(
         String id,
         String name,
@@ -896,7 +970,39 @@ public class AnalyticsRankingService {
           null,
           null,
           null,
+          null,
           null);
+    }
+
+    Row withCreatorMoney(CreatorMoney money) {
+      return new Row(
+          id,
+          name,
+          code,
+          related,
+          enabled,
+          social,
+          entityId,
+          shopId,
+          rank,
+          invitedCount,
+          effectiveCount,
+          kolCount,
+          spuCount,
+          lastPaidAt,
+          lastRefundedAt,
+          metrics,
+          imageUrl,
+          sourceItemId,
+          primaryPlatform,
+          linkCount,
+          commissionRate,
+          relationStatus,
+          bestCreator,
+          totalEstimatedCommission,
+          onSaleShopCount,
+          linkedCreatorCount,
+          money);
     }
 
     Row withInviterMetrics(BestCreator best, BigDecimal commission) {
@@ -926,7 +1032,8 @@ public class AnalyticsRankingService {
           best,
           commission,
           onSaleShopCount,
-          linkedCreatorCount);
+          linkedCreatorCount,
+          creatorMoney);
     }
 
     Row withProductCounts(Integer nextRank, RankingInventory counts) {
@@ -956,7 +1063,8 @@ public class AnalyticsRankingService {
           null,
           null,
           counts == null ? null : counts.onSaleShopCount(),
-          counts == null ? null : counts.linkedCreatorCount());
+          counts == null ? null : counts.linkedCreatorCount(),
+          creatorMoney);
     }
   }
 

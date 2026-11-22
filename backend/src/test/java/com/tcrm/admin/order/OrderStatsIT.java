@@ -754,6 +754,16 @@ class OrderStatsIT {
       var commission = orders.creatorCommission(scoped, FROM, UNTIL);
       assertThat(commission.total()).isEqualByComparingTo("8");
       assertThat(commission.clawback()).isEqualByComparingTo("2");
+      assertThat(orders.creatorRankingCommissions(scoped, FROM, UNTIL))
+          .singleElement()
+          .satisfies(
+              row -> {
+                assertThat(row.creatorId()).isEqualTo(11L);
+                assertThat(row.estimated()).isEqualByComparingTo("8");
+              });
+      assertThat(orders.creatorRankingCommissions(scoped, null, UNTIL))
+          .singleElement()
+          .satisfies(row -> assertThat(row.total()).isEqualByComparingTo("8"));
       assertThat(orders.inviterCreatorCommissions(scoped, FROM, UNTIL))
           .singleElement()
           .satisfies(

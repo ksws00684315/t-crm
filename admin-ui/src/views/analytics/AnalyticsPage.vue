@@ -320,7 +320,7 @@ function percent(value: Scalar | null | undefined): string {
 }
 
 function valueOf(row: RankRow, key: string): Scalar | null {
-  const value = row.metrics?.[key as Metric] ?? row[key];
+  const value = row.metrics?.[key as Metric] ?? row.creatorMoney?.[key] ?? row[key];
   return typeof value === "string" || typeof value === "number" ? value : null;
 }
 

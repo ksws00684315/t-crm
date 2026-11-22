@@ -50,6 +50,8 @@ class AnalyticsRankingServiceTest {
   private final ProductAccessApi catalog = mock(ProductAccessApi.class);
   private final AccountDTO account = mock(AccountDTO.class);
   private final CurrentUserContext current = mock(CurrentUserContext.class);
+  private final com.tcrm.admin.commission.api.CommissionPaymentStatsApi payments =
+      mock(com.tcrm.admin.commission.api.CommissionPaymentStatsApi.class);
   private final AnalyticsRankingService service =
       new AnalyticsRankingService(
           new StatsOverviewService(orders, current, creators, inviters),
@@ -58,7 +60,8 @@ class AnalyticsRankingServiceTest {
           catalog,
           creators,
           inviters,
-          ownership);
+          ownership,
+          payments);
 
   @BeforeEach
   void setup() {
@@ -254,8 +257,29 @@ class AnalyticsRankingServiceTest {
         .thenReturn(
             new OrderStatsApi.CreatorCommissionDTO(new BigDecimal("8"), new BigDecimal("2")));
 
-    var cards =
-        service.query(Board.CREATOR, FILTER, null, 1, 20, null, null).summary().creatorCards();
+    when(orders.creatorRankingCommissions(any(), eq(FROM), eq(until)))
+        .thenReturn(
+            List.of(
+                new OrderStatsApi.CreatorRankingCommission(
+                    11L, new BigDecimal("3"), new BigDecimal("8"))));
+    when(orders.creatorRankingCommissions(any(), org.mockito.ArgumentMatchers.isNull(), any()))
+        .thenReturn(
+            List.of(
+                new OrderStatsApi.CreatorRankingCommission(
+                    11L, new BigDecimal("3"), new BigDecimal("18"))));
+    when(payments.paidByCreator(List.of(11L), FROM, until))
+        .thenReturn(java.util.Map.of(11L, new BigDecimal("5")));
+
+    var result = service.query(Board.CREATOR, FILTER, null, 1, 20, null, null);
+    var cards = result.summary().creatorCards();
+    assertThat(result.ranking().items())
+        .singleElement()
+        .satisfies(
+            row -> {
+              assertThat(row.creatorMoney().estimatedCommission()).isEqualByComparingTo("3");
+              assertThat(row.creatorMoney().commissionExpense()).isEqualByComparingTo("5");
+              assertThat(row.creatorMoney().cumulativeCommission()).isEqualByComparingTo("18");
+            });
     assertThat(cards.periodEffectiveCount()).isEqualTo(1L);
     assertThat(cards.relationshipCount()).isEqualTo(1);
     assertThat(cards.spuCount()).isEqualTo(7);
@@ -277,6 +301,9 @@ class AnalyticsRankingServiceTest {
             new StatsOverviewService.UnavailableDTO("commissionRate", "COMMISSION_FORBIDDEN"));
     org.mockito.Mockito.verify(creators, org.mockito.Mockito.never()).listRatesByIds(any());
     assertThat(restricted.summary().creatorCards().totalCommission()).isNull();
+    assertThat(restricted.ranking().items())
+        .allSatisfy(row -> assertThat(row.creatorMoney()).isNull());
+    org.mockito.Mockito.verifyNoInteractions(payments);
     org.mockito.Mockito.verify(orders, org.mockito.Mockito.never())
         .creatorCommission(any(), any(), any());
     for (String direction : List.of("asc", "desc")) {

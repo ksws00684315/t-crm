@@ -103,6 +103,7 @@ export interface RankRow {
   relationStatus?: DisplayRelationStatus;
   linkCount?: Scalar;
   commissionRate?: Scalar;
+  creatorMoney?: Record<string, Scalar | null> | null;
   imageUrl?: string;
   bestCreator?: { id: string; name: string | null; netSalesAmount: Scalar; code?: string | null };
   metrics?: Metrics;
