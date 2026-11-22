@@ -448,6 +448,51 @@ class OrderStatsIT {
     checkInviterSearch(jdbc, factory);
     checkFirstShopSpu(jdbc, factory);
     checkRankingInventory(jdbc, factory);
+    checkCreatorCommissionExpenses(jdbc, factory);
+  }
+
+  private static void checkCreatorCommissionExpenses(JdbcTemplate jdbc, SqlSessionFactory factory) {
+    jdbc.execute(
+        """
+        INSERT INTO crm_order_item (
+          id, tenant_id, order_id, sub_order_id, weidian_item_id, sku_id, item_name, sku_name,
+          quantity, pay_amount, refund_amount, attribution_type, kol_id, create_time, update_time
+        ) VALUES (975, 4, 2, 't144-previous', 'B', '', 'Earlier order', '', 1, 80, 0, 1, 11, now(), now()),
+                 (976, 4, 3, 't144-other', 'C', '', 'Other owner', '', 1, 200, 0, 1, 11, now(), now());
+        INSERT INTO crm_commission_withdrawal (
+          id, tenant_id, kol_id, application_no, request_id, request_fingerprint, amount_cny,
+          status, account_type, account_cipher, account_masked, account_currency, account_holder,
+          actor_id, create_time, update_time
+        ) VALUES (970, 4, 11, 't144-paid', gen_random_uuid(), repeat('a', 64), 30,
+                  'PAID', 'PAYPAL', 'v1:fixture', 'masked', 'USD', 'Fixture', 11, now(), now());
+        INSERT INTO crm_commission_withdrawal_allocation (
+          id, tenant_id, withdrawal_id, order_item_id, order_no, item_name, occupied_cny,
+          remaining_snapshot_cny, source_released_cny, create_time
+        ) VALUES (971, 4, 970, 975, 't144-2', 'Earlier order', 12, 0, 12, now()),
+                 (972, 4, 970, 976, 't144-3', 'Other owner', 18, 0, 18, now());
+        INSERT INTO crm_commission_withdrawal_payment (
+          id, tenant_id, withdrawal_id, request_id, request_fingerprint, amount_cny,
+          actual_amount, actual_currency, paid_at, method, voucher_file_id, operator_id,
+          operator_role, create_time
+        ) VALUES (973, 4, 970, gen_random_uuid(), repeat('b', 64), 30, 30, 'CNY',
+                  '2026-11-03T00:00:00Z', 'Fixture', 1, 1, 'SUPER_ADMIN', now());
+        """);
+    try (var session = factory.openSession()) {
+      var orders = session.getMapper(OrderStatsMapper.class);
+      assertThat(orders.creatorCommissionExpenses(new ScopeDTO(4, 9L, 1L, 11L, null), FROM, UNTIL))
+          .singleElement()
+          .satisfies(row -> assertThat(row.amount()).isEqualByComparingTo("12"));
+      assertThat(orders.creatorCommissionExpenses(new ScopeDTO(4, 10L, 1L, 11L, null), FROM, UNTIL))
+          .singleElement()
+          .satisfies(row -> assertThat(row.amount()).isEqualByComparingTo("18"));
+      assertThat(
+              orders.creatorCommissionExpenses(new ScopeDTO(4, null, 2L, 11L, null), FROM, UNTIL))
+          .isEmpty();
+      assertThat(
+              orders.creatorCommissionExpenses(
+                  new ScopeDTO(4, null, 1L, 11L, null), UNTIL, UNTIL.plusSeconds(3600)))
+          .isEmpty();
+    }
   }
 
   private static void checkRankingInventory(JdbcTemplate jdbc, SqlSessionFactory factory) {
@@ -754,6 +799,16 @@ class OrderStatsIT {
       var commission = orders.creatorCommission(scoped, FROM, UNTIL);
       assertThat(commission.total()).isEqualByComparingTo("8");
       assertThat(commission.clawback()).isEqualByComparingTo("2");
+      assertThat(orders.creatorRankingCommissions(scoped, FROM, UNTIL))
+          .singleElement()
+          .satisfies(
+              row -> {
+                assertThat(row.creatorId()).isEqualTo(11L);
+                assertThat(row.estimated()).isEqualByComparingTo("8");
+              });
+      assertThat(orders.creatorRankingCommissions(scoped, null, UNTIL))
+          .singleElement()
+          .satisfies(row -> assertThat(row.total()).isEqualByComparingTo("8"));
       assertThat(orders.inviterCreatorCommissions(scoped, FROM, UNTIL))
           .singleElement()
           .satisfies(

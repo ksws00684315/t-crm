@@ -56,6 +56,16 @@ public interface OrderStatsApi {
   /** Read-only CRM commission snapshots for the same paid-order cohort. */
   CreatorCommissionDTO creatorCommission(ScopeDTO scope, Instant from, Instant until);
 
+  List<CreatorRankingCommission> creatorRankingCommissions(
+      ScopeDTO scope, Instant from, Instant until);
+
+  record CreatorRankingCommission(long creatorId, BigDecimal estimated, BigDecimal total) {}
+
+  List<CreatorCommissionExpense> creatorCommissionExpenses(
+      ScopeDTO scope, Instant from, Instant until);
+
+  record CreatorCommissionExpense(long creatorId, BigDecimal amount) {}
+
   List<InviterCommissionDTO> inviterCommissions(ScopeDTO scope, Instant from, Instant until);
 
   List<CreatorCommissionTotal> inviterCreatorCommissions(

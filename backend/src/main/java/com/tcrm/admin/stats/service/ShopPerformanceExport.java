@@ -221,9 +221,18 @@ public class ShopPerformanceExport {
                       money(m.averageOrderAmount()),
                       percent(m.amountRefundRate()),
                       percent(row.commissionRate()),
-                      "",
-                      "",
-                      "");
+                      money(
+                          row.creatorMoney() == null
+                              ? null
+                              : row.creatorMoney().estimatedCommission()),
+                      money(
+                          row.creatorMoney() == null
+                              ? null
+                              : row.creatorMoney().commissionExpense()),
+                      money(
+                          row.creatorMoney() == null
+                              ? null
+                              : row.creatorMoney().cumulativeCommission()));
                 })
             .toList();
     return excel.export(metadata, headers, rows);

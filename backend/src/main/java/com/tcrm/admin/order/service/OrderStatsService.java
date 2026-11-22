@@ -94,6 +94,18 @@ public class OrderStatsService implements OrderStatsApi {
   }
 
   @Override
+  public List<OrderStatsApi.CreatorRankingCommission> creatorRankingCommissions(
+      ScopeDTO scope, Instant from, Instant until) {
+    return mapper.creatorRankingCommissions(scope, from, until);
+  }
+
+  @Override
+  public List<OrderStatsApi.CreatorCommissionExpense> creatorCommissionExpenses(
+      ScopeDTO scope, Instant from, Instant until) {
+    return mapper.creatorCommissionExpenses(scope, from, until);
+  }
+
+  @Override
   public List<InviterCommissionDTO> inviterCommissions(
       ScopeDTO scope, Instant from, Instant until) {
     return mapper.inviterCommissions(scope, from, until);

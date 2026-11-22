@@ -429,9 +429,9 @@ const zhCN = {
         commissionRate: "达人推广配置中当前生效的默认佣金比例。历史订单按支付时适用的比例计佣。",
         estimatedCommission:
           "所选支付期间内，当前尚未结算的订单按计佣金额和支付时佣金比例计算的合计。",
-        commissionExpense: "按所选期间的实际付款时间，汇总已完成付款的佣金提现金额。",
+        commissionExpense: "按所选期间的实际付款时间，汇总符合当前筛选的订单所分摊的已付款佣金。",
         cumulativeCommission:
-          "截至当前的全量累计。未结算取预估，已结算取实际，已提现金额仍按原订单计一次。"
+          "沿用当前筛选，累计至今。未结算取预估，已结算取实际，已提现金额仍按原订单计一次。"
       }
     },
     "inviter-performance": {

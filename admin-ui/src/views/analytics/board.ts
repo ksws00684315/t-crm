@@ -101,9 +101,6 @@ export const pending = new Set([
   "refundUnits",
   "settlementAmount",
   "netCommission",
-  "estimatedCommission",
-  "commissionExpense",
-  "cumulativeCommission",
   "prepayExpense",
   "totalEstimatedCommission",
   "totalExpense"

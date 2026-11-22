@@ -185,7 +185,7 @@ const cellKeys = columnsByBoard[board].filter(
   key =>
     key !== "rank" &&
     !(product && key === "kolCount") &&
-    (sortable.has(key) || pendingColumns.has(key))
+    (sortable.has(key) || money.has(key) || pendingColumns.has(key))
 );
 const selectedDetail = ref<{ row: RankRow; filters: DetailQuery }>();
 
@@ -320,7 +320,7 @@ function percent(value: Scalar | null | undefined): string {
 }
 
 function valueOf(row: RankRow, key: string): Scalar | null {
-  const value = row.metrics?.[key as Metric] ?? row[key];
+  const value = row.metrics?.[key as Metric] ?? row.creatorMoney?.[key] ?? row[key];
   return typeof value === "string" || typeof value === "number" ? value : null;
 }
 
