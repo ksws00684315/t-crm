@@ -51,6 +51,7 @@ public class CommissionItemSnapshotService implements CommissionItemApi {
   private final CommissionRuleVersionMapper ruleVersions;
   private final CommissionWalletService wallet;
   private final WithdrawalPauseService pauses;
+  private final FinanceFlowService financeFlows;
   private final KolApi kols;
   private final com.tcrm.admin.shared.CurrentTenantResolver currentTenant;
   private final Clock clock;
@@ -62,9 +63,19 @@ public class CommissionItemSnapshotService implements CommissionItemApi {
       CommissionRuleVersionMapper ruleVersions,
       CommissionWalletService wallet,
       WithdrawalPauseService pauses,
+      FinanceFlowService financeFlows,
       KolApi kols,
       com.tcrm.admin.shared.CurrentTenantResolver currentTenant) {
-    this(states, revisions, ruleVersions, wallet, pauses, kols, currentTenant, Clock.systemUTC());
+    this(
+        states,
+        revisions,
+        ruleVersions,
+        wallet,
+        pauses,
+        financeFlows,
+        kols,
+        currentTenant,
+        Clock.systemUTC());
   }
 
   CommissionItemSnapshotService(
@@ -73,6 +84,7 @@ public class CommissionItemSnapshotService implements CommissionItemApi {
       CommissionRuleVersionMapper ruleVersions,
       CommissionWalletService wallet,
       WithdrawalPauseService pauses,
+      FinanceFlowService financeFlows,
       KolApi kols,
       com.tcrm.admin.shared.CurrentTenantResolver currentTenant,
       Clock clock) {
@@ -81,6 +93,7 @@ public class CommissionItemSnapshotService implements CommissionItemApi {
     this.ruleVersions = ruleVersions;
     this.wallet = wallet;
     this.pauses = pauses;
+    this.financeFlows = financeFlows;
     this.kols = kols;
     this.currentTenant = currentTenant;
     this.clock = clock;
@@ -146,6 +159,9 @@ public class CommissionItemSnapshotService implements CommissionItemApi {
     Long previousKol = row.getKolId();
     BigDecimal previousReleased =
         row.getReleasedCommissionCny() == null ? ZERO : row.getReleasedCommissionCny();
+    BigDecimal previousAccrued =
+        row.getAccruedCommissionCny() == null ? ZERO : row.getAccruedCommissionCny();
+    boolean ownerChanged = previousKol != null && !Objects.equals(previousKol, item.kolId());
     // Ownership change: claw the released amount back from the previous KOL's wallet (design
     // §8.3 / ADR-032 §10); the new owner accrues from zero and releases later.
     boolean ownershipChanged =
@@ -183,6 +199,10 @@ public class CommissionItemSnapshotService implements CommissionItemApi {
           now);
       walletDelta = walletDelta.add(clawback);
       released = ZERO;
+    }
+    if (ownerChanged && previousAccrued.signum() > 0) {
+      closeOutPreviousOwner(
+          tenantId, row, item, version, previousKol, previousAccrued, previousReleased, now);
     }
     // Same-owner decrease after release (refund, source correction): negative adjustment now.
     if (item.kolId() != null && result.accruedCny().compareTo(released) < 0) {
@@ -223,6 +243,19 @@ public class CommissionItemSnapshotService implements CommissionItemApi {
     } else {
       states.updateById(row);
     }
+    // Subject postings run after the row is persisted: a new row only gets its id above, and the
+    // flow source keys are keyed by it (task 159 review: a null id would silently deduplicate the
+    // postings of identical lines).
+    recordCommissionFlows(
+        tenantId,
+        row,
+        item,
+        version,
+        result,
+        ownerChanged ? ZERO : previousAccrued,
+        ownerChanged ? ZERO : previousReleased,
+        order.payTime() == null ? now : order.payTime(),
+        now);
     // Refund pause linkage (ADR-032 §6 退款阻断联动, owner decision 2026-11-01): pause the
     // applications occupying this line while it blocks; lift them only when every allocated line
     // is unblocked — a refund that concluded with the occupations no longer covered by the
@@ -386,6 +419,195 @@ public class CommissionItemSnapshotService implements CommissionItemApi {
   private static int revisionNo(String sourceVersion) {
     int separator = sourceVersion == null ? -1 : sourceVersion.indexOf(REVISION_SEPARATOR);
     return separator < 0 ? 0 : Integer.parseInt(sourceVersion.substring(separator + 1));
+  }
+
+  /**
+   * Closes the previous owner's subject balances of a re-attributed line (task 158 §2.1): released
+   * and unreleased parts claw back as commission clawback postings against their settleable/frozen
+   * subjects, and any provisional after-sales hold is restored first.
+   */
+  private void closeOutPreviousOwner(
+      long tenantId,
+      CommissionItemStateDO row,
+      ItemSourceDTO item,
+      String version,
+      long previousKol,
+      BigDecimal previousAccrued,
+      BigDecimal previousReleased,
+      Instant now) {
+    String base = "FIN:" + row.getId() + ":" + version;
+    BigDecimal provisional = financeFlows.provisionalClawbackNet(tenantId, item.orderItemId());
+    if (provisional.signum() > 0) {
+      financeFlows.record(
+          new FinanceFlowService.Command(
+              tenantId,
+              FinanceFlowService.COMMISSION_CLAWBACK,
+              provisional.negate(),
+              now,
+              row.getOrderId(),
+              item.orderItemId(),
+              previousKol,
+              FinanceFlowService.SOURCE_REVISION,
+              row.getId(),
+              base + ":RESTORE",
+              FinanceFlowService.EVIDENCE_RESTORE));
+    }
+    financeFlows.record(
+        new FinanceFlowService.Command(
+            tenantId,
+            FinanceFlowService.COMMISSION_CLAWBACK,
+            previousAccrued,
+            now,
+            row.getOrderId(),
+            item.orderItemId(),
+            previousKol,
+            FinanceFlowService.SOURCE_REVISION,
+            row.getId(),
+            base + ":K" + previousKol,
+            FinanceFlowService.EVIDENCE_OWNERSHIP));
+    if (previousReleased.signum() > 0) {
+      financeFlows.record(
+          new FinanceFlowService.Command(
+              tenantId,
+              FinanceFlowService.COMMISSION_SETTLEABLE,
+              previousReleased.negate(),
+              now,
+              row.getOrderId(),
+              item.orderItemId(),
+              previousKol,
+              FinanceFlowService.SOURCE_REVISION,
+              row.getId(),
+              base + ":K" + previousKol + ":SET",
+              FinanceFlowService.EVIDENCE_OWNERSHIP));
+    }
+    BigDecimal unreleased = previousAccrued.subtract(previousReleased);
+    if (unreleased.signum() > 0) {
+      financeFlows.record(
+          new FinanceFlowService.Command(
+              tenantId,
+              FinanceFlowService.COMMISSION_FROZEN,
+              unreleased.negate(),
+              now,
+              row.getOrderId(),
+              item.orderItemId(),
+              previousKol,
+              FinanceFlowService.SOURCE_REVISION,
+              row.getId(),
+              base + ":K" + previousKol + ":FRZ",
+              FinanceFlowService.EVIDENCE_OWNERSHIP));
+    }
+  }
+
+  /**
+   * Commission-side subject postings of one revision (task 158 §2.1): accrual increases post to
+   * frozen commission expense (netting provisional after-sales holds first); decreases post to
+   * commission clawback with offsetting postings against the frozen and settleable subjects.
+   */
+  private void recordCommissionFlows(
+      long tenantId,
+      CommissionItemStateDO row,
+      ItemSourceDTO item,
+      String version,
+      CommissionSettlementRules.Result result,
+      BigDecimal effectivePreviousAccrued,
+      BigDecimal effectivePreviousReleased,
+      Instant accrualAt,
+      Instant now) {
+    String base = "FIN:" + row.getId() + ":" + version;
+    BigDecimal delta = result.accruedCny().subtract(effectivePreviousAccrued);
+    if (delta.signum() > 0) {
+      BigDecimal provisional =
+          item.afterSales()
+              ? ZERO
+              : financeFlows.provisionalClawbackNet(tenantId, item.orderItemId());
+      // A restore of a provisional after-sales hold is a revision-time fact, not a payment fact.
+      Instant at = provisional.signum() > 0 ? now : accrualAt;
+      financeFlows.record(
+          new FinanceFlowService.Command(
+              tenantId,
+              FinanceFlowService.COMMISSION_FROZEN,
+              delta,
+              at,
+              row.getOrderId(),
+              item.orderItemId(),
+              item.kolId(),
+              FinanceFlowService.SOURCE_REVISION,
+              row.getId(),
+              base + ":ACCRUAL",
+              null));
+      if (provisional.signum() > 0) {
+        financeFlows.record(
+            new FinanceFlowService.Command(
+                tenantId,
+                FinanceFlowService.COMMISSION_CLAWBACK,
+                provisional.min(delta).negate(),
+                now,
+                row.getOrderId(),
+                item.orderItemId(),
+                item.kolId(),
+                FinanceFlowService.SOURCE_REVISION,
+                row.getId(),
+                base + ":RESTORE",
+                FinanceFlowService.EVIDENCE_RESTORE));
+      }
+      return;
+    }
+    if (delta.signum() == 0) {
+      return;
+    }
+    BigDecimal total = delta.negate();
+    BigDecimal releasedPart =
+        result.accruedCny().compareTo(effectivePreviousReleased) < 0
+            ? effectivePreviousReleased.subtract(result.accruedCny()).min(total)
+            : ZERO;
+    BigDecimal unreleasedPart = total.subtract(releasedPart);
+    String evidence =
+        item.afterSales() && result.accruedCny().compareTo(effectivePreviousReleased) == 0
+            ? FinanceFlowService.EVIDENCE_PROVISIONAL
+            : FinanceFlowService.EVIDENCE_DECREASE;
+    financeFlows.record(
+        new FinanceFlowService.Command(
+            tenantId,
+            FinanceFlowService.COMMISSION_CLAWBACK,
+            total,
+            now,
+            row.getOrderId(),
+            item.orderItemId(),
+            item.kolId(),
+            FinanceFlowService.SOURCE_REVISION,
+            row.getId(),
+            base + ":CLAW",
+            evidence));
+    if (unreleasedPart.signum() > 0) {
+      financeFlows.record(
+          new FinanceFlowService.Command(
+              tenantId,
+              FinanceFlowService.COMMISSION_FROZEN,
+              unreleasedPart.negate(),
+              now,
+              row.getOrderId(),
+              item.orderItemId(),
+              item.kolId(),
+              FinanceFlowService.SOURCE_REVISION,
+              row.getId(),
+              base + ":CLAW_FRZ",
+              evidence));
+    }
+    if (releasedPart.signum() > 0) {
+      financeFlows.record(
+          new FinanceFlowService.Command(
+              tenantId,
+              FinanceFlowService.COMMISSION_SETTLEABLE,
+              releasedPart.negate(),
+              now,
+              row.getOrderId(),
+              item.orderItemId(),
+              item.kolId(),
+              FinanceFlowService.SOURCE_REVISION,
+              row.getId(),
+              base + ":CLAW_SET",
+              FinanceFlowService.EVIDENCE_DECREASE));
+    }
   }
 
   static String releaseSourceKey(long itemStateId, String sourceVersion) {

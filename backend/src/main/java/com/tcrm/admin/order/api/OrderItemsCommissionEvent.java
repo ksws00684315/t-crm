@@ -11,7 +11,50 @@ import java.util.List;
  * depends on {@code notification}, which listens to order events (spec 01 §3).
  */
 public record OrderItemsCommissionEvent(
-    long orderId, long shopId, Instant payTime, List<ItemFacts> items) {
+    long orderId, long shopId, Instant payTime, OrderFacts order, List<ItemFacts> items) {
+
+  /**
+   * Order-level facts for the finance flow postings (task 159, 财务流转口径规则 task 158). The commission
+   * module records the income-side subjects from these before the order transaction commits;
+   * commission-side subjects are recorded next to their own trigger points.
+   *
+   * @param orderStatus {@code OrderStatus} name of the order (CLOSED drives the close postings)
+   * @param payAmount order pay amount; null while unpaid
+   * @param orderTotalCny order amount owed at placement (goods total + freight); null when any
+   *     historical unit price is missing, so no pre-income is booked (task 158 §1.1)
+   * @param orderTime platform placement time ({@code crm_order.order_time}), the pre-income
+   *     business time; falls back to the row creation time when the platform time is absent
+   * @param orderUpdatedAt last update time of the order row; the observation time of a close
+   * @param settledTime settlement confirmation time; null while unsettled
+   * @param settlementIncomeCny goods-income flow amount of the order ({@code toCny} of {@code
+   *     amount_raw}); null when no goods-income flow exists. Recorded as settlement evidence only
+   * @param refunds successful refund rows of the order (id and amount known)
+   */
+  public record OrderFacts(
+      String orderStatus,
+      BigDecimal payAmount,
+      BigDecimal orderTotalCny,
+      Instant orderTime,
+      Instant orderUpdatedAt,
+      Instant settledTime,
+      BigDecimal settlementIncomeCny,
+      List<RefundFacts> refunds) {}
+
+  /**
+   * One successful refund row.
+   *
+   * @param refundId {@code crm_refund.id}
+   * @param orderItemId the touched line; null on an order-level refund
+   * @param amount the refund amount
+   * @param refundStatus raw refund status; only SUCCESS rows are carried
+   * @param occurredAt the refund conclusion time (finish time when present, else refund time)
+   */
+  public record RefundFacts(
+      long refundId,
+      Long orderItemId,
+      BigDecimal amount,
+      String refundStatus,
+      Instant occurredAt) {}
 
   /**
    * Source facts of one item line.
@@ -21,8 +64,9 @@ public record OrderItemsCommissionEvent(
    * @param kolId attributed KOL id; null when unattributed
    * @param attributionType 0 unmatched, 1 item id, 2 manual, 3 non-KOL, 4 conflict
    * @param productId original product id when the mapping resolved it
-   * @param basisCny source commissionable amount (semantic {@code WEIDIAN_COMMISSIONABLE_CNY});
-   *     null when the settlement basis check failed, with the reason in {@code basisCheckReason}
+   * @param basisCny source commissionable amount (task 81 / D-01: the order pay amount split to the
+   *     line by pay ratio); null when the settlement basis check failed, with the reason in {@code
+   *     basisCheckReason}
    * @param basisIncludesRefund whether the source amount already excludes successful refunds
    * @param successfulRefundCny confirmed successful refunds of the line; null when unknown
    * @param settlementState CONFIRMED / UNSETTLED / UNKNOWN from the source; UNPAID for an unpaid

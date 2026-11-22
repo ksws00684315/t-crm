@@ -1,5 +1,6 @@
 package com.tcrm.admin.order;
 
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
@@ -12,7 +13,9 @@ import com.tcrm.admin.commission.api.CommissionItemApi.ItemSourceDTO;
 import com.tcrm.admin.commission.api.CommissionItemApi.OrderSourceDTO;
 import com.tcrm.admin.commission.job.CommissionReleaseJob;
 import com.tcrm.admin.commission.service.CommissionItemSnapshotService;
+import com.tcrm.admin.commission.service.FinanceFlowService;
 import com.tcrm.admin.commission.service.WithdrawalService;
+import com.tcrm.admin.order.api.OrderItemsCommissionEvent;
 import com.tcrm.admin.security.api.AccountDTO;
 import com.tcrm.admin.security.api.DataScope;
 import com.tcrm.admin.security.api.KolAccountDTO;
@@ -98,6 +101,7 @@ class OrderChainFinanceIT {
   @Autowired private CommissionItemSnapshotService snapshots;
   @Autowired private CommissionReleaseJob releaseJob;
   @Autowired private WithdrawalService withdrawals;
+  @Autowired private FinanceFlowService financeFlows;
 
   private String adminToken;
   private long kolA;
@@ -372,6 +376,7 @@ class OrderChainFinanceIT {
     jdbc.update("DELETE FROM crm_commission_withdrawal_outbox WHERE tenant_id = ?", TENANT_ID);
     jdbc.update("DELETE FROM crm_commission_item_revision WHERE tenant_id = ?", TENANT_ID);
     jdbc.update("DELETE FROM crm_commission_item_state WHERE tenant_id = ?", TENANT_ID);
+    jdbc.update("DELETE FROM crm_finance_flow WHERE tenant_id = ?", TENANT_ID);
     jdbc.update("DELETE FROM crm_refund WHERE tenant_id = ? AND order_id = ?", TENANT_ID, orderId);
     jdbc.update(
         "DELETE FROM crm_order_item WHERE tenant_id = ? AND order_id = ?", TENANT_ID, orderId);
@@ -467,29 +472,35 @@ class OrderChainFinanceIT {
         .andExpect(jsonPath("$.data.lines[1].commission.releaseBasis").value("UNVERIFIED"))
         .andExpect(jsonPath("$.data.lines[1].commission.occupiedTotal").value("0.00"))
         .andExpect(jsonPath("$.data.lines[1].commission.withdrawals").isEmpty())
-        // Finance flows (B08): release credit increase, refund clawback decrease, then the two
-        // withdrawal allocations — the paid one carries its application number and payment time,
-        // the pending one keeps a null transfer time.
-        .andExpect(jsonPath("$.data.financeFlows[0].flowNo").value(Matchers.startsWith("CL")))
+        // Finance flows (B08, task 159 subject rows): the paid allocation posting first (its
+        // payment date predates the accrual), then the accrual, the release transfer and the
+        // refund clawback with its settleable offsetting posting. The in-flight allocation has no
+        // posting until payment and stays visible in the line block above.
+        .andExpect(jsonPath("$.data.financeFlows[0].flowNo").value(Matchers.startsWith("FF")))
+        .andExpect(jsonPath("$.data.financeFlows[0].subject").value("ORDER_WITHDRAWN"))
         .andExpect(jsonPath("$.data.financeFlows[0].type").value("KOL_COMMISSION"))
         .andExpect(jsonPath("$.data.financeFlows[0].direction").value("INCREASE"))
-        .andExpect(jsonPath("$.data.financeFlows[0].amount").value("150.00"))
+        .andExpect(jsonPath("$.data.financeFlows[0].amount").value("100.00"))
         .andExpect(jsonPath("$.data.financeFlows[0].shopName").value("t72 Shop"))
         .andExpect(jsonPath("$.data.financeFlows[0].businessAt").value(Matchers.notNullValue()))
-        .andExpect(jsonPath("$.data.financeFlows[0].transferredAt").value(Matchers.nullValue()))
-        .andExpect(jsonPath("$.data.financeFlows[0].withdrawalNo").value(Matchers.nullValue()))
-        .andExpect(jsonPath("$.data.financeFlows[1].flowNo").value(Matchers.startsWith("CL")))
-        .andExpect(jsonPath("$.data.financeFlows[1].direction").value("DECREASE"))
-        .andExpect(jsonPath("$.data.financeFlows[1].amount").value("30.00"))
-        .andExpect(jsonPath("$.data.financeFlows[2].flowNo").value(Matchers.startsWith("WA")))
+        .andExpect(jsonPath("$.data.financeFlows[0].transferredAt").value(PAID_OUT_JSON))
+        .andExpect(jsonPath("$.data.financeFlows[0].withdrawalNo").value(first.applicationNo()))
+        .andExpect(jsonPath("$.data.financeFlows[1].subject").value("COMMISSION_FROZEN"))
+        .andExpect(jsonPath("$.data.financeFlows[1].direction").value("INCREASE"))
+        .andExpect(jsonPath("$.data.financeFlows[1].amount").value("150.00"))
+        .andExpect(jsonPath("$.data.financeFlows[1].withdrawalNo").value(Matchers.nullValue()))
+        .andExpect(jsonPath("$.data.financeFlows[2].subject").value("COMMISSION_FROZEN"))
         .andExpect(jsonPath("$.data.financeFlows[2].direction").value("DECREASE"))
-        .andExpect(jsonPath("$.data.financeFlows[2].amount").value("100.00"))
-        .andExpect(jsonPath("$.data.financeFlows[2].transferredAt").value(PAID_OUT_JSON))
-        .andExpect(jsonPath("$.data.financeFlows[2].withdrawalNo").value(first.applicationNo()))
-        .andExpect(jsonPath("$.data.financeFlows[3].flowNo").value(Matchers.startsWith("WA")))
-        .andExpect(jsonPath("$.data.financeFlows[3].amount").value("20.00"))
-        .andExpect(jsonPath("$.data.financeFlows[3].transferredAt").value(Matchers.nullValue()))
-        .andExpect(jsonPath("$.data.financeFlows[3].withdrawalNo").value(second.applicationNo()));
+        .andExpect(jsonPath("$.data.financeFlows[2].amount").value("150.00"))
+        .andExpect(jsonPath("$.data.financeFlows[3].subject").value("COMMISSION_SETTLEABLE"))
+        .andExpect(jsonPath("$.data.financeFlows[3].direction").value("INCREASE"))
+        .andExpect(jsonPath("$.data.financeFlows[3].amount").value("150.00"))
+        .andExpect(jsonPath("$.data.financeFlows[4].subject").value("COMMISSION_CLAWBACK"))
+        .andExpect(jsonPath("$.data.financeFlows[4].direction").value("INCREASE"))
+        .andExpect(jsonPath("$.data.financeFlows[4].amount").value("30.00"))
+        .andExpect(jsonPath("$.data.financeFlows[5].subject").value("COMMISSION_SETTLEABLE"))
+        .andExpect(jsonPath("$.data.financeFlows[5].direction").value("DECREASE"))
+        .andExpect(jsonPath("$.data.financeFlows[5].amount").value("30.00"));
 
     // A staff viewer holding commission:view sees the same financial blocks.
     String financeStaff =
@@ -502,7 +513,7 @@ class OrderChainFinanceIT {
         .andExpect(status().isOk())
         .andExpect(jsonPath("$.data.funds.kolCommission").value(Matchers.nullValue()))
         .andExpect(jsonPath("$.data.lines[0].commission.netCommission").value("120.00"))
-        .andExpect(jsonPath("$.data.financeFlows[2].withdrawalNo").value(first.applicationNo()));
+        .andExpect(jsonPath("$.data.financeFlows[0].withdrawalNo").value(first.applicationNo()));
     // Task 112: the order detail carries the same order-level commission through the same port
     // and gate — line 2 is unverified, so 计佣金额 and 预估佣金 stay null; the accrued rate shows.
     mvc.perform(get("/admin-api/order/orders/{id}", orderId).header("X-Admin-Token", financeStaff))
@@ -528,6 +539,181 @@ class OrderChainFinanceIT {
         .andExpect(status().isOk())
         .andExpect(jsonPath("$.data.payAmount").value("200.00"))
         .andExpect(jsonPath("$.data.commission").value(Matchers.nullValue()));
+  }
+
+  @Test
+  void shouldRecordTheSixStageSubjectSequence_andKeepTheSubjectIdentities() throws Exception {
+    // 下单未支付 → 预收入；支付 → 预收入核销、冻结中收入（task 158 §2.1）。
+    syncFinance(orderEvent(null, "UNPAID", "200.00", null, List.of()));
+    syncFinance(orderEvent(PAID_AT, "PAID", "200.00", null, List.of()));
+    // 佣金侧：计提（冻结中佣金支出）、释放（可结算佣金）、退款扣回（佣金扣回）。
+    sync("500.00", "0.00");
+    releaseJob.releaseDue();
+    sync("500.00", "100.00");
+    // 退款成功 → 支出、冻结中收入扣减；结算确认 → 冻结中收入转可提现收入。
+    syncFinance(
+        orderEvent(
+            PAID_AT,
+            "PAID",
+            "200.00",
+            SETTLED_AT,
+            List.of(
+                new OrderItemsCommissionEvent.RefundFacts(
+                    1L,
+                    item1,
+                    new BigDecimal("100.00"),
+                    "SUCCESS",
+                    SETTLED_AT.minusSeconds(3600)))));
+    // 提现付款 → 订单已提现、佣金已提现。
+    lowerMinimumWithdrawal();
+    long operator = operatorId();
+    var application =
+        withdrawals.apply(
+            kol(kolA),
+            new WithdrawalService.ApplyCommand(
+                UUID.randomUUID().toString(),
+                "100.00",
+                null,
+                null,
+                new WithdrawalService.AccountInput(
+                    "PAYPAL", "t72pay@example.invalid", "T72 Creator", "USD", null, null),
+                "t72 sequence"));
+    withdrawals.review(superAdmin(operator), application.id(), "APPROVE", null);
+    long voucher = withdrawals.uploadVoucher(superAdmin(operator), "t72-receipt.png", voucherPng());
+    withdrawals.pay(
+        superAdmin(operator),
+        application.id(),
+        new WithdrawalService.PaymentCommand(
+            UUID.randomUUID().toString(),
+            "100.00",
+            "100.00",
+            "CNY",
+            "2026-10-25T12:00:00+08:00",
+            "BANK",
+            "t72 sequence paid",
+            null,
+            voucher));
+    // 同一商品行第二笔提现：按分配拆行记「订单已提现」，不重复整笔佣金。
+    var secondApplication =
+        withdrawals.apply(
+            kol(kolA),
+            new WithdrawalService.ApplyCommand(
+                UUID.randomUUID().toString(),
+                "20.00",
+                null,
+                null,
+                new WithdrawalService.AccountInput(
+                    "PAYPAL", "t72pay@example.invalid", "T72 Creator", "USD", null, null),
+                "t72 sequence two"));
+    withdrawals.review(superAdmin(operator), secondApplication.id(), "APPROVE", null);
+    long secondVoucher =
+        withdrawals.uploadVoucher(superAdmin(operator), "t72-receipt2.png", voucherPng());
+    withdrawals.pay(
+        superAdmin(operator),
+        secondApplication.id(),
+        new WithdrawalService.PaymentCommand(
+            UUID.randomUUID().toString(),
+            "20.00",
+            "20.00",
+            "CNY",
+            "2026-10-26T12:00:00+08:00",
+            "BANK",
+            "t72 sequence paid two",
+            null,
+            secondVoucher));
+
+    org.assertj.core.api.Assertions.assertThat(subjectSum("PRE_INCOME")).isEqualByComparingTo("0");
+    org.assertj.core.api.Assertions.assertThat(subjectSum("FROZEN_INCOME"))
+        .isEqualByComparingTo("0");
+    org.assertj.core.api.Assertions.assertThat(subjectSum("WITHDRAWABLE_INCOME"))
+        .isEqualByComparingTo("100.00");
+    org.assertj.core.api.Assertions.assertThat(subjectSum("OUTFLOW"))
+        .isEqualByComparingTo("100.00");
+    org.assertj.core.api.Assertions.assertThat(subjectSum("ORDER_WITHDRAWN"))
+        .isEqualByComparingTo("120.00");
+    org.assertj.core.api.Assertions.assertThat(
+            jdbc.queryForObject(
+                "SELECT COUNT(*) FROM crm_finance_flow WHERE tenant_id = ? AND subject ="
+                    + " 'ORDER_WITHDRAWN' AND order_item_id = ?",
+                Integer.class,
+                TENANT_ID,
+                item1))
+        .isEqualTo(2);
+    org.assertj.core.api.Assertions.assertThat(subjectSum("COMMISSION_WITHDRAWN"))
+        .isEqualByComparingTo("120.00");
+    // §2.2: the frozen commission expense balance equals accrued minus released of the snapshot.
+    BigDecimal frozen = subjectSum("COMMISSION_FROZEN");
+    BigDecimal stateNet =
+        jdbc.queryForObject(
+            "SELECT accrued_commission_cny - released_commission_cny FROM"
+                + " crm_commission_item_state WHERE tenant_id = ? AND order_item_id = ?",
+            BigDecimal.class,
+            TENANT_ID,
+            item1);
+    org.assertj.core.api.Assertions.assertThat(frozen).isEqualByComparingTo(stateNet);
+    // 全序列按业务时间、插入序排列（task 158 §2.1）；结算转可提现与佣金释放同挂结算时间，
+    // 两者毫秒取整方向不同，桶内先后不作断言。
+    List<String> subjects =
+        jdbc
+            .queryForList(
+                "SELECT subject FROM crm_finance_flow WHERE tenant_id = ? AND order_id = ?"
+                    + " ORDER BY occurred_at, id",
+                String.class,
+                TENANT_ID,
+                orderId)
+            .stream()
+            .toList();
+    assertThat(subjects.subList(0, 8))
+        .containsExactly(
+            "ORDER_WITHDRAWN",
+            "ORDER_WITHDRAWN",
+            "PRE_INCOME",
+            "PRE_INCOME",
+            "FROZEN_INCOME",
+            "COMMISSION_FROZEN",
+            "OUTFLOW",
+            "FROZEN_INCOME");
+    assertThat(subjects.subList(8, 12))
+        .containsExactlyInAnyOrder(
+            "FROZEN_INCOME", "WITHDRAWABLE_INCOME", "COMMISSION_FROZEN", "COMMISSION_SETTLEABLE");
+    assertThat(subjects.subList(12, 14))
+        .containsExactly("COMMISSION_CLAWBACK", "COMMISSION_SETTLEABLE");
+  }
+
+  private BigDecimal subjectSum(String subject) {
+    return jdbc.queryForObject(
+        "SELECT COALESCE(SUM(amount_cny), 0) FROM crm_finance_flow WHERE tenant_id = ? AND"
+            + " subject = ?",
+        BigDecimal.class,
+        TENANT_ID,
+        subject);
+  }
+
+  /** Income-side postings run inside the company scope, like the order write path does. */
+  private void syncFinance(OrderItemsCommissionEvent event) {
+    TenantScope.runCompany(TENANT_ID, () -> financeFlows.syncOrderFinance(event));
+  }
+
+  private OrderItemsCommissionEvent orderEvent(
+      Instant payTime,
+      String status,
+      String amount,
+      Instant settledTime,
+      List<OrderItemsCommissionEvent.RefundFacts> refunds) {
+    return new OrderItemsCommissionEvent(
+        orderId,
+        7201L,
+        payTime,
+        new OrderItemsCommissionEvent.OrderFacts(
+            status,
+            payTime == null ? null : new BigDecimal(amount),
+            payTime == null ? new BigDecimal(amount) : null,
+            PAID_AT,
+            PAID_AT,
+            settledTime,
+            settledTime == null ? null : new BigDecimal("200.00"),
+            refunds),
+        List.of());
   }
 
   @Test

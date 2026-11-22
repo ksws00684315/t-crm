@@ -489,13 +489,12 @@ class OrderQueryIT {
         .andExpect(jsonPath("$.data.lines[0].commission.occupiedTotal").value("0.00"))
         .andExpect(jsonPath("$.data.lines[0].commission.withdrawals").isEmpty())
         .andExpect(jsonPath("$.data.funds.accountStatus").value("UNVERIFIED"))
-        .andExpect(jsonPath("$.data.financeFlows.length()").value(3))
+        // Task 159: the flow list is the subject ledger; the raw-JDBC refund rows book nothing.
+        .andExpect(jsonPath("$.data.financeFlows.length()").value(1))
+        .andExpect(jsonPath("$.data.financeFlows[0].subject").value("FROZEN_INCOME"))
         .andExpect(jsonPath("$.data.financeFlows[0].type").value("SHOP_RECEIVABLE"))
-        .andExpect(jsonPath("$.data.financeFlows[0].amount").value("10.00"))
-        .andExpect(jsonPath("$.data.financeFlows[1].direction").value("DECREASE"))
-        .andExpect(jsonPath("$.data.financeFlows[1].amount").value("5.00"))
-        .andExpect(jsonPath("$.data.financeFlows[2].type").value("COMMISSION_REFUND"))
-        .andExpect(jsonPath("$.data.financeFlows[2].amount").isEmpty());
+        .andExpect(jsonPath("$.data.financeFlows[0].direction").value("INCREASE"))
+        .andExpect(jsonPath("$.data.financeFlows[0].amount").value("10.00"));
   }
 
   @Test

@@ -13,6 +13,11 @@ import java.time.Instant;
 import java.util.List;
 import org.junit.jupiter.api.Test;
 
+/**
+ * Funds-status derivation of the chain. Since task 159 the derived flow events are replaced by the
+ * subject postings of {@code crm_finance_flow}; only the status and the refund-netted amount are
+ * derived here (the posting semantics moved to the ledger tests).
+ */
 class OrderChainAccrualTest {
   private static final Instant PAID = Instant.parse("2026-11-21T02:00:00Z");
 
@@ -49,19 +54,18 @@ class OrderChainAccrualTest {
 
     var confirmed =
         OrderChainAccrual.of(
-            order, List.of(refundedItem, unaffectedItem), List.of(refund), commission, "XD");
+            order, List.of(refundedItem, unaffectedItem), List.of(refund), commission);
+    assertThat(confirmed.status()).isEqualTo("REFUNDED");
     assertThat(confirmed.amount()).isEqualByComparingTo("31.00");
     assertThat(confirmed.commissionStatus(commission)).isEqualTo("WITHDRAWABLE");
-    var deduction = confirmed.flows().getLast();
-    assertThat(deduction.orderItemId()).isEqualTo(11L);
-    assertThat(deduction.amount()).isEqualByComparingTo("4.00");
 
+    // An order-wide partial refund cannot be attributed across lines with different rates.
     refund.setOrderItemId(null);
     var unmatched =
         OrderChainAccrual.of(
-            order, List.of(refundedItem, unaffectedItem), List.of(refund), commission, "XD");
+            order, List.of(refundedItem, unaffectedItem), List.of(refund), commission);
+    assertThat(unmatched.status()).isEqualTo("REFUNDED");
     assertThat(unmatched.amount()).isNull();
-    assertThat(unmatched.flows().getLast().amount()).isNull();
   }
 
   private static LineCommissionDTO confirmedLine(
@@ -84,7 +88,7 @@ class OrderChainAccrualTest {
   }
 
   @Test
-  void shouldShowPaymentAccrualAndAdjustTheSameRefundEventFromPendingToSuccess() {
+  void shouldFollowTheRefundLifecycleFromPendingToSuccessToFullRefund() {
     var order = new OrderDO();
     order.setWeidianOrderId("991121000001");
     order.setPayTime(PAID);
@@ -93,16 +97,9 @@ class OrderChainAccrualTest {
     item.setId(11L);
     item.setPayAmount(new BigDecimal("150.00"));
 
-    var frozen =
-        OrderChainAccrual.of(order, List.of(item), List.of(), commission("30", false), "XD");
+    var frozen = OrderChainAccrual.of(order, List.of(item), List.of(), commission("30", false));
     assertThat(frozen.status()).isEqualTo("FROZEN");
     assertThat(frozen.amount()).isEqualByComparingTo("0");
-    assertThat(frozen.flows()).hasSize(2);
-    assertThat(frozen.flows().getFirst().type()).isEqualTo("SHOP_RECEIVABLE");
-    assertThat(frozen.flows().getFirst().amount()).isEqualByComparingTo("150");
-    assertThat(frozen.flows().getLast().type()).isEqualTo("COMMISSION_ACCRUAL");
-    assertThat(frozen.flows().getLast().amount()).isEqualByComparingTo("30");
-    assertThat(frozen.flows().getLast().transferredAt()).isNull();
 
     var refund = new RefundDO();
     refund.setId(21L);
@@ -111,36 +108,23 @@ class OrderChainAccrualTest {
     refund.setAmount(new BigDecimal("20"));
     refund.setRefundStatus("PROCESSING");
     var pending =
-        OrderChainAccrual.of(
-            order, List.of(item), List.of(refund, refund), commission("0", true), "XD");
+        OrderChainAccrual.of(order, List.of(item), List.of(refund, refund), commission("0", true));
     assertThat(pending.status()).isEqualTo("REFUNDING");
     assertThat(pending.amount()).isEqualByComparingTo("26");
-    assertThat(pending.flows()).hasSize(4);
-    assertThat(pending.flows().get(2).type()).isEqualTo("SHOP_RECEIVABLE");
-    assertThat(pending.flows().get(2).amount()).isEqualByComparingTo("20");
-    assertThat(pending.flows().getLast().amount()).isEqualByComparingTo("4");
-    assertThat(pending.flows().getLast().type()).isEqualTo("COMMISSION_REFUND_PENDING");
-    assertThat(pending.flows().getLast().commissionStatus()).isEqualTo("FROZEN");
     assertThat(pending.commissionStatus(commission("0", true))).isEqualTo("FROZEN");
 
     refund.setRefundStatus("SUCCESS");
     refund.setFinishTime(PAID.plusSeconds(120));
     var confirmed =
-        OrderChainAccrual.of(order, List.of(item), List.of(refund), commission("26", false), "XD");
+        OrderChainAccrual.of(order, List.of(item), List.of(refund), commission("26", false));
     assertThat(confirmed.status()).isEqualTo("REFUNDED");
     assertThat(confirmed.amount()).isEqualByComparingTo("26");
-    assertThat(confirmed.flows().getLast().flowNo()).isEqualTo(pending.flows().getLast().flowNo());
-    assertThat(confirmed.flows().getLast().type()).isEqualTo("COMMISSION_REFUND");
-    assertThat(confirmed.flows().getLast().commissionStatus()).isEqualTo("INVALID");
     assertThat(confirmed.commissionStatus(commission("26", false))).isEqualTo("FROZEN");
-    assertThat(confirmed.flows().getLast().businessAt()).isEqualTo(refund.getFinishTime());
 
     refund.setAmount(new BigDecimal("150"));
-    var full =
-        OrderChainAccrual.of(order, List.of(item), List.of(refund), commission("0", false), "XD");
+    var full = OrderChainAccrual.of(order, List.of(item), List.of(refund), commission("0", false));
     assertThat(full.amount()).isEqualByComparingTo("0");
     assertThat(full.commissionStatus(commission("0", false))).isEqualTo("INVALID");
-    assertThat(full.flows().getLast().amount()).isEqualByComparingTo("30");
   }
 
   private OrderCommissionChainDTO commission(String net, boolean afterSales) {

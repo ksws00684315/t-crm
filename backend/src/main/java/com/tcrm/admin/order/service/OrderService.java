@@ -565,53 +565,13 @@ public class OrderService {
                   .toList()));
     }
     String shopName = shopName(order);
-    var flows =
-        commission.flows().stream()
-            .map(
-                f ->
-                    new OrderChainDTO.FlowDTO(
-                        f.flowNo(),
-                        f.orderItemId(),
-                        shopName,
-                        f.type(),
-                        f.direction(),
-                        f.amountCny(),
-                        f.businessAt(),
-                        f.transferredAt(),
-                        f.withdrawalNo(),
-                        f.withdrawalNo() == null
-                                && OrderChainCommissionApi.DIRECTION_INCREASE.equals(f.direction())
-                                && order.getSettledTime() != null
-                            ? "SETTLEABLE"
-                            : null,
-                        f.withdrawalNo() != null
-                            ? "WITHDRAWN"
-                            : OrderChainCommissionApi.DIRECTION_INCREASE.equals(f.direction())
-                                ? "WITHDRAWABLE"
-                                : "INVALID",
-                        null,
-                        null))
+    var accrual = OrderChainAccrual.of(order, lines, refunds, commission);
+    // 财务流水板块 (task 159): the subject postings of crm_finance_flow replace the derived
+    // SR/SRF/CA/CR/WS/CL/WA events (task 158 §5.2); the accrual stays for the funds block.
+    List<OrderChainDTO.FlowDTO> chainFlows =
+        commissionChain.financeFlows(order.getId()).stream()
+            .map(f -> financeFlow(shopName, f))
             .toList();
-    var accrual = OrderChainAccrual.of(order, lines, refunds, commission, shopName);
-    var chainFlows = new ArrayList<>(flows);
-    chainFlows.addAll(accrual.flows());
-    if (order.getSettledTime() != null && order.getShopId() != null) {
-      chainFlows.add(
-          new OrderChainDTO.FlowDTO(
-              "WS" + order.getWeidianOrderId(),
-              null,
-              shopName,
-              "ORDER_SETTLEMENT",
-              null,
-              settlementFlows.orderReceivable(order.getShopId(), order.getWeidianOrderId()),
-              order.getSettledTime(),
-              null,
-              null,
-              "SETTLEABLE",
-              null,
-              order.getSettledTime(),
-              null));
-    }
     String settlementStatus =
         order.getPayTime() == null
             ? null
@@ -631,6 +591,29 @@ public class OrderService {
             settlementStatus,
             accrual.commissionStatus(commission));
     return new ChainFinance(funds, Map.copyOf(byItem), List.copyOf(chainFlows));
+  }
+
+  /** Maps one finance ledger posting to the chain flow row (task 158 §5.2). */
+  private static OrderChainDTO.FlowDTO financeFlow(
+      String shopName, OrderChainCommissionApi.FinanceFlowDTO flow) {
+    boolean increase = flow.amountCny().signum() >= 0;
+    return new OrderChainDTO.FlowDTO(
+        flow.flowNo(),
+        flow.orderItemId(),
+        shopName,
+        flow.type(),
+        increase
+            ? OrderChainCommissionApi.DIRECTION_INCREASE
+            : OrderChainCommissionApi.DIRECTION_DECREASE,
+        flow.amountCny().abs(),
+        flow.businessAt(),
+        flow.transferredAt(),
+        flow.withdrawalNo(),
+        null,
+        null,
+        null,
+        null,
+        flow.subject());
   }
 
   /**

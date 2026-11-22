@@ -25,22 +25,28 @@ public class CommissionReleaseService {
 
   private final CommissionItemStateMapper states;
   private final CommissionWalletService wallet;
+  private final FinanceFlowService financeFlows;
   private final TransactionTemplate tx;
   private final Clock clock;
 
   @Autowired
   public CommissionReleaseService(
-      CommissionItemStateMapper states, CommissionWalletService wallet, TransactionTemplate tx) {
-    this(states, wallet, tx, Clock.systemUTC());
+      CommissionItemStateMapper states,
+      CommissionWalletService wallet,
+      FinanceFlowService financeFlows,
+      TransactionTemplate tx) {
+    this(states, wallet, financeFlows, tx, Clock.systemUTC());
   }
 
   CommissionReleaseService(
       CommissionItemStateMapper states,
       CommissionWalletService wallet,
+      FinanceFlowService financeFlows,
       TransactionTemplate tx,
       Clock clock) {
     this.states = states;
     this.wallet = wallet;
+    this.financeFlows = financeFlows;
     this.tx = tx;
     this.clock = clock;
   }
@@ -128,11 +134,14 @@ public class CommissionReleaseService {
             credit);
       }
       states.updateReleased(row.getId(), released, accrued, now);
+      // Crash-retry path: the wallet posting may predate the flow entries (they are idempotent).
+      recordReleaseFlows(tenantId, row, credit);
       return false;
     }
     wallet.postCommissionCredit(
         new CommissionWalletService.CreditCommand(
             tenantId, row.getKolId(), row.getId(), sourceKey, credit, row.getReleaseAt()));
+    recordReleaseFlows(tenantId, row, credit);
     if (states.updateReleased(row.getId(), released, accrued, now) != 1) {
       // The locked row changed underneath; count this batch row as unreleased so the loop's
       // no-progress guard stops the run instead of spinning on the same row.
@@ -142,5 +151,39 @@ public class CommissionReleaseService {
     LOG.info(
         "commission released: itemState={} kol={} credit={}", row.getId(), row.getKolId(), credit);
     return true;
+  }
+
+  /**
+   * Subject postings of one release (task 158 §2.1): frozen commission expense transfers into
+   * settleable commission. Idempotent per item state and source version.
+   */
+  private void recordReleaseFlows(long tenantId, CommissionItemStateDO row, BigDecimal credit) {
+    String base = "FIN:RELEASE:" + row.getId() + ":" + row.getSourceVersion();
+    financeFlows.record(
+        new FinanceFlowService.Command(
+            tenantId,
+            FinanceFlowService.COMMISSION_FROZEN,
+            credit.negate(),
+            row.getReleaseAt(),
+            row.getOrderId(),
+            row.getOrderItemId(),
+            row.getKolId(),
+            FinanceFlowService.SOURCE_RELEASE,
+            row.getId(),
+            base + ":FRZ",
+            null));
+    financeFlows.record(
+        new FinanceFlowService.Command(
+            tenantId,
+            FinanceFlowService.COMMISSION_SETTLEABLE,
+            credit,
+            row.getReleaseAt(),
+            row.getOrderId(),
+            row.getOrderItemId(),
+            row.getKolId(),
+            FinanceFlowService.SOURCE_RELEASE,
+            row.getId(),
+            base + ":SET",
+            null));
   }
 }

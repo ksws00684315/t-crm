@@ -512,6 +512,18 @@ public interface WithdrawalMapper {
   List<AllocationOccupationRow> listAllocationsByOrderItems(
       @Param("orderItemIds") List<Long> orderItemIds);
 
+  /** Allocations of one application with their order id (finance flow postings, task 159). */
+  @Select(
+      """
+      SELECT a.id AS allocation_id, a.order_item_id AS order_item_id,
+             a.occupied_cny AS occupied_cny, s.order_id AS order_id
+      FROM crm_commission_withdrawal_allocation a
+      JOIN crm_commission_item_state s ON s.id = a.item_state_id
+      WHERE a.withdrawal_id = #{id}
+      ORDER BY a.id
+      """)
+  List<AllocationOrderRow> listAllocationsWithOrder(@Param("id") long id);
+
   @Insert(
       """
       INSERT INTO crm_commission_withdrawal_history (
@@ -768,6 +780,10 @@ public interface WithdrawalMapper {
       String status,
       Instant submittedAt,
       Instant paidAt) {}
+
+  /** One allocation of one application with its order id (finance flow postings, task 159). */
+  record AllocationOrderRow(
+      long allocationId, long orderItemId, BigDecimal occupiedCny, long orderId) {}
 
   /** Funding already taken per order item. */
   record ItemOccupation(long orderItemId, BigDecimal occupiedCny) {}

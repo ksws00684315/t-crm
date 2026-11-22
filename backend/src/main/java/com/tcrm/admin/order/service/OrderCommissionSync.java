@@ -13,6 +13,7 @@ import com.tcrm.admin.order.model.RefundDO;
 import com.tcrm.admin.order.service.SettlementBasisCalculator.BasisOutcome;
 import com.tcrm.admin.shared.TransactionalEvents;
 import java.math.BigDecimal;
+import java.time.Instant;
 import java.util.List;
 import java.util.Objects;
 import org.slf4j.Logger;
@@ -78,7 +79,68 @@ public class OrderCommissionSync {
         items.stream().map(item -> toFacts(order, item, basis, afterSales)).toList();
     TransactionalEvents.publish(
         events,
-        new OrderItemsCommissionEvent(order.getId(), order.getShopId(), order.getPayTime(), facts));
+        new OrderItemsCommissionEvent(
+            order.getId(),
+            order.getShopId(),
+            order.getPayTime(),
+            orderFacts(order, items, flows),
+            facts));
+  }
+
+  /** Order-level facts for the finance flow postings (task 159, 财务流转口径规则 task 158). */
+  private OrderItemsCommissionEvent.OrderFacts orderFacts(
+      OrderDO order, List<OrderItemDO> items, List<OrderSettlementFlowDO> flows) {
+    List<OrderItemsCommissionEvent.RefundFacts> refunds =
+        this.refunds
+            .selectList(
+                new LambdaQueryWrapper<RefundDO>()
+                    .select(
+                        RefundDO::getId,
+                        RefundDO::getOrderItemId,
+                        RefundDO::getAmount,
+                        RefundDO::getRefundStatus,
+                        RefundDO::getRefundTime,
+                        RefundDO::getFinishTime)
+                    .eq(RefundDO::getOrderId, order.getId())
+                    .eq(RefundDO::getRefundStatus, "SUCCESS"))
+            .stream()
+            .filter(row -> row.getId() != null && row.getAmount() != null)
+            .map(
+                row ->
+                    new OrderItemsCommissionEvent.RefundFacts(
+                        row.getId(),
+                        row.getOrderItemId(),
+                        row.getAmount(),
+                        row.getRefundStatus(),
+                        refundEventTime(row)))
+            .toList();
+    OrderSettlementFlowDO income = SettlementBasisCalculator.singleGoodsIncome(flows);
+    return new OrderItemsCommissionEvent.OrderFacts(
+        order.getOrderStatus(),
+        order.getPayAmount(),
+        orderTotalCny(order, items),
+        order.getOrderTime() == null ? order.getCreateTime() : order.getOrderTime(),
+        order.getUpdateTime(),
+        order.getSettledTime(),
+        income == null ? null : SettlementBasisCalculator.toCny(income.getAmountRaw()),
+        refunds);
+  }
+
+  /** Order amount owed at placement (goods total + freight); null when a unit price is missing. */
+  private static BigDecimal orderTotalCny(OrderDO order, List<OrderItemDO> items) {
+    BigDecimal goods = BigDecimal.ZERO;
+    for (OrderItemDO item : items) {
+      if (item.getHistoricalUnitPrice() == null || item.getQuantity() == null) {
+        return null;
+      }
+      goods =
+          goods.add(item.getHistoricalUnitPrice().multiply(BigDecimal.valueOf(item.getQuantity())));
+    }
+    return goods.add(order.getFreight() == null ? BigDecimal.ZERO : order.getFreight());
+  }
+
+  private static Instant refundEventTime(RefundDO refund) {
+    return refund.getFinishTime() != null ? refund.getFinishTime() : refund.getRefundTime();
   }
 
   private OrderItemsCommissionEvent.ItemFacts toFacts(

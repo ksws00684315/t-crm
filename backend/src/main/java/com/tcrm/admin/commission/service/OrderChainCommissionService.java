@@ -23,6 +23,8 @@ import java.util.HashMap;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
+import java.util.stream.Collectors;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -39,6 +41,7 @@ public class OrderChainCommissionService implements OrderChainCommissionApi {
   private final CommissionItemRevisionMapper revisions;
   private final CommissionWalletMapper wallet;
   private final WithdrawalMapper withdrawals;
+  private final FinanceFlowService financeFlows;
   private final CurrentTenantResolver currentTenant;
 
   public OrderChainCommissionService(
@@ -46,11 +49,13 @@ public class OrderChainCommissionService implements OrderChainCommissionApi {
       CommissionItemRevisionMapper revisions,
       CommissionWalletMapper wallet,
       WithdrawalMapper withdrawals,
+      FinanceFlowService financeFlows,
       CurrentTenantResolver currentTenant) {
     this.states = states;
     this.revisions = revisions;
     this.wallet = wallet;
     this.withdrawals = withdrawals;
+    this.financeFlows = financeFlows;
     this.currentTenant = currentTenant;
   }
 
@@ -77,6 +82,65 @@ public class OrderChainCommissionService implements OrderChainCommissionApi {
         != 1) {
       throw new BusinessException(ErrorCode.ORDER_COMMISSION_RATE_EXISTS);
     }
+  }
+
+  @Override
+  @Transactional(readOnly = true)
+  public List<FinanceFlowDTO> financeFlows(long orderId) {
+    Long tenant = TenantScope.companyId();
+    if (tenant == null) {
+      tenant = currentTenant.currentLoginTenantId();
+    }
+    if (tenant == null) {
+      throw new BusinessException(ErrorCode.COMMON_VALIDATION_FAILED);
+    }
+    List<com.tcrm.admin.commission.model.FinanceFlowDO> rows =
+        financeFlows.listByOrder(tenant, orderId);
+    if (rows.isEmpty()) {
+      return List.of();
+    }
+    Set<Long> itemIds =
+        rows.stream()
+            .map(com.tcrm.admin.commission.model.FinanceFlowDO::getOrderItemId)
+            .filter(java.util.Objects::nonNull)
+            .collect(Collectors.toSet());
+    Map<String, String> applicationNoByAllocation = new HashMap<>();
+    if (!itemIds.isEmpty()) {
+      for (AllocationOccupationRow allocation :
+          withdrawals.listAllocationsByOrderItems(List.copyOf(itemIds))) {
+        applicationNoByAllocation.put(
+            allocation.withdrawalId() + ":" + allocation.orderItemId(), allocation.applicationNo());
+      }
+    }
+    List<FinanceFlowDTO> result = new ArrayList<>(rows.size());
+    for (com.tcrm.admin.commission.model.FinanceFlowDO row : rows) {
+      boolean withdrawal =
+          FinanceFlowService.SOURCE_WITHDRAWAL.equals(row.getSourceType())
+              || FinanceFlowService.SOURCE_WITHDRAWAL_ALLOCATION.equals(row.getSourceType());
+      String withdrawalNo =
+          FinanceFlowService.SOURCE_WITHDRAWAL_ALLOCATION.equals(row.getSourceType())
+              ? applicationNoByAllocation.get(row.getSourceId() + ":" + row.getOrderItemId())
+              : null;
+      result.add(
+          new FinanceFlowDTO(
+              row.getFlowNo(),
+              row.getSubject(),
+              incomeSubject(row.getSubject()) ? FLOW_SHOP_RECEIVABLE : FLOW_KOL_COMMISSION,
+              row.getOrderItemId(),
+              row.getKolId(),
+              row.getAmountCny(),
+              row.getOccurredAt(),
+              withdrawal ? row.getOccurredAt() : null,
+              withdrawalNo));
+    }
+    return List.copyOf(result);
+  }
+
+  private static boolean incomeSubject(String subject) {
+    return FinanceFlowService.PRE_INCOME.equals(subject)
+        || FinanceFlowService.FROZEN_INCOME.equals(subject)
+        || FinanceFlowService.OUTFLOW.equals(subject)
+        || FinanceFlowService.WITHDRAWABLE_INCOME.equals(subject);
   }
 
   @Override

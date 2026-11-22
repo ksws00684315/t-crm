@@ -145,12 +145,18 @@ class OrderCommissionSyncTest {
             status -> sync.sync(order(null), List.of(item(9001L, 101L, 1, null, "6.00"))));
     ArgumentCaptor<LambdaQueryWrapper<RefundDO>> captor =
         ArgumentCaptor.forClass(LambdaQueryWrapper.class);
-    verify(refunds).selectList(captor.capture());
-    LambdaQueryWrapper<RefundDO> wrapper = captor.getValue();
-    assertThat(wrapper.getSqlSegment()).contains("refund_status IN");
-    assertThat(wrapper.getParamNameValuePairs().values())
+    verify(refunds, org.mockito.Mockito.times(2)).selectList(captor.capture());
+    List<LambdaQueryWrapper<RefundDO>> wrappers = captor.getAllValues();
+    // The after-sales query only looks for unconcluded refunds.
+    LambdaQueryWrapper<RefundDO> afterSales = wrappers.get(0);
+    assertThat(afterSales.getSqlSegment()).contains("refund_status IN");
+    assertThat(afterSales.getParamNameValuePairs().values())
         .contains("PROCESSING", "UNKNOWN")
         .doesNotContain("SUCCESS");
+    // The finance facts query only carries successful refunds (task 159).
+    LambdaQueryWrapper<RefundDO> successful = wrappers.get(1);
+    assertThat(successful.getSqlSegment()).contains("refund_status =");
+    assertThat(successful.getParamNameValuePairs().values()).contains("SUCCESS");
   }
 
   @Test

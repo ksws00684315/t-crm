@@ -133,4 +133,25 @@ public interface OrderChainCommissionApi {
       Instant businessAt,
       Instant transferredAt,
       String withdrawalNo) {}
+
+  /**
+   * Subject-labeled finance flows of one order (task 159, 财务流转口径规则 task 158 §5.2): the entries of
+   * {@code crm_finance_flow}, income subjects at order level and commission subjects at line level.
+   * Withdrawal-paid entries split per allocation. The KOL-level 佣金已提现 subject is not part of one
+   * order's listing; its order-level counterpart 订单已提现 is. The amount is signed: positive increases
+   * the subject.
+   */
+  List<FinanceFlowDTO> financeFlows(long orderId);
+
+  /** One finance flow entry of the order. */
+  record FinanceFlowDTO(
+      String flowNo,
+      String subject,
+      String type,
+      Long orderItemId,
+      Long kolId,
+      BigDecimal amountCny,
+      Instant businessAt,
+      Instant transferredAt,
+      String withdrawalNo) {}
 }

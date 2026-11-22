@@ -820,31 +820,31 @@ class BusinessChainIT {
     assertThat(chain.at("/funds/accountStatus").asString()).isEqualTo("POSTED");
     assertLineCommission(lineOf(chain, itemA), lineA);
     assertLineCommission(lineOf(chain, itemB), lineB);
-    BigDecimal increase = BigDecimal.ZERO;
-    BigDecimal decrease = BigDecimal.ZERO;
+    // Task 159 subject rows: the settleable credits are the wallet postings, and the outflow is
+    // the paid allocations plus the released clawback offsets; the other subjects are accrual
+    // and income-side postings with their own balances.
+    BigDecimal creditedGross = BigDecimal.ZERO;
+    BigDecimal outflow = BigDecimal.ZERO;
     for (JsonNode flow : chain.path("financeFlows")) {
-      String type = flow.path("type").asString();
-      if (!"KOL_COMMISSION".equals(type)) {
-        assertThat(type)
-            .isIn(
-                "SHOP_RECEIVABLE",
-                "COMMISSION_ACCRUAL",
-                "COMMISSION_REFUND_PENDING",
-                "COMMISSION_REFUND",
-                "ORDER_SETTLEMENT");
+      String subject = flow.path("subject").asString();
+      if (!"COMMISSION_SETTLEABLE".equals(subject) && !"ORDER_WITHDRAWN".equals(subject)) {
         continue;
       }
       BigDecimal amount = new BigDecimal(flow.path("amount").asString());
       assertThat(amount).isPositive();
       if ("INCREASE".equals(flow.path("direction").asString())) {
-        increase = increase.add(amount);
+        if ("COMMISSION_SETTLEABLE".equals(subject)) {
+          creditedGross = creditedGross.add(amount);
+        } else {
+          outflow = outflow.add(amount);
+        }
       } else {
-        assertThat(flow.path("direction").asString()).isEqualTo("DECREASE");
-        decrease = decrease.add(amount);
+        assertThat(subject).isEqualTo("COMMISSION_SETTLEABLE");
+        outflow = outflow.add(amount);
       }
     }
-    assertThat(increase).isEqualByComparingTo(credited);
-    assertThat(decrease).isEqualByComparingTo(withdrawn);
+    assertThat(creditedGross).isEqualByComparingTo(credited);
+    assertThat(outflow).isEqualByComparingTo(withdrawn);
   }
 
   private static void assertLineCommission(JsonNode line, String commission) {

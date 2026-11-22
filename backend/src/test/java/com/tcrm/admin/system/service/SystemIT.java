@@ -192,6 +192,7 @@ class SystemIT {
             "crm_commission_withdrawal_outbox:NO",
             "crm_commission_withdrawal_payment:NO",
             "crm_commission_withdrawal_sequence:NO",
+            "crm_finance_flow:NO",
             "crm_copy_job:NO",
             "crm_copy_job_item:NO",
             "crm_file:NO",

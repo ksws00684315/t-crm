@@ -223,7 +223,7 @@ public final class SettlementBasisCalculator {
     return total;
   }
 
-  private static OrderSettlementFlowDO singleGoodsIncome(List<OrderSettlementFlowDO> flows) {
+  static OrderSettlementFlowDO singleGoodsIncome(List<OrderSettlementFlowDO> flows) {
     OrderSettlementFlowDO found = null;
     for (OrderSettlementFlowDO flow : flows) {
       if (TRADE_SUB_TYPE_GOODS_INCOME.equals(flow.getTradeSubType())) {

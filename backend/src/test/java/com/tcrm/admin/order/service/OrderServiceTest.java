@@ -1198,6 +1198,29 @@ class OrderServiceTest {
                         "W20261016000001")),
                 null,
                 false));
+    when(commissionChain.financeFlows(10L))
+        .thenReturn(
+            List.of(
+                new OrderChainCommissionApi.FinanceFlowDTO(
+                    "FF900",
+                    "COMMISSION_FROZEN",
+                    "KOL_COMMISSION",
+                    20L,
+                    100L,
+                    new BigDecimal("5.00"),
+                    PAID,
+                    null,
+                    null),
+                new OrderChainCommissionApi.FinanceFlowDTO(
+                    "FF901",
+                    "ORDER_WITHDRAWN",
+                    "KOL_COMMISSION",
+                    20L,
+                    100L,
+                    new BigDecimal("-3.00"),
+                    PAID.plusSeconds(1),
+                    PAID.plusSeconds(3600),
+                    "W20261016000001")));
 
     var chain = service.chain(10L);
 
@@ -1215,12 +1238,17 @@ class OrderServiceTest {
     assertThat(block.withdrawals()).hasSize(2);
     assertThat(block.withdrawals().getFirst().applicationNo()).isEqualTo("W20261016000001");
     assertThat(block.withdrawals().getFirst().paidAt()).isEqualTo(PAID);
-    assertThat(chain.financeFlows()).hasSize(7);
+    assertThat(chain.financeFlows()).hasSize(2);
     assertThat(chain.funds().financeStatus()).isEqualTo("REFUNDING");
     assertThat(chain.funds().financeAmount()).isNull();
     assertThat(chain.funds().commissionStatus()).isEqualTo("WITHDRAWN");
-    assertThat(chain.financeFlows().getFirst().flowNo()).isEqualTo("CL900");
+    assertThat(chain.financeFlows().getFirst().flowNo()).isEqualTo("FF900");
+    assertThat(chain.financeFlows().getFirst().subject()).isEqualTo("COMMISSION_FROZEN");
+    assertThat(chain.financeFlows().getFirst().direction()).isEqualTo("INCREASE");
+    assertThat(chain.financeFlows().getFirst().amount()).isEqualByComparingTo("5.00");
     assertThat(chain.financeFlows().getFirst().shopName()).isEqualTo("Main shop");
+    assertThat(chain.financeFlows().get(1).subject()).isEqualTo("ORDER_WITHDRAWN");
+    assertThat(chain.financeFlows().get(1).direction()).isEqualTo("DECREASE");
     assertThat(chain.financeFlows().get(1).transferredAt()).isEqualTo(PAID.plusSeconds(3600));
     assertThat(chain.financeFlows().get(1).withdrawalNo()).isEqualTo("W20261016000001");
   }

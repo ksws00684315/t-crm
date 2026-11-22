@@ -84,6 +84,7 @@ class WithdrawalServiceScopeTest {
       mock(com.tcrm.admin.commission.mapper.CommissionItemStateMapper.class);
   private final com.tcrm.admin.commission.mapper.CommissionItemRevisionMapper itemRevisions =
       mock(com.tcrm.admin.commission.mapper.CommissionItemRevisionMapper.class);
+  private final FinanceFlowService financeFlows = mock(FinanceFlowService.class);
   private WithdrawalService service;
 
   @BeforeEach
@@ -107,6 +108,7 @@ class WithdrawalServiceScopeTest {
             configs,
             itemStates,
             itemRevisions,
+            financeFlows,
             Clock.fixed(NOW, ZoneOffset.UTC));
     when(configs.getInt(any())).thenReturn(200);
     when(ruleConfig.current())

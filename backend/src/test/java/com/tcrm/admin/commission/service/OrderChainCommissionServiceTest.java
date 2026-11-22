@@ -33,9 +33,11 @@ class OrderChainCommissionServiceTest {
   private final CommissionItemRevisionMapper revisions = mock(CommissionItemRevisionMapper.class);
   private final CommissionWalletMapper wallet = mock(CommissionWalletMapper.class);
   private final WithdrawalMapper withdrawals = mock(WithdrawalMapper.class);
+  private final FinanceFlowService financeFlows = mock(FinanceFlowService.class);
   private final CurrentTenantResolver tenants = mock(CurrentTenantResolver.class);
   private final OrderChainCommissionService service =
-      new OrderChainCommissionService(states, revisions, wallet, withdrawals, tenants);
+      new OrderChainCommissionService(
+          states, revisions, wallet, withdrawals, financeFlows, tenants);
 
   @Test
   void shouldSplitFlowsPerAllocation_andCountOnlyOccupyingApplications() {

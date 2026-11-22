@@ -98,18 +98,24 @@ public record OrderChainDTO(
 
   /**
    * One finance flow of the order (B08); null without the finance permission or on hidden mixed
-   * orders. Shop receivable, commission and platform settlement events retain independent statuses.
+   * orders. Since task 159 the rows are the subject postings of {@code crm_finance_flow} (财务流水 科目化,
+   * task 158): income subjects at order level and commission subjects at line level.
    *
-   * @param flowNo stable reference for the order accrual, refund, wallet entry or withdrawal
-   * @param direction INCREASE / DECREASE for monetary changes, null for a settlement status event
-   * @param businessAt business fact time of the flow (ledger {@code occurred_at}; allocation =
-   *     application submission)
+   * @param flowNo stable reference: {@code FF} + the finance flow id
+   * @param subject finance subject code (task 158 §1: PRE_INCOME / FROZEN_INCOME / OUTFLOW /
+   *     WITHDRAWABLE_INCOME / COMMISSION_FROZEN / COMMISSION_CLAWBACK / COMMISSION_SETTLEABLE /
+   *     ORDER_WITHDRAWN / COMMISSION_WITHDRAWN)
+   * @param direction INCREASE / DECREASE of the signed posting
+   * @param businessAt business fact time of the flow (payment, refund, settlement, revision,
+   *     release or payment-registration time)
    * @param transferredAt money movement time: the registered withdrawal payment time, null before
    *     payment
    * @param withdrawalNo the linked withdrawal application number; null on non-withdrawal flows (UI
    *     shows "-")
-   * @param settlementAt confirmed Weidian settlement time, when available
-   * @param settlementNo settlement identifier supplied by Weidian, when available
+   * @param orderStatus deprecated chain status event label, null on subject rows
+   * @param commissionStatus deprecated chain status event label, null on subject rows
+   * @param settlementAt deprecated settlement event time, null on subject rows
+   * @param settlementNo deprecated settlement identifier, null on subject rows
    */
   record FlowDTO(
       String flowNo,
@@ -124,7 +130,8 @@ public record OrderChainDTO(
       String orderStatus,
       String commissionStatus,
       Instant settlementAt,
-      String settlementNo) {}
+      String settlementNo,
+      String subject) {}
 
   /** The copy job that produced the exclusive item; null when no job item wrote the target id. */
   record ChainCopyJobDTO(String jobCode, Instant createTime, String status) {}

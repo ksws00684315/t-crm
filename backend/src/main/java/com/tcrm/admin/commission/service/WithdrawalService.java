@@ -111,6 +111,7 @@ public class WithdrawalService {
   private final SystemConfigApi configs;
   private final CommissionItemStateMapper itemStates;
   private final CommissionItemRevisionMapper itemRevisions;
+  private final FinanceFlowService financeFlows;
   private final Clock clock;
 
   @Autowired
@@ -131,7 +132,8 @@ public class WithdrawalService {
       CommissionRuleConfigService ruleConfig,
       SystemConfigApi configs,
       CommissionItemStateMapper itemStates,
-      CommissionItemRevisionMapper itemRevisions) {
+      CommissionItemRevisionMapper itemRevisions,
+      FinanceFlowService financeFlows) {
     this(
         withdrawals,
         freezes,
@@ -150,6 +152,7 @@ public class WithdrawalService {
         configs,
         itemStates,
         itemRevisions,
+        financeFlows,
         Clock.systemUTC());
   }
 
@@ -171,6 +174,7 @@ public class WithdrawalService {
       SystemConfigApi configs,
       CommissionItemStateMapper itemStates,
       CommissionItemRevisionMapper itemRevisions,
+      FinanceFlowService financeFlows,
       Clock clock) {
     this.withdrawals = withdrawals;
     this.freezes = freezes;
@@ -184,6 +188,7 @@ public class WithdrawalService {
     this.orderItems = orderItems;
     this.products = products;
     this.cipher = cipher;
+    this.financeFlows = financeFlows;
     this.audit = audit;
     this.ruleConfig = ruleConfig;
     this.configs = configs;
@@ -797,6 +802,7 @@ public class WithdrawalService {
       throw new BusinessException(ErrorCode.WITHDRAWAL_STATE_CONFLICT);
     }
     wallet.postWithdrawalDebit(user.tenantId(), row.kolId(), id, amount, paidAt, user.id());
+    recordWithdrawalFinance(user.tenantId(), row.kolId(), id, amount, paidAt);
     insertHistory(id, "PAID", user.id(), user.nickname(), "PAYMENT", financeNote, now);
     insertOutbox(id, row.applicationNo(), "PAID", now);
     audit.recordTenantWriteOperation(
@@ -812,6 +818,43 @@ public class WithdrawalService {
             + voucherId
             + "\"}");
     return detail(user, id);
+  }
+
+  /**
+   * Subject postings of a paid withdrawal (task 158 §2.1): one 订单已提现 per allocation split of the
+   * application, and one 佣金已提现 for the paid amount. Idempotent per withdrawal.
+   */
+  private void recordWithdrawalFinance(
+      long tenantId, long kolId, long id, BigDecimal amount, Instant paidAt) {
+    financeFlows.record(
+        new FinanceFlowService.Command(
+            tenantId,
+            FinanceFlowService.COMMISSION_WITHDRAWN,
+            amount,
+            paidAt,
+            null,
+            null,
+            kolId,
+            FinanceFlowService.SOURCE_WITHDRAWAL,
+            id,
+            "FIN:WD:" + id,
+            null));
+    for (WithdrawalMapper.AllocationOrderRow allocation :
+        withdrawals.listAllocationsWithOrder(id)) {
+      financeFlows.record(
+          new FinanceFlowService.Command(
+              tenantId,
+              FinanceFlowService.ORDER_WITHDRAWN,
+              allocation.occupiedCny(),
+              paidAt,
+              allocation.orderId(),
+              allocation.orderItemId(),
+              kolId,
+              FinanceFlowService.SOURCE_WITHDRAWAL_ALLOCATION,
+              id,
+              "FIN:WD_ALLOC:" + id + ":" + allocation.orderItemId(),
+              null));
+    }
   }
 
   /** Admin list (13.02): review and read-only viewers; OWN scope sees only own creators. */

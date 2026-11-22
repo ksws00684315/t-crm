@@ -1,6 +1,5 @@
 package com.tcrm.admin.order.service;
 
-import com.tcrm.admin.order.api.OrderChainCommissionApi;
 import com.tcrm.admin.order.api.OrderChainCommissionApi.OrderCommissionChainDTO;
 import com.tcrm.admin.order.model.OrderDO;
 import com.tcrm.admin.order.model.OrderItemDO;
@@ -8,7 +7,6 @@ import com.tcrm.admin.order.model.RefundDO;
 import java.math.BigDecimal;
 import java.math.RoundingMode;
 import java.time.Instant;
-import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.HashSet;
 import java.util.LinkedHashMap;
@@ -17,8 +15,12 @@ import java.util.Map;
 import java.util.Objects;
 import java.util.stream.Collectors;
 
-/** Derived payment accrual and refund events for the chain. These do not post wallet entries. */
-record OrderChainAccrual(String status, BigDecimal amount, List<OrderChainDTO.FlowDTO> flows) {
+/**
+ * Derived funds status of the chain. The former derived flow events (SR/SRF/CA/CR) were replaced by
+ * the subject postings of {@code crm_finance_flow} (task 159, task 158 §5.2); only the funds block
+ * status and the refund-netted amount remain here.
+ */
+record OrderChainAccrual(String status, BigDecimal amount) {
   private static final BigDecimal ZERO = BigDecimal.ZERO.setScale(2);
   private static final Comparator<Instant> EVENT_TIME =
       Comparator.nullsLast(Comparator.naturalOrder());
@@ -27,10 +29,9 @@ record OrderChainAccrual(String status, BigDecimal amount, List<OrderChainDTO.Fl
       OrderDO order,
       List<OrderItemDO> items,
       List<RefundDO> refunds,
-      OrderCommissionChainDTO commission,
-      String shopName) {
+      OrderCommissionChainDTO commission) {
     if (order.getPayTime() == null || items.isEmpty()) {
-      return new OrderChainAccrual(null, null, List.of());
+      return new OrderChainAccrual(null, null);
     }
 
     var effectiveRefunds =
@@ -56,37 +57,8 @@ record OrderChainAccrual(String status, BigDecimal amount, List<OrderChainDTO.Fl
         effectiveRefunds.isEmpty()
             ? commission.allVerified() ? commission.netCommissionCny() : null
             : basis != null ? amount(basis, rates) : null;
-    var flows = new ArrayList<OrderChainDTO.FlowDTO>();
-    if (order.getPayAmount() != null) {
-      flows.add(
-          shopFlow(
-              "SR" + order.getWeidianOrderId(),
-              null,
-              shopName,
-              OrderChainCommissionApi.DIRECTION_INCREASE,
-              order.getPayAmount(),
-              order.getPayTime(),
-              "PENDING_SETTLEMENT"));
-    }
     if (commission.afterSales() && effectiveRefunds.isEmpty()) {
-      return new OrderChainAccrual("UNVERIFIED", null, List.copyOf(flows));
-    }
-    if (gross != null) {
-      flows.add(
-          new OrderChainDTO.FlowDTO(
-              "CA" + order.getWeidianOrderId(),
-              null,
-              shopName,
-              "COMMISSION_ACCRUAL",
-              OrderChainCommissionApi.DIRECTION_INCREASE,
-              gross,
-              order.getPayTime(),
-              null,
-              null,
-              "PENDING_SETTLEMENT",
-              "FROZEN",
-              null,
-              null));
+      return new OrderChainAccrual("UNVERIFIED", null);
     }
 
     BigDecimal remaining = gross;
@@ -95,51 +67,21 @@ record OrderChainAccrual(String status, BigDecimal amount, List<OrderChainDTO.Fl
       if (!seen.add(refund.getId())) {
         continue;
       }
-      flows.add(
-          shopFlow(
-              "SRF" + refund.getId(),
-              refund.getOrderItemId(),
-              shopName,
-              OrderChainCommissionApi.DIRECTION_DECREASE,
-              refund.getAmount(),
-              eventTime(refund),
-              "DEDUCTION"));
-      BigDecimal expense = null;
       if (remaining != null && basis != null && applyRefund(basis, rates, refund)) {
-        BigDecimal next = amount(basis, rates);
-        expense = remaining.subtract(next);
-        remaining = next;
+        remaining = amount(basis, rates);
       } else {
         remaining = null;
       }
-      flows.add(
-          new OrderChainDTO.FlowDTO(
-              "CR" + refund.getId(),
-              refund.getOrderItemId(),
-              shopName,
-              pending(refund) ? "COMMISSION_REFUND_PENDING" : "COMMISSION_REFUND",
-              OrderChainCommissionApi.DIRECTION_DECREASE,
-              expense,
-              eventTime(refund),
-              null,
-              null,
-              "DEDUCTION",
-              pending(refund) ? "FROZEN" : "INVALID",
-              null,
-              null));
     }
-    flows.sort(Comparator.comparing(OrderChainDTO.FlowDTO::businessAt, EVENT_TIME));
     if (!effectiveRefunds.isEmpty()) {
-      return new OrderChainAccrual(
-          hasPending ? "REFUNDING" : "REFUNDED", remaining, List.copyOf(flows));
+      return new OrderChainAccrual(hasPending ? "REFUNDING" : "REFUNDED", remaining);
     }
     if (gross == null) {
-      return new OrderChainAccrual("UNVERIFIED", null, List.copyOf(flows));
+      return new OrderChainAccrual("UNVERIFIED", null);
     }
     BigDecimal released = releasedCommission(commission);
     boolean frozen = released.compareTo(gross) < 0 || released.signum() == 0;
-    return new OrderChainAccrual(
-        frozen ? "FROZEN" : "POSTED", frozen ? ZERO : released, List.copyOf(flows));
+    return new OrderChainAccrual(frozen ? "FROZEN" : "POSTED", frozen ? ZERO : released);
   }
 
   String commissionStatus(OrderCommissionChainDTO commission) {
@@ -170,35 +112,12 @@ record OrderChainAccrual(String status, BigDecimal amount, List<OrderChainDTO.Fl
         .filter(flow -> flow.withdrawalNo() == null && flow.flowNo().startsWith("CL"))
         .map(
             flow ->
-                OrderChainCommissionApi.DIRECTION_DECREASE.equals(flow.direction())
+                com.tcrm.admin.order.api.OrderChainCommissionApi.DIRECTION_DECREASE.equals(
+                        flow.direction())
                     ? flow.amountCny().negate()
                     : flow.amountCny())
         .reduce(ZERO, BigDecimal::add)
         .max(ZERO);
-  }
-
-  private static OrderChainDTO.FlowDTO shopFlow(
-      String reference,
-      Long itemId,
-      String shopName,
-      String direction,
-      BigDecimal value,
-      Instant time,
-      String status) {
-    return new OrderChainDTO.FlowDTO(
-        reference,
-        itemId,
-        shopName,
-        OrderChainCommissionApi.FLOW_SHOP_RECEIVABLE,
-        direction,
-        value,
-        time,
-        null,
-        null,
-        status,
-        null,
-        null,
-        null);
   }
 
   private static boolean applyRefund(

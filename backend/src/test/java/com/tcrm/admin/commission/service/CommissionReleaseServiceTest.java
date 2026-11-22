@@ -35,10 +35,12 @@ class CommissionReleaseServiceTest {
 
   private final CommissionItemStateMapper states = mock(CommissionItemStateMapper.class);
   private final CommissionWalletService wallet = mock(CommissionWalletService.class);
+  private final FinanceFlowService financeFlows = mock(FinanceFlowService.class);
   private final TransactionTemplate tx = mock(TransactionTemplate.class);
   private final TransactionStatus status = mock(TransactionStatus.class);
   private final CommissionReleaseService service =
-      new CommissionReleaseService(states, wallet, tx, Clock.fixed(NOW, ZoneOffset.UTC));
+      new CommissionReleaseService(
+          states, wallet, financeFlows, tx, Clock.fixed(NOW, ZoneOffset.UTC));
 
   @BeforeEach
   void prepare() {
@@ -101,6 +103,10 @@ class CommissionReleaseServiceTest {
     verify(wallet, never()).postCommissionCredit(any());
     verify(states)
         .updateReleased(row.getId(), new BigDecimal("10.00"), new BigDecimal("30.00"), NOW);
+    // Task 159 review: the crash-retry path re-records the subject postings; the source keys make
+    // the replay idempotent.
+    verify(financeFlows, org.mockito.Mockito.times(2))
+        .record(any(FinanceFlowService.Command.class));
   }
 
   @Test

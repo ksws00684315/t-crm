@@ -49,12 +49,21 @@ class CommissionItemSnapshotServiceTest {
   private final CommissionRuleVersionMapper ruleVersions = mock(CommissionRuleVersionMapper.class);
   private final CommissionWalletService wallet = mock(CommissionWalletService.class);
   private final WithdrawalPauseService pauses = mock(WithdrawalPauseService.class);
+  private final FinanceFlowService financeFlows = mock(FinanceFlowService.class);
   private final KolApi kols = mock(KolApi.class);
   private final com.tcrm.admin.shared.CurrentTenantResolver tenantResolver = () -> TENANT;
   private final Clock clock = Clock.fixed(NOW, ZoneOffset.UTC);
   private final CommissionItemSnapshotService service =
       new CommissionItemSnapshotService(
-          states, revisions, ruleVersions, wallet, pauses, kols, tenantResolver, clock);
+          states,
+          revisions,
+          ruleVersions,
+          wallet,
+          pauses,
+          financeFlows,
+          kols,
+          tenantResolver,
+          clock);
 
   @BeforeEach
   void prepare() {
@@ -65,6 +74,9 @@ class CommissionItemSnapshotServiceTest {
     // No occupations anywhere: the block state then follows the after-sales flag alone.
     lenient().when(pauses.isItemBlocked(anyLong())).thenReturn(false);
     lenient().when(states.findIdsByOrder(anyLong())).thenReturn(List.of());
+    lenient()
+        .when(financeFlows.provisionalClawbackNet(anyLong(), anyLong()))
+        .thenReturn(BigDecimal.ZERO.setScale(2));
   }
 
   @Test
@@ -321,6 +333,48 @@ class CommissionItemSnapshotServiceTest {
     assertThat(row.getValue().getAccruedCommissionCny()).isEqualByComparingTo("10.00");
     verify(wallet, times(1))
         .postCommissionAdjustment(anyLong(), anyLong(), anyLong(), any(), any(), any());
+    // Task 159 review: the close-out postings belong to the previous owner and are keyed by the
+    // row id, never by a null placeholder.
+    ArgumentCaptor<FinanceFlowService.Command> flows =
+        ArgumentCaptor.forClass(FinanceFlowService.Command.class);
+    verify(financeFlows, org.mockito.Mockito.atLeastOnce()).record(flows.capture());
+    assertThat(flows.getAllValues())
+        .filteredOn(command -> FinanceFlowService.EVIDENCE_OWNERSHIP.equals(command.evidence()))
+        .allMatch(
+            command ->
+                command.kolId() == KOL_A
+                    && command.sourceKey().startsWith("FIN:")
+                    && !command.sourceKey().contains("null"));
+    assertThat(flows.getAllValues())
+        .filteredOn(command -> FinanceFlowService.EVIDENCE_OWNERSHIP.equals(command.evidence()))
+        .extracting(FinanceFlowService.Command::subject)
+        .contains(FinanceFlowService.COMMISSION_CLAWBACK, FinanceFlowService.COMMISSION_SETTLEABLE);
+  }
+
+  @Test
+  void shouldKeySubjectFlowsByRowId_forIdenticalItemLines() {
+    // Task 159 review: identical lines share one source fingerprint, so the flow source keys must
+    // carry the row id — a null placeholder would silently deduplicate the second line's postings.
+    when(states.lockByOrderItemId(9001L)).thenReturn(null);
+    when(states.lockByOrderItemId(9002L)).thenReturn(null);
+    whenRateAtPayTime(KOL_A, "0.2500", 1);
+    TenantScope.runCompany(
+        TENANT,
+        () ->
+            service.syncOrderItems(
+                order(),
+                List.of(
+                    item(9001L, KOL_A, 1, new BigDecimal("100.00"), null),
+                    item(9002L, KOL_A, 1, new BigDecimal("100.00"), null))));
+    ArgumentCaptor<FinanceFlowService.Command> flows =
+        ArgumentCaptor.forClass(FinanceFlowService.Command.class);
+    verify(financeFlows, org.mockito.Mockito.atLeastOnce()).record(flows.capture());
+    List<String> keys =
+        flows.getAllValues().stream().map(FinanceFlowService.Command::sourceKey).toList();
+    assertThat(keys).hasSize(2);
+    assertThat(keys)
+        .allMatch(key -> key.startsWith("FIN:") && !key.contains("null"))
+        .doesNotHaveDuplicates();
   }
 
   @Test
