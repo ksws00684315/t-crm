@@ -2,6 +2,7 @@ package com.tcrm.admin.order.service;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
+import com.tcrm.admin.order.api.OrderChainCommissionApi.FlowDTO;
 import com.tcrm.admin.order.api.OrderChainCommissionApi.LineCommissionDTO;
 import com.tcrm.admin.order.api.OrderChainCommissionApi.OrderCommissionChainDTO;
 import com.tcrm.admin.order.model.OrderDO;
@@ -14,6 +15,66 @@ import org.junit.jupiter.api.Test;
 
 class OrderChainAccrualTest {
   private static final Instant PAID = Instant.parse("2026-11-21T02:00:00Z");
+
+  @Test
+  void aCompletedPartialRefundOnlyReducesItsLineAndKeepsReleasedCommissionAvailable() {
+    var order = new OrderDO();
+    order.setWeidianOrderId("991121000001");
+    order.setPayTime(PAID);
+    order.setPayAmount(new BigDecimal("150"));
+    var refundedItem = new OrderItemDO();
+    refundedItem.setId(11L);
+    refundedItem.setPayAmount(new BigDecimal("100"));
+    var unaffectedItem = new OrderItemDO();
+    unaffectedItem.setId(12L);
+    unaffectedItem.setPayAmount(new BigDecimal("50"));
+
+    var refund = new RefundDO();
+    refund.setId(21L);
+    refund.setOrderItemId(11L);
+    refund.setAmount(new BigDecimal("20"));
+    refund.setRefundStatus("SUCCESS");
+    refund.setFinishTime(PAID.plusSeconds(120));
+    var commission =
+        new OrderCommissionChainDTO(
+            new BigDecimal("31.00"),
+            true,
+            List.of(
+                new LineCommissionDTO(
+                    11L, new BigDecimal("0.20"), false, new BigDecimal("16"), "CONFIRMED",
+                    BigDecimal.ZERO, List.of(), new BigDecimal("80")),
+                new LineCommissionDTO(
+                    12L, new BigDecimal("0.30"), false, new BigDecimal("15"), "CONFIRMED",
+                    BigDecimal.ZERO, List.of(), new BigDecimal("50"))),
+            List.of(
+                new FlowDTO(
+                    11L, "CL1", "KOL_COMMISSION", "INCREASE", new BigDecimal("20"), PAID, null,
+                    null),
+                new FlowDTO(
+                    12L, "CL2", "KOL_COMMISSION", "INCREASE", new BigDecimal("15"), PAID, null,
+                    null),
+                new FlowDTO(
+                    11L, "CL3", "KOL_COMMISSION", "DECREASE", new BigDecimal("4"),
+                    refund.getFinishTime(), null, null)),
+            new BigDecimal("130"),
+            false);
+
+    var confirmed =
+        OrderChainAccrual.of(
+            order, List.of(refundedItem, unaffectedItem), List.of(refund), commission, "XD");
+    assertThat(confirmed.amount()).isEqualByComparingTo("31.00");
+    assertThat(confirmed.commissionStatus(commission)).isEqualTo("WITHDRAWABLE");
+    var deduction = confirmed.flows().getLast();
+    assertThat(deduction.orderItemId()).isEqualTo(11L);
+    assertThat(deduction.amount()).isEqualByComparingTo("4.00");
+
+    refund.setOrderItemId(null);
+    var unmatched =
+        OrderChainAccrual.of(
+            order, List.of(refundedItem, unaffectedItem), List.of(refund), commission, "XD");
+    assertThat(unmatched.amount()).isNull();
+    assertThat(unmatched.flows().getLast().amount()).isNull();
+  }
 
   @Test
   void shouldShowPaymentAccrualAndAdjustTheSameRefundEventFromPendingToSuccess() {
