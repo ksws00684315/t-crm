@@ -14,7 +14,13 @@ import { computed, onMounted, ref } from "vue";
 import { useI18n } from "vue-i18n";
 import { useRoute, useRouter } from "vue-router";
 import { getOrder, getOrderChain } from "@/api/order/order";
-import type { ChainLineVO, ChainWithdrawalVO, OrderChainVO, OrderDetailVO } from "@/api/types";
+import type {
+  ChainFinanceFlowVO,
+  ChainLineVO,
+  ChainWithdrawalVO,
+  OrderChainVO,
+  OrderDetailVO
+} from "@/api/types";
 import CopyText from "@/components/CopyText.vue";
 import DataTable, { type DataColumn } from "@/components/DataTable.vue";
 import { useUserStore } from "@/stores/user";
@@ -197,7 +203,14 @@ type FundMovement = {
   id: string;
   type: "goodsFund" | "commissionFund";
   direction:
-    "receivableIncrease" | "receivableDecrease" | "accrualExpense" | "expensePending" | null;
+    | "receivableIncrease"
+    | "receivableDecrease"
+    | "accrualExpense"
+    | "expensePending"
+    | "increase"
+    | "decrease"
+    | null;
+  subject?: ChainFinanceFlowVO["subject"] | null;
   amount: string | null;
   status: string;
   time: string | null;
@@ -260,8 +273,10 @@ const commissionBalances = computed(() => {
 
   let released = 0n;
   for (const flow of financeFlows) {
-    if (flow.type !== "KOL_COMMISSION" || flow.withdrawalNo != null) continue;
-    if (flow.amount == null || !validMoney(flow.amount, false) || !flow.direction) return null;
+    // Task 159 subject rows: the settleable postings carry the released total (releases in,
+    // released clawbacks out); the other subjects do not move the released balance.
+    if (flow.subject !== "COMMISSION_SETTLEABLE") continue;
+    if (!validMoney(flow.amount, false) || !flow.direction) return null;
     released += flow.direction === "INCREASE" ? cents(flow.amount) : -cents(flow.amount);
   }
 
@@ -278,28 +293,10 @@ const commissionBalances = computed(() => {
 });
 
 const fundMovements = computed<FundMovement[]>(() => {
-  const rows: FundMovement[] = flows.value.map(flow => {
-    const expense = flow.type === "COMMISSION_EXPENSE";
-    return {
-      id: `weidian-${flow.id}`,
-      type: expense ? "commissionFund" : "goodsFund",
-      direction: expense
-        ? "accrualExpense"
-        : flow.type === "GOODS_INCOME"
-          ? "receivableIncrease"
-          : "receivableDecrease",
-      amount:
-        flow.type === "GOODS_INCOME" && flow.amount && validMoney(flow.amount)
-          ? `+${flow.amount}`
-          : flow.amount,
-      status:
-        flow.tradeTime || flow.settlementAt || flow.settlementNo
-          ? t("order.chain.orderMoneyStatus.SETTLED")
-          : "—",
-      time: flow.type === "GOODS_INCOME" ? (flow.settlementAt ?? flow.tradeTime) : flow.tradeTime,
-      reference: flow.settlementNo
-    };
-  });
+  // Task 159 review: the board is the subject ledger (task 158 §5.2); the platform reconciliation
+  // flows stay in the settlement header and completeness alerts, not as movement rows — showing
+  // both would double every payment.
+  const rows: FundMovement[] = [];
   const balances = commissionBalances.value;
   if (balances?.frozen) {
     rows.push({
@@ -323,22 +320,21 @@ const fundMovements = computed<FundMovement[]>(() => {
       reference: null
     });
   }
-  for (const record of activeWithdrawals.value) {
-    const paid = record.status === "PAID" && !!record.paidAt;
-    const pending = record.status !== "PAID";
+  // Task 159 subject postings replace the derived withdrawal rows; paid allocations split per row.
+  for (const flow of chain.value?.financeFlows ?? []) {
+    const withdrawalRecord = withdrawalRecords.value.find(
+      record => record.applicationNo === flow.withdrawalNo
+    );
     rows.push({
-      id: `withdrawal-${record.withdrawalId}`,
-      type: "commissionFund",
-      direction: paid ? "accrualExpense" : pending ? "expensePending" : null,
-      amount: paid && record.orderShare ? `-${record.orderShare}` : record.orderShare,
-      status: paid
-        ? financeStatusText("WITHDRAWN")
-        : pending
-          ? t("order.chain.withdrawalInProgress")
-          : t("finance.unverified"),
-      time: paid ? record.paidAt : null,
-      reference: record.applicationNo,
-      withdrawalId: record.withdrawalId
+      id: `flow-${flow.flowNo}`,
+      type: flow.type === "KOL_COMMISSION" ? "commissionFund" : "goodsFund",
+      direction: flow.direction === "DECREASE" ? "decrease" : "increase",
+      subject: flow.subject,
+      amount: flow.direction === "DECREASE" ? `-${flow.amount}` : `+${flow.amount}`,
+      status: flow.subject === "ORDER_WITHDRAWN" ? financeStatusText("WITHDRAWN") : "—",
+      time: flow.businessAt,
+      reference: flow.withdrawalNo ?? flow.flowNo,
+      withdrawalId: withdrawalRecord?.withdrawalId
     });
   }
   return rows;
@@ -507,11 +503,11 @@ const summaryColumns = computed<DataColumn[]>(() => [
   { key: "quantity", label: t("order.line.quantity"), minWidth: 80 },
   { key: "totalAmount", label: t("order.amounts.productTotal"), minWidth: 116, amount: true },
   { key: "freight", label: t("order.freight"), minWidth: 90, amount: true, tooltip: false },
-  { key: "payAmount", label: t("order.chain.itemPaidAmount"), minWidth: 110, amount: true },
+  { key: "payAmount", label: t("order.chain.itemPaidAmount"), minWidth: 120, amount: true },
   {
     key: "rate",
     label: t("order.chain.summaryRate"),
-    minWidth: locale.value.startsWith("en") ? 150 : 100
+    minWidth: locale.value.startsWith("en") ? 160 : 110
   },
   {
     key: "commission",
@@ -520,16 +516,70 @@ const summaryColumns = computed<DataColumn[]>(() => [
     minWidth: canSeeCommission.value ? 120 : { "zh-CN": 140, "en-US": 290 },
     amount: true
   },
-  { key: "occupied", label: t("order.chain.withdrawalOccupation"), minWidth: 110, amount: true }
+  {
+    key: "occupied",
+    label: t("order.chain.withdrawalOccupation"),
+    minWidth: locale.value.startsWith("en") ? 155 : 110,
+    amount: true
+  },
+  {
+    key: "paidRemaining",
+    label: t("order.chain.paidRemaining"),
+    minWidth: locale.value.startsWith("en") ? 185 : 150,
+    amount: true
+  }
 ]);
+
+/**
+ * Withdrawn X / remaining Y of one line (task 158 §4.3): the paid allocation total versus the
+ * released balance less every occupation. Null when the data is missing or unparseable.
+ */
+function paidRemaining(orderItemId: string): { withdrawn: string; remaining: string } | null {
+  const flows = chain.value?.financeFlows;
+  const line = chain.value?.lines?.find(entry => entry.orderItemId === orderItemId);
+  // An unverified line has no established amounts: show them as unknown, never as a fake zero.
+  if (!line?.commission || line.commission.netCommission == null || !Array.isArray(flows)) {
+    return null;
+  }
+  let released = 0n;
+  for (const flow of flows) {
+    if (flow.orderItemId !== orderItemId || flow.subject !== "COMMISSION_SETTLEABLE") continue;
+    if (!validMoney(flow.amount, false) || !flow.direction) return null;
+    released += flow.direction === "INCREASE" ? cents(flow.amount) : -cents(flow.amount);
+  }
+  let withdrawn = 0n;
+  let occupied = 0n;
+  for (const record of line.commission.withdrawals ?? []) {
+    if (!record.occupiedCny || !validMoney(record.occupiedCny, false)) return null;
+    if (record.status === "PAID") withdrawn += cents(record.occupiedCny);
+    if (["PENDING_REVIEW", "PENDING_PAYMENT", "PAID"].includes(record.status)) {
+      occupied += cents(record.occupiedCny);
+    }
+  }
+  // A refund clawback may leave the occupation outrunning the released balance (task 158 §4.3):
+  // the negative remainder stays visible instead of being clamped to zero.
+  return { withdrawn: decimal(withdrawn), remaining: decimal(released - occupied) };
+}
 
 const flowColumns = computed<DataColumn[]>(() => [
   { key: "type", label: t("order.chain.financeType"), minWidth: 125, align: "left" },
+  {
+    key: "subject",
+    label: t("order.chain.financeSubject"),
+    // Long English subject names ("Frozen commission expense") must stay whole (task 160).
+    minWidth: locale.value.startsWith("en") ? 235 : 150,
+    align: "left"
+  },
   { key: "direction", label: t("order.chain.direction"), minWidth: 132 },
   { key: "amount", label: t("order.chain.financeAmount"), minWidth: 114, amount: true },
-  { key: "status", label: t("common.status"), minWidth: 133 },
+  {
+    key: "status",
+    label: t("common.status"),
+    minWidth: locale.value.startsWith("en") ? 180 : 133
+  },
   { key: "time", label: t("order.chain.settlementPaymentTime"), minWidth: 172 },
-  { key: "reference", label: t("order.chain.settlementWithdrawalNo"), minWidth: 184 }
+  // 20-char flow numbers (FF + snowflake id) plus the copy icon need ~235px of content box.
+  { key: "reference", label: t("order.chain.settlementWithdrawalNo"), minWidth: 240 }
 ]);
 
 function openWithdrawal(withdrawalId: string): void {
@@ -792,6 +842,19 @@ onMounted(load);
               fundsText((row as ChainLineVO).commission?.occupiedTotal)
             }}</template></template
           >
+          <template #cell-paidRemaining="{ row }">
+            <span v-if="!canSeeCommission">-</span>
+            <div v-else class="chain-product__stack" data-test="chain-line-paid-remaining">
+              <span
+                >{{ t("order.chain.lineWithdrawn") }}
+                {{ fundsText(paidRemaining((row as ChainLineVO).orderItemId)?.withdrawn) }}</span
+              >
+              <span class="chain-product__secondary"
+                >{{ t("order.chain.lineRemaining") }}
+                {{ fundsText(paidRemaining((row as ChainLineVO).orderItemId)?.remaining) }}</span
+              >
+            </div>
+          </template>
         </DataTable>
       </section>
 
@@ -881,6 +944,9 @@ onMounted(load);
             <el-tag round :class="{ 'chain-fund-tag--commission': row.type === 'commissionFund' }">
               {{ t(`order.chain.${row.type}`) }}
             </el-tag>
+          </template>
+          <template #cell-subject="{ row }">
+            {{ row.subject ? t(`finance.subjects.${row.subject}`) : "—" }}
           </template>
           <template #cell-direction="{ row }">
             {{ row.direction ? t(`order.chain.${row.direction}`) : "—" }}

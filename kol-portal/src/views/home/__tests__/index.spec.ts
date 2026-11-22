@@ -237,7 +237,8 @@ describe("workspace section 2: commission details", () => {
     await mountHome();
     const zh = (key: string) => i18n.global.t(key, {}, { locale: "zh-CN" });
     expect(zh("home.settledCaption")).toBe("已结算且未申请提现的佣金，未抵扣预付款");
-    expect(zh("home.frozenCaption")).toBe("未结算订单的佣金金额");
+    expect(zh("home.frozenCaption")).toBe("已计入累计佣金、尚未释放到达人账户的部分");
+    expect(zh("funds.stepFrozenCaption")).toBe("订单未结算或售后处理中，暂不可提现");
     expect(zh("home.withdrawingCaption")).toBe("已提交提现申请待打款的金额");
     expect(zh("home.withdrawnCaption")).toBe("已完成打款");
     expect(zh("home.detailsFootnote")).toBe(

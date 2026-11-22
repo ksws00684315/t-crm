@@ -86,6 +86,17 @@ export default {
   view: "查看",
   refresh: "刷新",
   unverified: "待核实",
+  subjects: {
+    PRE_INCOME: "预收入",
+    FROZEN_INCOME: "冻结中收入",
+    OUTFLOW: "支出",
+    WITHDRAWABLE_INCOME: "可提现收入",
+    COMMISSION_FROZEN: "冻结中佣金支出",
+    COMMISSION_CLAWBACK: "佣金扣回",
+    COMMISSION_SETTLEABLE: "可结算佣金",
+    ORDER_WITHDRAWN: "订单已提现",
+    COMMISSION_WITHDRAWN: "佣金已提现"
+  },
   afterSalesShort: "售后处理中",
   afterSalesHint: "售后处理中，暂不计佣；已释放部分冻结，退款成功后按退款金额扣减",
   unverifiedNotice: "尚有 {count} 条待核实记录未计入金额，不能按零佣金理解。",

@@ -661,22 +661,26 @@ export interface OrderChainFundsVO {
 }
 
 /**
- * One finance flow of the chain. The direction carries the sign for monetary changes.
- * Shop receivables, creator commission and Weidian settlement are distinct event types.
+ * One finance flow of the chain (task 159 subject rows, task 158 §5.2). The subject carries the
+ * sign through `direction`; income subjects stay at order level (`orderItemId` null).
  */
 export interface ChainFinanceFlowVO {
   flowNo: string;
   orderItemId: string | null;
   shopName: string | null;
-  type:
-    | "KOL_COMMISSION"
-    | "SHOP_RECEIVABLE"
-    | "COMMISSION_ACCRUAL"
-    | "COMMISSION_REFUND_PENDING"
-    | "COMMISSION_REFUND"
-    | "ORDER_SETTLEMENT";
-  direction: "INCREASE" | "DECREASE" | null;
-  amount: string | null;
+  type: "KOL_COMMISSION" | "SHOP_RECEIVABLE";
+  subject:
+    | "PRE_INCOME"
+    | "FROZEN_INCOME"
+    | "OUTFLOW"
+    | "WITHDRAWABLE_INCOME"
+    | "COMMISSION_FROZEN"
+    | "COMMISSION_CLAWBACK"
+    | "COMMISSION_SETTLEABLE"
+    | "ORDER_WITHDRAWN"
+    | "COMMISSION_WITHDRAWN";
+  direction: "INCREASE" | "DECREASE";
+  amount: string;
   businessAt: string | null;
   transferredAt: string | null;
   withdrawalNo: string | null;

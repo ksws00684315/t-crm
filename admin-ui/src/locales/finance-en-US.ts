@@ -88,6 +88,17 @@ export default {
   view: "View",
   refresh: "Refresh",
   unverified: "Needs verification",
+  subjects: {
+    PRE_INCOME: "Pre-income",
+    FROZEN_INCOME: "Frozen income",
+    OUTFLOW: "Outflow",
+    WITHDRAWABLE_INCOME: "Withdrawable income",
+    COMMISSION_FROZEN: "Frozen commission expense",
+    COMMISSION_CLAWBACK: "Commission clawback",
+    COMMISSION_SETTLEABLE: "Settleable commission",
+    ORDER_WITHDRAWN: "Order withdrawn",
+    COMMISSION_WITHDRAWN: "Commission withdrawn"
+  },
   afterSalesShort: "After-sales",
   afterSalesHint:
     "After-sales in progress: no commission is counted for now; released commission stays frozen and is reduced by the refund amount once the refund succeeds",
