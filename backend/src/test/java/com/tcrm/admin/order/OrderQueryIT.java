@@ -779,14 +779,15 @@ class OrderQueryIT {
         .andExpect(status().isOk())
         .andExpect(jsonPath("$.data.total").value("1"))
         .andExpect(jsonPath("$.data.items[0].orderNo").value("1000"));
+    // Orders placed at the same time sort by record ID, independent of payment time.
     mvc.perform(
             get("/admin-api/order/orders")
                 .param("kolKeyword", "Twin")
                 .header("X-Admin-Token", admin))
         .andExpect(status().isOk())
         .andExpect(jsonPath("$.data.total").value("2"))
-        .andExpect(jsonPath("$.data.items[0].orderNo").value("1002"))
-        .andExpect(jsonPath("$.data.items[1].orderNo").value("1003"));
+        .andExpect(jsonPath("$.data.items[0].orderNo").value("1003"))
+        .andExpect(jsonPath("$.data.items[1].orderNo").value("1002"));
     mvc.perform(
             get("/admin-api/order/orders")
                 .param("kolKeyword", "KOL-ZZZ999")
