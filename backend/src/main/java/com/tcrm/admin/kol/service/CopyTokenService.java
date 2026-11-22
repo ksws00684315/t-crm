@@ -107,6 +107,10 @@ public class CopyTokenService implements CopyTokenApi {
     if (filter.targetChannel() != null && !filter.targetChannel().isBlank()) {
       query.eq(KolCopyTokenDO::getTargetChannel, filter.targetChannel().strip());
     }
+    query.apply(
+        filter.jobCode() != null,
+        "EXISTS (SELECT 1 FROM crm_copy_job job WHERE job.token_id = crm_kol_copy_token.id AND job.tenant_id = crm_kol_copy_token.tenant_id AND job.job_code = {0})",
+        filter.jobCode());
     applyDisplayStatus(query, filter.status());
     List<Long> visible = visibleKolIds(user, filter.kolId());
     if (visible != null) {

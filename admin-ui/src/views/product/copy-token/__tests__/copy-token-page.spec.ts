@@ -5,6 +5,7 @@ import { createPinia, setActivePinia } from "pinia";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import * as copyTokenApi from "@/api/kol/copy-token";
 import * as kolApi from "@/api/kol/kol";
+import * as copyJobApi from "@/api/product/copy-job";
 import * as shopApi from "@/api/product/shop";
 import type { CopyChannelVO, CopyTokenVO, CreatedCopyTokenVO, Role } from "@/api/types";
 import { i18n } from "@/locales";
@@ -16,6 +17,7 @@ import CopyTokenPage from "../index.vue";
 vi.mock("@/api/kol/copy-token");
 vi.mock("@/api/kol/kol");
 vi.mock("@/api/product/shop");
+vi.mock("@/api/product/copy-job");
 vi.mock("@/utils/copy");
 
 function row(overrides: Partial<CopyTokenVO> = {}): CopyTokenVO {
@@ -106,6 +108,35 @@ describe("Copy token page", () => {
     expect(copyTokenApi.revealCopyToken).toHaveBeenCalled();
     expect(copyTokenApi.revealCopyToken).toHaveBeenCalledWith("1");
     expect(copyUtil.copyText).toHaveBeenCalledWith("TKN-" + "A".repeat(26));
+    wrapper.unmount();
+  });
+
+  it("filters by exact job code and opens the selected token's jobs", async () => {
+    vi.mocked(copyJobApi.listJobsByToken).mockResolvedValue({
+      items: [
+        {
+          id: "21",
+          jobCode: "t1121-preview-job",
+          status: "failed",
+          totalCount: 2,
+          createTime: "2026-11-21T01:00:00Z"
+        }
+      ],
+      total: "1",
+      page: 1,
+      size: 20
+    });
+    const wrapper = await open();
+    await wrapper.get('[data-test="filter-job-code"]').setValue(" t1121-preview-job ");
+    await wrapper.get('[data-test="search"]').trigger("click");
+    await flushPromises();
+    expect(copyTokenApi.listCopyTokens).toHaveBeenLastCalledWith(
+      expect.objectContaining({ jobCode: "t1121-preview-job" })
+    );
+    await wrapper.get('.el-table__body [data-test="token-jobs"]').trigger("click");
+    await flushPromises();
+    expect(copyJobApi.listJobsByToken).toHaveBeenCalledWith("1", { page: 1, size: 20 });
+    expect(document.body.querySelector(".el-drawer")?.textContent).toContain("t1121-preview-job");
     wrapper.unmount();
   });
 

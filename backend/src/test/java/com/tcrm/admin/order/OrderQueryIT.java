@@ -475,6 +475,7 @@ class OrderQueryIT {
         .andExpect(jsonPath("$.data.lines[0].link.kolItemId").value("1"))
         .andExpect(jsonPath("$.data.lines[0].link.linkCode").value("KPL-000000000001"))
         .andExpect(jsonPath("$.data.lines[0].link.sourceProductId").value("1"))
+        .andExpect(jsonPath("$.data.lines[0].link.sourceItemId").value("81"))
         .andExpect(jsonPath("$.data.lines[0].link.targetItemId").value("90"))
         .andExpect(jsonPath("$.data.lines[0].link.kolCode").value("KOL-AAA100"))
         .andExpect(jsonPath("$.data.lines[0].quantity").value(1))

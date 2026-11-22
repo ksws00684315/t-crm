@@ -6,7 +6,7 @@ import { copyText, truncateCopy } from "@/utils/copy";
 
 defineOptions({ name: "CopyText" });
 
-const props = defineProps<{ value?: string | null }>();
+const props = defineProps<{ value?: string | null; hideTooltip?: boolean }>();
 const { t } = useI18n();
 
 async function onCopy(): Promise<void> {
@@ -22,7 +22,7 @@ async function onCopy(): Promise<void> {
   <span class="copy-text">
     <el-tooltip
       :content="value ?? ''"
-      :disabled="!value"
+      :disabled="hideTooltip || !value"
       :trigger="['hover', 'focus']"
       :trigger-keys="[]"
       placement="top"
@@ -30,8 +30,8 @@ async function onCopy(): Promise<void> {
       <span
         class="copy-text__value"
         data-test="value"
-        :title="value || undefined"
-        :tabindex="value ? 0 : undefined"
+        :title="hideTooltip ? undefined : value || undefined"
+        :tabindex="value && !hideTooltip ? 0 : undefined"
         >{{ value }}</span
       >
     </el-tooltip>

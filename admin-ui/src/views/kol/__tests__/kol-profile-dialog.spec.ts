@@ -104,6 +104,8 @@ describe("creator profile dialog password reset (task 147)", () => {
     signIn("SUPER_ADMIN");
     await openDialog();
     expect(element("reset-password").text()).toBe("重置密码");
+    expect(element("reset-password").element.closest(".el-dialog__footer")).not.toBeNull();
+    expect(element("profile-email").find('[data-test="copy"]').exists()).toBe(true);
 
     document.body.innerHTML = "";
     await openDialog({ accountStatus: 0 });
@@ -181,7 +183,7 @@ describe("creator profile dialog password reset (task 147)", () => {
   });
 });
 
-describe("creator profile dialog read-only switch and inviter tab (task 156)", () => {
+describe("creator profile dialog read-only switch and grouped inviter information (task 156)", () => {
   beforeEach(() => {
     document.body.innerHTML = "";
     setActivePinia(createPinia());
@@ -202,15 +204,6 @@ describe("creator profile dialog read-only switch and inviter tab (task 156)", (
     return input;
   }
 
-  async function openInviterTab(wrapper: Awaited<ReturnType<typeof openDialog>>) {
-    const tab = wrapper
-      .findAll(".el-tabs__item")
-      .find(item => item.text() === i18n.global.t("kol.tabInviter"));
-    if (!tab) throw new Error("missing inviter tab");
-    await tab.trigger("click");
-    await flushPromises();
-  }
-
   it("opens as a detail view, unlocks on Edit, and sends the business accounts", async () => {
     signIn("STAFF", ["kol:edit"]);
     const wrapper = await openDialog();
@@ -222,8 +215,8 @@ describe("creator profile dialog read-only switch and inviter tab (task 156)", (
     expect(document.body.querySelector('[data-test="profile-edit"]')).not.toBeNull();
     expect(document.body.querySelector('[data-test="profile-save"]')).toBeNull();
 
-    await openInviterTab(wrapper);
     expect(element("profile-inviter").text()).toBe("BD Five");
+    expect(element("profile-code").text()).toMatch(/^KOL-/);
     expect(element("profile-bd-discord-view").text()).toContain("bd5#0001");
     expect(element("profile-bd-whatsapp-view").text()).toContain("+447700900123");
     expect(document.body.querySelector('[data-test="profile-bd-discord"]')).toBeNull();
@@ -248,31 +241,33 @@ describe("creator profile dialog read-only switch and inviter tab (task 156)", (
     wrapper.unmount();
   });
 
-  it("keeps the inviter tab read-only while reviewing", async () => {
+  it("keeps the inviter group read-only while reviewing", async () => {
     signIn("SUPER_ADMIN");
     const wrapper = await openDialog({ reviewStatus: "PENDING" }, true);
 
     // Review saves through the review endpoint, which carries no inviter accounts.
     expect(inputOf("profile-name").disabled).toBe(false);
-    await openInviterTab(wrapper);
     expect(document.body.querySelector('[data-test="profile-bd-discord"]')).toBeNull();
     expect(element("profile-bd-discord-view").text()).toContain("bd5#0001");
     expect(document.body.querySelector('[data-test="profile-save"]')).not.toBeNull();
     wrapper.unmount();
   });
 
-  it("returns to the profile tab when its validation fails from the inviter tab", async () => {
+  it("shows the invalid field and keeps inviter edits when validation fails", async () => {
     signIn("STAFF", ["kol:edit"]);
     const wrapper = await openDialog();
     await element("profile-edit").trigger("click");
     await flushPromises();
     await element("profile-name").setValue("");
-    await openInviterTab(wrapper);
+    await element("profile-bd-discord").setValue("bd9#0001");
 
     await element("profile-save").trigger("click");
     await flushPromises();
 
-    expect(wrapper.findComponent({ name: "ElTabs" }).props("modelValue")).toBe("profile");
+    expect(inputOf("profile-name").closest(".el-form-item")?.classList.contains("is-error")).toBe(
+      true
+    );
+    expect(inputOf("profile-bd-discord").value).toBe("bd9#0001");
     expect(kolApi.editKol).not.toHaveBeenCalled();
     wrapper.unmount();
   });

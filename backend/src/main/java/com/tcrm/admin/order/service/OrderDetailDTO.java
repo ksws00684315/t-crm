@@ -65,6 +65,7 @@ public record OrderDetailDTO(
    */
   record CommissionDTO(
       BigDecimal commissionableAmount,
+      BigDecimal settlementAmount,
       List<BigDecimal> rates,
       BigDecimal estimatedCommission,
       boolean afterSales) {}

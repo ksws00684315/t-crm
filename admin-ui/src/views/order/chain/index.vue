@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import RateSupplementDialog from "../RateSupplementDialog.vue";
-import NameCode from "@/components/NameCode.vue";
 import {
+  Box,
   Document,
   Link,
   ShoppingCart,
@@ -14,34 +14,24 @@ import { computed, onMounted, ref } from "vue";
 import { useI18n } from "vue-i18n";
 import { useRoute, useRouter } from "vue-router";
 import { getOrder, getOrderChain } from "@/api/order/order";
-import type { ChainLineVO, OrderChainVO, OrderDetailVO } from "@/api/types";
+import type { ChainLineVO, ChainWithdrawalVO, OrderChainVO, OrderDetailVO } from "@/api/types";
 import CopyText from "@/components/CopyText.vue";
 import DataTable, { type DataColumn } from "@/components/DataTable.vue";
 import { useUserStore } from "@/stores/user";
 import { formatInstant, formatNameWithCode, formatAmountWithCurrency } from "@/utils/format";
+import { cents, decimal, sumMoney, validMoney } from "@/utils/finance";
 import { notifyError } from "@/utils/notify";
 import {
   channelText,
   orderStatusText,
-  refundStatusText,
-  refundTagType,
-  refundTypeText
+  orderRefundStatusText,
+  orderRefundTagType
 } from "@/utils/order";
 import { formatRate } from "@/utils/rate";
-import OrderAmounts from "../OrderAmounts.vue";
-import OrderProductCell from "../OrderProductCell.vue";
-import { useDescriptionColumns } from "@/composables/useDescriptionColumns";
+import OrderProductImage from "../OrderProductImage.vue";
 
 defineOptions({ name: "OrderChainPage" });
 
-/**
- * Order chain (requirement 09.04, task 40 §4): opens as a system tab from the order list since
- * task 59 (R-17). The chain endpoint only carries the per-line wiring, so the page also loads the
- * order detail for the header and the line names. Every product line walks copy job → creator
- * item link → order line → refunds; task 72 wires the real commission data into the funds cards,
- * the per-line commission block and the finance ledger (funds, flows and line blocks stay null
- * without commission:view or, for OWN scopes, on mixed attribution).
- */
 const { t, te, locale } = useI18n();
 
 function shopLabel(name: string | null | undefined, code: string | null | undefined): string {
@@ -72,264 +62,370 @@ const loading = ref(false);
 const chain = ref<OrderChainVO | null>(null);
 /** Header context; degrades to the bare chain when the detail call fails. */
 const detail = ref<OrderDetailVO | null>(null);
-const sourceIds = computed(
-  () =>
-    [
-      ...new Set((chain.value?.lines ?? []).map(line => line.link?.sourceProductId).filter(Boolean))
-    ].join(", ") || "-"
-);
-const targetIds = computed(
-  () =>
-    [
-      ...new Set(
-        (chain.value?.lines ?? [])
-          .map(line => line.link?.targetItemId ?? lineItem(line)?.weidianItemId)
-          .filter(Boolean)
-      )
-    ].join(", ") || "-"
-);
 
 /** Financial data needs commission:view; OWN scopes additionally see nothing on mixed orders. */
 const canSeeCommission = computed(() => userStore.can("commission:view"));
-/** Why a line's commission block is hidden: no commission:view, or an OWN scope on a mixed order. */
-const lineCommissionHint = computed(() =>
-  canSeeCommission.value ? t("finance.scopeLimited") : t("order.chain.noCommissionPermission")
-);
-
 /**
  * Successful-refund total summed on the client, deduplicated by refund id so one refund spanning
  * several lines counts once (B07; same rule as the server's dedup, for viewers without funds).
  */
 const completedRefundTotal = computed(() => {
-  const refunds = (chain.value?.lines ?? []).flatMap(line => line.refunds);
-  const centsById = new Map<string, bigint>();
-  for (const refund of refunds) {
-    if (refund.refundStatus !== "SUCCESS") continue;
-    const match = /^(\d+)(?:\.(\d{1,2}))?$/.exec(refund.amount);
-    if (!match) return null;
-    if (!centsById.has(refund.id)) {
-      centsById.set(
-        refund.id,
-        BigInt(match[1]!) * 100n + BigInt((match[2] ?? "").padEnd(2, "0") || "0")
-      );
-    }
-  }
-  let cents = 0n;
-  for (const value of centsById.values()) cents += value;
-  return `${cents / 100n}.${String(cents % 100n).padStart(2, "0")}`;
+  const amounts = refundRecords.value
+    .filter(refund => refund.refundStatus === "SUCCESS")
+    .map(refund => refund.amount);
+  return sumKnownAmounts(amounts);
 });
 
-/** Refund total: the server value first, then the deduplicated client sum for viewers without it. */
+const orderLines = computed(() => chain.value?.lines ?? []);
+const orderCreators = computed(() => {
+  const creators = new Map<string, { name: string | null; code: string | null }>();
+  for (const line of orderLines.value) {
+    const item = lineItem(line);
+    const creator = item?.kolName || item?.kolCode ? item : line.link;
+    const identity = creator?.kolCode || creator?.kolName;
+    if (!creator || !identity) continue;
+    const key = creator.kolId || identity;
+    const previous = creators.get(key);
+    creators.set(key, {
+      name: creator.kolName || previous?.name || null,
+      code: creator.kolCode || previous?.code || null
+    });
+  }
+  const order = detail.value;
+  const identity = order?.kolCode || order?.kolName;
+  if (!creators.size && order && identity) {
+    creators.set(order.kolId || identity, {
+      name: order.kolName,
+      code: order.kolCode
+    });
+  }
+  return creators;
+});
+const copyJobs = computed(() => [
+  ...new Map(
+    orderLines.value.flatMap(({ copyJob }) => (copyJob ? [[copyJob.jobCode, copyJob]] : []))
+  ).values()
+]);
+const refundRecords = computed(() => [
+  ...new Map(
+    orderLines.value.flatMap(line => line.refunds).map(refund => [refund.id, refund])
+  ).values()
+]);
+const withdrawalRecords = computed(() => {
+  if (!canSeeCommission.value || !chain.value?.funds) return [];
+  const byApplication = new Map<string, ChainWithdrawalVO[]>();
+  for (const record of orderLines.value.flatMap(line => line.commission?.withdrawals ?? [])) {
+    const allocations = byApplication.get(record.withdrawalId);
+    if (allocations) allocations.push(record);
+    else byApplication.set(record.withdrawalId, [record]);
+  }
+  // One application can span multiple orders and items. These allocations belong to this order.
+  return [...byApplication.values()].map(allocations => ({
+    ...allocations[0]!,
+    orderShare: sumKnownAmounts(allocations.map(record => record.occupiedCny))
+  }));
+});
+const paidWithdrawalTotal = computed(() => {
+  const paid = withdrawalRecords.value.filter(record => record.status === "PAID");
+  return paid.length && paid.every(record => record.paidAt)
+    ? sumKnownAmounts(paid.map(record => record.orderShare))
+    : null;
+});
+const occupiedTotal = computed(() => {
+  const amounts = orderLines.value.map(line => line.commission?.occupiedTotal);
+  return canSeeCommission.value && amounts.length ? sumKnownAmounts(amounts) : null;
+});
 const refundTotalAmount = computed(
-  () => chain.value?.funds?.refundTotal ?? completedRefundTotal.value
+  () => detail.value?.refundAmount ?? chain.value?.funds?.refundTotal ?? completedRefundTotal.value
+);
+const platform = computed(() =>
+  canSeeCommission.value ? (chain.value?.weidianReconciliation ?? null) : null
+);
+const flows = computed(() => (Array.isArray(platform.value?.flows) ? platform.value.flows : []));
+const flowsView = computed(() => {
+  if (!canSeeCommission.value) return "noPermission";
+  if (userStore.isOwnScope && !chain.value?.funds) return "scopeLimited";
+  if (!Array.isArray(platform.value?.flows)) return "incomplete";
+  return "table";
+});
+const settlementState = computed(() => {
+  if (!platform.value) return "—";
+  if (platform.value.settlementAmount != null) return t("order.chain.orderMoneyStatus.SETTLED");
+  return (detail.value ? detail.value.payTime : chain.value?.funds?.orderSettlementStatus)
+    ? t("order.chain.orderMoneyStatus.PENDING_SETTLEMENT")
+    : "—";
+});
+
+function countRecords(count: number) {
+  return t("order.chain.recordCount", { count });
+}
+function copyJobState(status?: string | null): string {
+  const value = status?.trim().toLowerCase();
+  const key = `copyJob.jobStatus.${value}`;
+  return value && te(key) ? t(key) : status || t("finance.unverified");
+}
+function copyJobTagType(status?: string | null) {
+  if (status === "completed") return "success";
+  if (status === "partial_failed") return "warning";
+  if (status === "failed") return "danger";
+  return "info";
+}
+function financeStatusText(status?: string | null) {
+  const key = `order.chain.commissionMoneyStatus.${status}`;
+  return status && te(key) ? t(key) : "—";
+}
+function displayAmount(amount?: string | null) {
+  return amount == null ? "—" : formatAmountWithCurrency(amount);
+}
+function sumKnownAmounts(amounts: readonly (string | null | undefined)[]) {
+  return amounts.every((amount): amount is string => amount != null && validMoney(amount, false))
+    ? sumMoney(amounts)
+    : null;
+}
+function displayTime(value?: string | null) {
+  return value ? formatInstant(value) : "—";
+}
+
+function amountTone(amount: string | null) {
+  if (!amount || !validMoney(amount.replace(/^[+-]/, ""))) return undefined;
+  return amount.startsWith("-") ? "chain-money--negative" : "chain-money--positive";
+}
+
+type FundMovement = {
+  id: string;
+  type: "goodsFund" | "commissionFund";
+  direction:
+    "receivableIncrease" | "receivableDecrease" | "accrualExpense" | "expensePending" | null;
+  amount: string | null;
+  status: string;
+  time: string | null;
+  reference: string | null;
+  withdrawalId?: string;
+};
+
+const activeWithdrawals = computed(() =>
+  withdrawalRecords.value.filter(record =>
+    ["PENDING_REVIEW", "PENDING_PAYMENT", "PAID"].includes(record.status)
+  )
 );
 
-/** Funds section columns, the same responsive rule as the order detail drawer. */
-const fundsRegion = ref<HTMLElement | null>(null);
-const fundsColumns = useDescriptionColumns(fundsRegion);
+const withdrawalStageReference = computed(() => {
+  const counts = new Map<string, number>();
+  for (const record of activeWithdrawals.value) {
+    const label =
+      record.status !== "PAID"
+        ? t("order.chain.withdrawalInProgress")
+        : record.paidAt
+          ? financeStatusText("WITHDRAWN")
+          : t("finance.unverified");
+    counts.set(label, (counts.get(label) ?? 0) + 1);
+  }
+  if (!counts.size) {
+    return occupiedTotal.value == null ? "—" : t("order.chain.noActiveWithdrawal");
+  }
+  return [...counts]
+    .map(([status, count]) => t("order.chain.withdrawalStatusCount", { status, count }))
+    .join(" · ");
+});
 
-/** Non-null flow rows for the table; the empty cases come from {@link #flowsView}. */
-const flows = computed(() =>
-  Array.isArray(chain.value?.financeFlows) ? chain.value.financeFlows : []
-);
+/** Split the verified accrual into unreleased and released, unoccupied amounts. */
+const commissionBalances = computed(() => {
+  const funds = chain.value?.funds;
+  const financeFlows = chain.value?.financeFlows;
+  if (
+    !canSeeCommission.value ||
+    !funds?.financeStatus ||
+    ["REFUNDING", "UNVERIFIED"].includes(funds.financeStatus) ||
+    detail.value?.commission?.afterSales ||
+    !funds.kolCommission ||
+    !validMoney(funds.kolCommission, false) ||
+    occupiedTotal.value == null ||
+    !Array.isArray(financeFlows)
+  )
+    return null;
 
-const chainStages = computed(() => {
-  const lines = chain.value?.lines ?? [];
-  const jobs = [
-    ...new Map(
-      lines.filter(line => line.copyJob).map(line => [line.copyJob!.jobCode, line.copyJob!])
-    ).values()
-  ];
-  const links = [
-    ...new Map(
-      lines.filter(line => line.link).map(line => [line.link!.kolItemId, line.link!])
-    ).values()
-  ];
-  const refunds = [
-    ...new Map(lines.flatMap(line => line.refunds).map(refund => [refund.id, refund])).values()
-  ];
-  const jobStates = [...new Set(jobs.map(job => job.status?.trim().toLowerCase()).filter(Boolean))];
-  const missingJobStatus = jobs.some(job => !job.status?.trim());
-  const jobState = jobStates.length === 1 && !missingJobStatus ? jobStates[0] : null;
-  const jobStateKey = `copyJob.jobStatus.${jobState}`;
-  const knownJobState = ["processing", "completed", "partial_failed", "failed"].includes(
-    jobState ?? ""
-  );
-  const count = (value: number) => t("order.chain.recordCount", { count: value });
-  const hasFinancials =
-    canSeeCommission.value && lines.length > 0 && lines.every(line => line.commission != null);
-  const occupied = hasFinancials
-    ? sumKnownCny([
-        ...new Map(lines.map(line => [line.orderItemId, line.commission!.occupiedTotal])).values()
-      ])
-    : null;
-  const withdrawalRecords = hasFinancials
-    ? lines.flatMap(line => line.commission!.withdrawals)
-    : null;
-  const withdrawals =
-    withdrawalRecords &&
-    withdrawalRecords.every(withdrawal =>
-      ["PENDING_REVIEW", "PENDING_PAYMENT", "PAID", "REJECTED", "WITHDRAWN"].includes(
-        withdrawal.status
-      )
-    )
-      ? new Set(
-          withdrawalRecords
-            .filter(withdrawal =>
-              ["PENDING_REVIEW", "PENDING_PAYMENT", "PAID"].includes(withdrawal.status)
-            )
-            .map(withdrawal => withdrawal.withdrawalId)
-        ).size
-      : null;
+  let released = 0n;
+  for (const flow of financeFlows) {
+    if (flow.type !== "KOL_COMMISSION" || flow.withdrawalNo != null) continue;
+    if (flow.amount == null || !validMoney(flow.amount, false) || !flow.direction) return null;
+    released += flow.direction === "INCREASE" ? cents(flow.amount) : -cents(flow.amount);
+  }
+
+  const occupied = cents(occupiedTotal.value);
+  const accrued = cents(funds.kolCommission);
+  // A withdrawal referencing missing ledger data cannot establish an available balance.
+  if (released < occupied) return null;
+  const frozen = accrued - released;
+  const available = (accrued < released ? accrued : released) - occupied;
+  return {
+    frozen: frozen > 0n ? decimal(frozen) : null,
+    available: available > 0n ? decimal(available) : null
+  };
+});
+
+const fundMovements = computed<FundMovement[]>(() => {
+  const rows: FundMovement[] = flows.value.map(flow => {
+    const expense = flow.type === "COMMISSION_EXPENSE";
+    return {
+      id: `weidian-${flow.id}`,
+      type: expense ? "commissionFund" : "goodsFund",
+      direction: expense
+        ? "accrualExpense"
+        : flow.type === "GOODS_INCOME"
+          ? "receivableIncrease"
+          : "receivableDecrease",
+      amount:
+        flow.type === "GOODS_INCOME" && flow.amount && validMoney(flow.amount)
+          ? `+${flow.amount}`
+          : flow.amount,
+      status:
+        flow.tradeTime || flow.settlementAt || flow.settlementNo
+          ? t("order.chain.orderMoneyStatus.SETTLED")
+          : "—",
+      time: flow.settlementAt,
+      reference: flow.settlementNo
+    };
+  });
+  const balances = commissionBalances.value;
+  if (balances?.frozen) {
+    rows.push({
+      id: "commission-frozen",
+      type: "commissionFund",
+      direction: null,
+      amount: balances.frozen,
+      status: financeStatusText("FROZEN"),
+      time: null,
+      reference: null
+    });
+  }
+  if (balances?.available) {
+    rows.push({
+      id: "commission-available",
+      type: "commissionFund",
+      direction: null,
+      amount: balances.available,
+      status: t("order.chain.withdrawalReady"),
+      time: null,
+      reference: null
+    });
+  }
+  for (const record of activeWithdrawals.value) {
+    const paid = record.status === "PAID" && !!record.paidAt;
+    const pending = record.status !== "PAID";
+    rows.push({
+      id: `withdrawal-${record.withdrawalId}`,
+      type: "commissionFund",
+      direction: paid ? "accrualExpense" : pending ? "expensePending" : null,
+      amount: paid && record.orderShare ? `-${record.orderShare}` : record.orderShare,
+      status: paid
+        ? financeStatusText("WITHDRAWN")
+        : pending
+          ? t("order.chain.withdrawalInProgress")
+          : t("finance.unverified"),
+      time: paid ? record.paidAt : null,
+      reference: record.applicationNo,
+      withdrawalId: record.withdrawalId
+    });
+  }
+  return rows;
+});
+
+const stageGroups = computed(() => {
+  const jobs = copyJobs.value;
+  const jobStates = new Set(jobs.map(job => job.status?.trim().toLowerCase()));
+  const singleJobState = jobStates.size === 1 ? [...jobStates][0] : null;
+  const refundAmount = refundTotalAmount.value;
+  const currentCommission = canSeeCommission.value ? chain.value?.funds?.commissionStatus : null;
+  const commissionState = activeWithdrawals.value.some(record => record.status !== "PAID")
+    ? t("order.chain.withdrawalInProgress")
+    : commissionBalances.value?.available
+      ? t("order.chain.withdrawalReady")
+      : commissionBalances.value?.frozen
+        ? financeStatusText("FROZEN")
+        : paidWithdrawalTotal.value != null
+          ? financeStatusText("WITHDRAWN")
+          : financeStatusText(currentCommission === "WITHDRAWN" ? null : currentCommission);
   return [
     {
-      key: "copy",
-      icon: Document,
-      tone: "success",
-      label: t("order.chain.copyJob"),
-      state: !jobs.length
-        ? t("order.chain.notLinked")
-        : missingJobStatus
-          ? t("finance.unverified")
-          : jobStates.length > 1
-            ? t("order.chain.mixedStates")
-            : knownJobState
-              ? t(jobStateKey)
-              : (jobs[0]?.status ?? t("finance.unverified")),
-      stateTone:
-        jobState === "failed"
-          ? "danger"
-          : jobState === "partial_failed"
-            ? "warning"
-            : jobState === "completed"
-              ? "success"
-              : "info",
-      reference: jobs.length === 1 ? jobs[0]!.jobCode : jobs.length ? count(jobs.length) : "-",
-      amount: null
+      key: "journey",
+      stages: [
+        {
+          key: "source",
+          icon: Box,
+          label: t("order.chain.originalProduct"),
+          state: t(
+            orderLines.value.some(({ link }) => link?.sourceItemId)
+              ? "order.chain.linked"
+              : "order.chain.notLinked"
+          )
+        },
+        {
+          key: "copy",
+          icon: Document,
+          label: t("order.chain.copyJob"),
+          stateTone: copyJobTagType(singleJobState),
+          state: !jobs.length
+            ? t("order.chain.notLinked")
+            : jobs.some(job => !job.status?.trim())
+              ? t("finance.unverified")
+              : jobStates.size > 1
+                ? t("order.chain.mixedStates")
+                : copyJobState(jobs[0]?.status),
+          identifiers: jobs.map(job => job.jobCode),
+          reference: jobs.length ? null : "—"
+        },
+        {
+          key: "link",
+          icon: Link,
+          label: t("order.chain.kolItem"),
+          state: t(
+            orderLines.value.some(({ link }) => link)
+              ? "order.chain.linkCreated"
+              : "order.chain.notLinked"
+          )
+        },
+        {
+          key: "order",
+          icon: ShoppingCart,
+          label: t("order.chain.completedOrder"),
+          state: detail.value ? orderStatusText(detail.value.orderStatus) : "—",
+          reference: chain.value?.orderNo ?? "—"
+        }
+      ]
     },
     {
-      key: "link",
-      icon: Link,
-      tone: "success",
-      label: t("order.chain.kolItem"),
-      state: links.length ? t("order.chain.linkCreated") : t("order.chain.notLinked"),
-      stateTone: "info",
-      reference:
-        links.length === 1 ? (links[0]!.linkCode ?? "-") : links.length ? count(links.length) : "-",
-      amount: null
-    },
-    {
-      key: "order",
-      icon: ShoppingCart,
-      tone: "success",
-      label: t("order.chain.orderNode"),
-      state: detail.value ? orderStatusText(detail.value.orderStatus) : "-",
-      stateTone:
-        detail.value?.orderStatus === "UNKNOWN"
-          ? "danger"
-          : ["RECEIVED", "COMPLETED"].includes(detail.value?.orderStatus ?? "")
-            ? "success"
-            : ["PAID", "SHIPPED"].includes(detail.value?.orderStatus ?? "")
-              ? "primary"
-              : "info",
-      reference: chain.value?.orderNo ?? "-",
-      amount: null
-    },
-    {
-      key: "refund",
-      icon: Refresh,
-      tone: "neutral",
-      stateTone: "info",
-      label: t("order.chain.refunds"),
-      state: count(refunds.length),
-      reference: null,
-      amount:
-        refundTotalAmount.value == null
-          ? t("finance.unverified")
-          : formatAmountWithCurrency(refundTotalAmount.value)
-    },
-    {
-      key: "finance",
-      icon: Money,
-      tone: "finance",
-      stateTone: "info",
-      label: t("order.chain.financeNode"),
-      state:
-        canSeeCommission.value && Array.isArray(chain.value?.financeFlows)
-          ? t("order.chain.recordCount", { count: flows.value.length })
-          : "-",
-      reference: null,
-      amount: t("finance.unverified")
-    },
-    {
-      key: "withdrawal",
-      icon: Wallet,
-      tone: "neutral",
-      stateTone: "info",
-      label: t("order.chain.withdrawalOccupation"),
-      state: withdrawals == null ? "-" : count(withdrawals),
-      reference: null,
-      amount: occupied == null ? t("finance.unverified") : formatAmountWithCurrency(occupied)
+      key: "afterOrder",
+      stages: [
+        {
+          key: "refund",
+          icon: Refresh,
+          label: t("order.chain.refunds"),
+          state: detail.value
+            ? orderRefundStatusText(detail.value.refundStatus)
+            : countRecords(refundRecords.value.length),
+          reference:
+            refundAmount == null
+              ? countRecords(refundRecords.value.length)
+              : displayAmount(refundAmount)
+        },
+        {
+          key: "settlement",
+          icon: Money,
+          label: t("order.chain.shopSettlement"),
+          state: settlementState.value,
+          reference: displayAmount(platform.value?.settlementAmount)
+        },
+        {
+          key: "withdrawal",
+          icon: Wallet,
+          label: t("order.chain.commissionBlock"),
+          state: commissionState,
+          reference: withdrawalStageReference.value
+        }
+      ]
     }
   ];
 });
-
-/** Sum only the backend's current occupation totals; never mix ledger flow types or use floats. */
-function sumKnownCny(values: string[]): string | null {
-  let cents = 0n;
-  for (const value of values) {
-    const match = /^(\d+)(?:\.(\d{1,2}))?$/.exec(value);
-    if (!match) return null;
-    cents += BigInt(match[1]!) * 100n + BigInt((match[2] ?? "").padEnd(2, "0") || "0");
-  }
-  return `${cents / 100n}.${String(cents % 100n).padStart(2, "0")}`;
-}
-
-/**
- * What the finance ledger section shows: the flow table, its empty state, or the reason the
- * financial data is hidden (no commission:view, or an OWN scope on a mixed-attribution order).
- */
-const flowsView = computed<"table" | "empty" | "noPermission" | "scopeLimited" | "incomplete">(
-  () => {
-    if (!canSeeCommission.value) return "noPermission";
-    if (chain.value && chain.value.financeFlows === undefined) return "incomplete";
-    if (chain.value?.financeFlows != null && !Array.isArray(chain.value.financeFlows))
-      return "incomplete";
-    if (
-      flows.value.some(
-        flow =>
-          !flow ||
-          typeof flow.flowNo !== "string" ||
-          !flow.flowNo.trim() ||
-          typeof flow.orderItemId !== "string" ||
-          !flow.orderItemId.trim() ||
-          typeof flow.type !== "string" ||
-          !flow.type.trim() ||
-          typeof flow.direction !== "string" ||
-          !flow.direction.trim() ||
-          typeof flow.amount !== "string" ||
-          !flow.amount.trim()
-      )
-    )
-      return "incomplete";
-    if (flows.value.length) return "table";
-    if (chain.value?.financeFlows) return "empty";
-    if (userStore.isOwnScope) return "scopeLimited";
-    return "incomplete";
-  }
-);
-
-function flowTypeText(type: string | null | undefined): string {
-  if (!type) return "-";
-  const key = `order.chain.flowType.${type}`;
-  return te(key) ? t(key) : type;
-}
-
-function flowDirectionText(direction: string | null | undefined): string {
-  if (direction === "INCREASE") return t("order.chain.directionIncrease");
-  if (direction === "DECREASE") return t("order.chain.directionDecrease");
-  return direction || "-";
-}
 
 /**
  * Text for a gated fund value: the amount when known, otherwise the reason it is hidden — no
@@ -355,8 +451,23 @@ function lineSku(line: ChainLineVO): string | null {
   return detail.value?.items.find(candidate => candidate.id === line.orderItemId)?.skuName ?? null;
 }
 
+function newProductId(line: ChainLineVO) {
+  return lineItem(line)?.weidianItemId || line.link?.targetItemId;
+}
+
 function lineItem(line: ChainLineVO) {
   return detail.value?.items.find(item => item.id === line.orderItemId);
+}
+
+function productSpan({
+  column,
+  rowIndex
+}: {
+  column: { columnKey?: string; property?: string };
+  rowIndex: number;
+}): number[] | undefined {
+  if ((column.columnKey ?? column.property) !== "freight") return;
+  return rowIndex === 0 ? [orderLines.value.length, 1] : [0, 0];
 }
 
 function lineStatus(line: ChainLineVO): string {
@@ -369,12 +480,20 @@ function lineStatus(line: ChainLineVO): string {
 }
 
 const summaryColumns = computed<DataColumn[]>(() => [
-  { key: "product", align: "left", label: t("order.chain.summaryProduct"), minWidth: 230 },
-  { key: "status", label: t("common.status"), minWidth: 100 },
-  { key: "kol", align: "left", label: t("order.chain.summaryKol"), minWidth: 145 },
-  { key: "unitPrice", label: t("order.detail.unitPrice"), minWidth: 130, amount: true },
-  { key: "quantity", label: t("order.line.quantity"), minWidth: 90 },
-  { key: "productTotal", label: t("order.amounts.productTotal"), minWidth: 110, amount: true },
+  { key: "image", label: t("order.chain.productImage"), width: 76 },
+  { key: "product", align: "left", label: t("order.chain.productNameSku"), minWidth: 178 },
+  {
+    key: "productIds",
+    align: "left",
+    label: t("order.chain.productIds"),
+    minWidth: locale.value.startsWith("en") ? 300 : 248
+  },
+  { key: "status", label: t("common.status"), minWidth: 90, align: "left" },
+  { key: "unitPrice", label: t("order.detail.unitPrice"), minWidth: 104, amount: true },
+  { key: "quantity", label: t("order.line.quantity"), minWidth: 80 },
+  { key: "totalAmount", label: t("order.amounts.productTotal"), minWidth: 116, amount: true },
+  { key: "freight", label: t("order.freight"), minWidth: 90, amount: true, tooltip: false },
+  { key: "payAmount", label: t("order.chain.itemPaidAmount"), minWidth: 110, amount: true },
   {
     key: "rate",
     label: t("order.chain.summaryRate"),
@@ -387,71 +506,20 @@ const summaryColumns = computed<DataColumn[]>(() => [
     minWidth: canSeeCommission.value ? 120 : { "zh-CN": 140, "en-US": 290 },
     amount: true
   },
-  { key: "occupied", label: t("order.chain.withdrawalOccupation"), minWidth: 110, amount: true },
-  ...(userStore.isSuperAdmin
-    ? [{ key: "rateAction", label: t("common.actions"), minWidth: 160 }]
-    : [])
-]);
-
-/** Product name of a finance flow, matched by its order-item id. */
-function flowProductName(orderItemId: string): string {
-  const item = detail.value?.items.find(candidate => candidate.id === orderItemId);
-  return item?.itemName ?? t("order.detail.itemName");
-}
-
-const refundColumns = computed<DataColumn[]>(() => [
-  { key: "refundNo", align: "left" as const, label: t("order.refund.no"), width: 150 },
-  { key: "refundType", label: t("order.refund.typeColumn"), width: 100 },
-  { key: "refundStatus", label: t("order.refund.statusColumn"), width: 100 },
-  { key: "amount", label: t("order.refund.amount"), width: 100, amount: true },
-  { key: "finishTime", label: t("order.refund.finishTime"), width: 170 }
-]);
-
-const withdrawalColumns = computed<DataColumn[]>(() => [
-  {
-    key: "applicationNo",
-    align: "left" as const,
-    label: t("order.chain.applicationNo"),
-    width: 170
-  },
-  { key: "occupiedCny", label: t("order.chain.withdrawalAmount"), width: 110, amount: true },
-  { key: "status", label: t("finance.status"), width: 100 },
-  { key: "paidAt", label: t("order.chain.paidAt"), width: 170 }
+  { key: "occupied", label: t("order.chain.withdrawalOccupation"), minWidth: 110, amount: true }
 ]);
 
 const flowColumns = computed<DataColumn[]>(() => [
-  { key: "flowNo", align: "left" as const, label: t("order.chain.flowNo"), width: 130 },
-  { key: "shopName", align: "left" as const, label: t("order.chain.shopName"), width: 130 },
-  // "Creator commission" (en) needs the wider box; zh fits 110 (2026-11-06 audit).
-  {
-    key: "type",
-    label: t("order.chain.financeType"),
-    width: locale.value.startsWith("en") ? 170 : 110
-  },
-  { key: "direction", label: t("order.chain.direction"), width: 100 },
-  { key: "amount", label: t("order.chain.financeAmount"), width: 110, amount: true },
-  { key: "businessAt", label: t("order.chain.businessTime"), width: 170 },
-  { key: "transferredAt", label: t("order.chain.transferTime"), width: 170 },
-  {
-    key: "withdrawalNo",
-    align: "left" as const,
-    label: t("order.chain.linkedSettlementNo"),
-    width: 170
-  }
+  { key: "type", label: t("order.chain.financeType"), minWidth: 125, align: "left" },
+  { key: "direction", label: t("order.chain.direction"), minWidth: 132 },
+  { key: "amount", label: t("order.chain.financeAmount"), minWidth: 114, amount: true },
+  { key: "status", label: t("common.status"), minWidth: 133 },
+  { key: "time", label: t("order.chain.settlementPaymentTime"), minWidth: 172 },
+  { key: "reference", label: t("order.chain.settlementWithdrawalNo"), minWidth: 184 }
 ]);
 
-/** The product-task page owns the copy jobs; keep the job code as the filter (task 38). */
-function openCopyJob(jobCode: string): void {
-  void router.push({ path: "/product/tasks", query: { jobCode } });
-}
-
-/** Task 59: the refund list and the creator item list read these as pre-filled filters. */
-function openRefund(refundNo: string): void {
-  void router.push({ path: "/order/refunds", query: { refundNo } });
-}
-
-function openKolItem(linkCode: string): void {
-  void router.push({ path: "/kol/kol-items", query: { linkCode } });
+function openWithdrawal(withdrawalId: string): void {
+  void router.push({ name: "FundPayouts", query: { withdrawalId } });
 }
 
 async function load(): Promise<void> {
@@ -480,7 +548,7 @@ onMounted(load);
 
 <template>
   <div v-loading="loading" class="chain-page">
-    <h1 class="chain-page__heading">{{ t("route.orderChain") }}</h1>
+    <h1 v-if="!chain" class="chain-page__heading">{{ t("order.chain.orderInfoSection") }}</h1>
     <RateSupplementDialog
       v-if="chain && rateTarget"
       v-model="rateDialog"
@@ -491,144 +559,193 @@ onMounted(load);
       @saved="load"
     />
     <template v-if="chain">
-      <section class="chain-page__card" data-test="chain-funds">
-        <h3 class="chain-page__title">{{ t("order.chain.fundsSection") }}</h3>
-        <div ref="fundsRegion">
-          <OrderAmounts v-if="detail" :detail="detail" :columns="fundsColumns" />
-          <div v-else class="chain-product__secondary">-</div>
-        </div>
-        <div
-          v-if="chain.funds?.accountStatus"
-          class="chain-account-status"
-          data-test="chain-account-status"
-        >
-          <span>{{ t("finance.accountStatus") }}</span>
-          <el-tag :type="chain.funds.accountStatus === 'POSTED' ? 'success' : 'warning'">{{
-            t(`finance.${chain.funds.accountStatus}`)
+      <header class="chain-page__card" data-test="chain-header">
+        <div class="chain-product__secondary">{{ t("order.chain.orderInfoSection") }}</div>
+        <div class="chain-header__title">
+          <h1 class="chain-page__heading"><CopyText :value="chain.orderNo" /></h1>
+          <el-tag v-if="detail" effect="light">{{ orderStatusText(detail.orderStatus) }}</el-tag>
+          <el-tag v-if="detail" :type="orderRefundTagType(detail.refundStatus)" effect="light">{{
+            orderRefundStatusText(detail.refundStatus)
           }}</el-tag>
         </div>
-      </section>
-
-      <section class="chain-page__card chain-order-info" data-test="chain-order-info">
-        <h3 class="chain-page__title">{{ t("order.chain.orderInfoSection") }}</h3>
-        <ol class="chain-stages" :aria-label="t('order.chain.wiringDetails')">
-          <li
-            v-for="(stage, index) in chainStages"
-            :key="stage.key"
-            :data-test="`chain-stage-${stage.key}`"
-            :class="`chain-stage--${stage.tone}`"
-          >
-            <span class="chain-stage__icon" aria-hidden="true"
-              ><el-icon><component :is="stage.icon" /></el-icon
-            ></span>
-            <div class="chain-stage__content">
-              <span class="chain-stage__label">{{ stage.label }}</span>
-              <span class="chain-stage__state" :class="`chain-stage__state--${stage.stateTone}`">{{
-                stage.state
-              }}</span>
-              <CopyText
-                v-if="stage.reference && stage.reference !== '-'"
-                :value="stage.reference"
-              />
-              <span v-else-if="stage.reference" class="chain-product__secondary">{{
-                stage.reference
-              }}</span>
-              <span v-if="stage.amount" class="chain-product__secondary chain-money">{{
-                stage.amount
-              }}</span>
-            </div>
-            <el-icon
-              v-if="index < chainStages.length - 1"
-              class="chain-stage__arrow"
-              aria-hidden="true"
-              ><Right
-            /></el-icon>
-          </li>
-        </ol>
-        <div class="chain-page__card chain-page__card--nested" data-test="chain-header">
-          <dl class="chain-order-band">
+        <dl class="chain-meta">
+          <template v-if="detail">
             <div>
-              <dt>{{ t("order.orderId") }}</dt>
-              <dd>
-                <CopyText :value="chain.orderNo" />
-              </dd>
-            </div>
-            <div v-if="detail">
-              <dt>{{ t("order.shop") }}</dt>
-              <dd>{{ shopLabel(detail.shopName, detail.shopCode) }}</dd>
-            </div>
-            <div v-if="detail">
               <dt>{{ t("order.channel") }}</dt>
               <dd>{{ channelText(detail.channel) }}</dd>
             </div>
             <div>
-              <dt>{{ t("order.chain.targetItemId") }}</dt>
-              <dd><CopyText v-if="targetIds !== '-'" :value="targetIds" /><span v-else>-</span></dd>
+              <dt>{{ t("order.shop") }}</dt>
+              <dd>{{ shopLabel(detail.shopName, detail.shopCode) }}</dd>
             </div>
             <div>
-              <dt>{{ t("order.chain.sourceItemId") }}</dt>
-              <dd><CopyText v-if="sourceIds !== '-'" :value="sourceIds" /><span v-else>-</span></dd>
-            </div>
-            <div v-if="detail">
               <dt>{{ t("order.detail.orderTime") }}</dt>
-              <dd>{{ formatInstant(detail.orderTime) }}</dd>
+              <dd>{{ displayTime(detail.orderTime) }}</dd>
             </div>
-          </dl>
-        </div>
+            <div>
+              <dt>{{ t("order.payTime") }}</dt>
+              <dd>{{ displayTime(detail.payTime) }}</dd>
+            </div>
+          </template>
+          <div data-test="chain-creators">
+            <dt>{{ t("order.drawerCreator") }}</dt>
+            <dd v-if="orderCreators.size" class="chain-creators">
+              <span v-for="[key, creator] in orderCreators" :key="key" class="chain-creator">
+                <span v-if="creator.name" data-test="identity-name">{{ creator.name }}</span>
+                <CopyText
+                  v-if="creator.code"
+                  class="chain-product__secondary"
+                  data-test="identity-code"
+                  :value="creator.code"
+                  hide-tooltip
+                />
+              </span>
+            </dd>
+            <dd v-else>—</dd>
+          </div>
+        </dl>
+      </header>
 
+      <section class="chain-page__card" data-test="chain-order-info">
+        <h2 class="chain-page__title">{{ t("order.chain.fullJourney") }}</h2>
+        <template v-for="group in stageGroups" :key="group.key">
+          <h3 v-if="group.key === 'afterOrder'" class="chain-stages__divider">
+            {{ t("order.chain.afterOrder") }}
+          </h3>
+          <ol
+            class="chain-stages"
+            :class="`chain-stages--${group.key}`"
+            :aria-label="t(`order.chain.${group.key === 'journey' ? 'fullJourney' : 'afterOrder'}`)"
+          >
+            <li v-for="(stage, index) in group.stages" :key="stage.key">
+              <div
+                class="chain-stage"
+                :data-test="`chain-stage-${stage.key}`"
+                :class="{ 'chain-stage--order': stage.key === 'order' }"
+              >
+                <div class="chain-stage__heading">
+                  <span class="chain-stage__label">
+                    <el-icon aria-hidden="true"><component :is="stage.icon" /></el-icon>
+                    {{ stage.label }}
+                  </span>
+                  <el-tag
+                    size="small"
+                    :type="stage.stateTone ?? (stage.key === 'order' ? 'primary' : 'info')"
+                  >
+                    {{ stage.state }}
+                  </el-tag>
+                </div>
+                <CopyText
+                  v-for="identifier in stage.identifiers"
+                  :key="identifier"
+                  :value="identifier"
+                  hide-tooltip
+                />
+                <span v-if="stage.reference" class="chain-product__secondary">
+                  {{ stage.reference }}
+                </span>
+                <span
+                  v-if="
+                    stage.key === 'withdrawal' && canSeeCommission && detail?.commission?.afterSales
+                  "
+                  class="chain-product__secondary"
+                  data-test="chain-after-sales"
+                >
+                  {{ t("finance.afterSalesHint") }}
+                </span>
+              </div>
+              <el-icon
+                v-if="group.key === 'journey' && index < group.stages.length - 1"
+                class="chain-stage__arrow"
+                aria-hidden="true"
+                ><Right
+              /></el-icon>
+            </li>
+          </ol>
+        </template>
+      </section>
+
+      <section class="chain-page__card chain-product-details" data-test="chain-product-details">
+        <h2 class="chain-page__title">{{ t("order.chain.productDetails") }}</h2>
         <DataTable
           plain
-          table-id="chain-product-summary"
+          table-id="chain-order-items-with-freight"
           data-test="chain-product-summary"
+          row-key="orderItemId"
           :rows="chain.lines"
           :columns="summaryColumns"
           :total="chain.lines.length"
           :paged="false"
           :fixed-columns="false"
+          :span-method="productSpan"
         >
+          <template #cell-image="{ row }">
+            <OrderProductImage :image-url="lineItem(row as ChainLineVO)?.imageUrl" />
+          </template>
           <template #cell-product="{ row }">
-            <OrderProductCell
-              :image-url="lineItem(row as ChainLineVO)?.imageUrl"
-              :name="lineName(row as ChainLineVO)"
-              :sku="lineSku(row as ChainLineVO)"
-              :product-id="
-                (row as ChainLineVO).link?.targetItemId ??
-                lineItem(row as ChainLineVO)?.weidianItemId
-              "
-            />
+            <div class="chain-product__stack">
+              <span>{{ lineName(row as ChainLineVO) }}</span>
+              <span class="chain-product__secondary">{{ lineSku(row as ChainLineVO) || "—" }}</span>
+            </div>
+          </template>
+          <template #cell-productIds="{ row }">
+            <div class="chain-product__stack">
+              <div class="chain-product__identity">
+                <span class="chain-product__secondary">{{ t("order.chain.newItemId") }}</span>
+                <CopyText
+                  v-if="newProductId(row as ChainLineVO)"
+                  :value="newProductId(row as ChainLineVO)"
+                  hide-tooltip
+                />
+                <span v-else>—</span>
+              </div>
+              <div class="chain-product__identity">
+                <span class="chain-product__secondary">{{ t("order.chain.sourceItemId") }}</span>
+                <CopyText
+                  v-if="(row as ChainLineVO).link?.sourceItemId"
+                  :value="(row as ChainLineVO).link?.sourceItemId"
+                  hide-tooltip
+                />
+                <span v-else>—</span>
+              </div>
+            </div>
           </template>
           <template #cell-status="{ row }">{{ lineStatus(row as ChainLineVO) }}</template>
-          <template #cell-kol="{ row }">
-            <NameCode
-              v-if="lineItem(row as ChainLineVO)?.kolCode || (row as ChainLineVO).link?.kolCode"
-              :name="lineItem(row as ChainLineVO)?.kolName ?? (row as ChainLineVO).link?.kolName"
-              :code="lineItem(row as ChainLineVO)?.kolCode ?? (row as ChainLineVO).link?.kolCode"
-            />
-            <span v-else>-</span>
-          </template>
-          <template #cell-rateAction="{ row }"
-            ><el-button
-              v-if="canSupplement(row as ChainLineVO)"
-              link
-              type="primary"
-              data-test="rate-supplement"
-              @click="openSupplement(row as ChainLineVO)"
-              >{{ t("order.rateSupplement.title") }}</el-button
-            ></template
-          >
           <template #cell-unitPrice="{ row }">{{
             lineItem(row as ChainLineVO)?.unitPrice == null
               ? t("order.missingHistoricalPrice")
               : formatAmountWithCurrency(lineItem(row as ChainLineVO)?.unitPrice)
           }}</template>
           <template #cell-quantity="{ row }">{{ (row as ChainLineVO).quantity ?? "-" }}</template>
-          <template #cell-productTotal="{ row }">{{
-            lineItem(row as ChainLineVO)?.totalAmount == null
-              ? t("order.missingHistoricalPrice")
-              : formatAmountWithCurrency(lineItem(row as ChainLineVO)?.totalAmount)
-          }}</template>
+          <template #cell-totalAmount="{ row }">
+            <span data-test="chain-item-total">{{
+              displayAmount(lineItem(row as ChainLineVO)?.totalAmount)
+            }}</span>
+          </template>
+          <template #cell-freight>
+            <div class="chain-product__stack chain-order-freight" data-test="chain-order-freight">
+              <span>{{ displayAmount(detail?.freight) }}</span>
+              <span
+                v-if="detail?.freight != null && chain.lines.length > 1"
+                class="chain-product__secondary"
+                >{{ t("order.chain.orderFreightScope") }}</span
+              >
+            </div>
+          </template>
+          <template #cell-payAmount="{ row }">
+            <span data-test="chain-item-pay">{{
+              displayAmount((row as ChainLineVO).payAmount)
+            }}</span>
+          </template>
           <template #cell-rate="{ row }"
             ><span v-if="!canSeeCommission">-</span
+            ><el-button
+              v-else-if="canSupplement(row as ChainLineVO)"
+              link
+              type="primary"
+              data-test="rate-supplement"
+              @click="openSupplement(row as ChainLineVO)"
+              >{{ t("order.rateSupplement.title") }}</el-button
             ><span v-else-if="(row as ChainLineVO).commission?.rateSnapshot == null">{{
               fundsText(null)
             }}</span
@@ -662,256 +779,59 @@ onMounted(load);
             }}</template></template
           >
         </DataTable>
-
-        <details v-show="false" class="chain-wiring-details" data-test="chain-wiring-details">
-          <summary>{{ t("order.chain.wiringDetails") }}</summary>
-          <section
-            v-for="line in chain.lines"
-            :key="line.orderItemId"
-            class="chain-page__card chain-line"
-            data-test="chain-line"
-          >
-            <h4 class="chain-line__title">
-              <!-- R-18: the other blocks read "label + value"; the product title now does too. -->
-              <span class="chain-line__product-label">{{ t("order.chain.product") }}</span>
-              {{ lineName(line) }}
-              <span v-if="lineSku(line)" class="chain-line__sku">{{ lineSku(line) }}</span>
-            </h4>
-
-            <div class="chain-line__blocks">
-              <div class="chain-block" data-test="chain-copy-job">
-                <div class="chain-block__title">{{ t("order.chain.copyJob") }}</div>
-                <template v-if="line.copyJob">
-                  <el-button
-                    link
-                    type="primary"
-                    data-test="chain-copy-job-link"
-                    @click="openCopyJob(line.copyJob.jobCode)"
-                  >
-                    {{ line.copyJob.jobCode }}
-                  </el-button>
-                  <div class="chain-block__text">
-                    {{ t("order.chain.copyJobTime") }}: {{ formatInstant(line.copyJob.createTime) }}
-                  </div>
-                </template>
-                <div v-else class="chain-block__text">-</div>
-              </div>
-
-              <div class="chain-block" data-test="chain-kol-item">
-                <div class="chain-block__title">{{ t("order.chain.kolItem") }}</div>
-                <template v-if="line.link">
-                  <div class="chain-block__text">
-                    {{ t("order.chain.linkCode") }}:
-                    <!-- R-05: codes never wrap; the ellipsis keeps the line single-line and the jump
-                     lands on the creator item list pre-filtered by this code (task 59). -->
-                    <el-button
-                      link
-                      type="primary"
-                      class="chain-block__code"
-                      data-test="chain-kol-item-link"
-                      @click="openKolItem(line.link.linkCode ?? '')"
-                    >
-                      {{ line.link.linkCode ?? "-" }}
-                    </el-button>
-                  </div>
-                  <div class="chain-block__text">
-                    {{ t("order.chain.sourceItemId") }}: {{ line.link.sourceProductId ?? "-" }}
-                  </div>
-                  <div class="chain-block__text">
-                    {{ t("order.chain.targetItemId") }}: {{ line.link.targetItemId ?? "-" }}
-                  </div>
-                  <div class="chain-block__text">
-                    {{ t("order.kol") }}:
-                    <span v-if="line.link.kolCode"
-                      ><NameCode :name="line.link.kolName" :code="line.link.kolCode"
-                    /></span>
-                    <span v-else>-</span>
-                  </div>
-                </template>
-                <div v-else class="chain-block__text">-</div>
-              </div>
-
-              <div class="chain-block" data-test="chain-order-line">
-                <div class="chain-block__title">{{ t("order.chain.orderLine") }}</div>
-                <div class="chain-block__text">
-                  {{ t("order.line.quantity") }}: {{ line.quantity ?? "-" }}
-                </div>
-                <div class="chain-block__text">
-                  {{ t("order.amounts.productTotal") }}:
-                  {{
-                    lineItem(line)?.totalAmount == null
-                      ? t("order.missingHistoricalPrice")
-                      : formatAmountWithCurrency(lineItem(line)?.totalAmount)
-                  }}
-                </div>
-              </div>
-
-              <div
-                class="chain-block chain-block--wide"
-                data-test="chain-commission"
-                v-if="line.commission"
-              >
-                <div class="chain-block__title">{{ t("order.chain.commissionBlock") }}</div>
-                <div class="chain-commission-fields">
-                  <div class="chain-block__text">
-                    {{ t("order.chain.rateSnapshot") }}:
-                    {{
-                      line.commission.rateSnapshot == null
-                        ? t("finance.unverified")
-                        : formatRate(line.commission.rateSnapshot)
-                    }}
-                    <el-tag
-                      v-if="line.commission.rateSupplemented"
-                      class="chain-rate__tag"
-                      size="small"
-                      type="warning"
-                      effect="plain"
-                      data-test="rate-supplemented"
-                      >{{ t("order.chain.rateSupplemented") }}</el-tag
-                    >
-                  </div>
-                  <div class="chain-block__text">
-                    {{ t("order.chain.kolCommission") }}:
-                    {{
-                      line.commission.netCommission == null
-                        ? t("finance.unverified")
-                        : formatAmountWithCurrency(line.commission.netCommission)
-                    }}
-                  </div>
-                  <div class="chain-block__text">
-                    {{ t("order.chain.releaseBasis") }}:
-                    {{
-                      line.commission.releaseBasis == null
-                        ? "-"
-                        : t(`finance.${line.commission.releaseBasis}`)
-                    }}
-                  </div>
-                  <div class="chain-block__text">
-                    {{ t("order.chain.occupiedTotal") }}:
-                    {{ formatAmountWithCurrency(line.commission.occupiedTotal) }}
-                  </div>
-                </div>
-                <template v-if="line.commission.withdrawals.length">
-                  <div class="chain-block__text chain-block__subtitle">
-                    {{ t("order.chain.withdrawalOccupation") }}
-                  </div>
-                  <DataTable
-                    plain
-                    :table-id="`chain-withdrawals-${line.orderItemId}`"
-                    :rows="line.commission.withdrawals"
-                    :columns="withdrawalColumns"
-                    :total="line.commission.withdrawals.length"
-                    :paged="false"
-                  >
-                    <template #cell-status="{ row }">{{
-                      row.status
-                        ? te(`finance.${row.status}`)
-                          ? t(`finance.${row.status}`)
-                          : row.status
-                        : "-"
-                    }}</template>
-                    <template #cell-occupiedCny="{ row }"
-                      ><span class="chain-money">{{
-                        formatAmountWithCurrency(row.occupiedCny)
-                      }}</span></template
-                    >
-                    <template #cell-paidAt="{ row }">{{ formatInstant(row.paidAt) }}</template>
-                  </DataTable>
-                </template>
-                <div v-else class="chain-block__text">{{ t("order.chain.noWithdrawal") }}</div>
-              </div>
-
-              <div
-                v-else-if="!canSeeCommission || (userStore.isOwnScope && !chain.financeFlows)"
-                class="chain-block chain-block--wide"
-                data-test="chain-commission-hidden"
-              >
-                <div class="chain-block__title">{{ t("order.chain.commissionBlock") }}</div>
-                <div class="chain-block__text">{{ lineCommissionHint }}</div>
-              </div>
-
-              <div class="chain-block chain-block--wide" data-test="chain-refunds">
-                <div class="chain-block__title">{{ t("order.chain.refunds") }}</div>
-                <DataTable
-                  v-if="line.refunds.length"
-                  plain
-                  :table-id="`chain-refunds-${line.orderItemId}`"
-                  :rows="line.refunds"
-                  :columns="refundColumns"
-                  :total="line.refunds.length"
-                  :paged="false"
-                >
-                  <template #cell-refundNo="{ row }">
-                    <!-- Task 59: jump to the refund list pre-filtered by this refund number. -->
-                    <el-button
-                      link
-                      type="primary"
-                      data-test="chain-refund-link"
-                      @click="openRefund(row.refundNo)"
-                    >
-                      {{ row.refundNo }}
-                    </el-button>
-                  </template>
-                  <template #cell-refundType="{ row }">{{
-                    refundTypeText(row.refundType)
-                  }}</template>
-                  <template #cell-refundStatus="{ row }">
-                    <el-tag :type="refundTagType(row.refundStatus)">
-                      {{ refundStatusText(row.refundStatus) }}
-                    </el-tag>
-                  </template>
-                  <template #cell-amount="{ row }"
-                    ><span class="chain-money">{{
-                      formatAmountWithCurrency(row.amount)
-                    }}</span></template
-                  >
-                  <template #cell-finishTime="{ row }">{{
-                    formatInstant(row.finishTime)
-                  }}</template>
-                </DataTable>
-                <div v-else class="chain-block__text">{{ t("order.chain.noRefund") }}</div>
-              </div>
-            </div>
-          </section>
-        </details>
-
-        <div v-if="!chain.lines.length" class="chain-page__card chain-page__empty">
-          {{ t("order.chain.noLines") }}
-        </div>
       </section>
 
-      <section class="chain-page__card" data-test="chain-finance-ledger">
-        <h3 class="chain-page__title">{{ t("order.chain.financeLedgerSection") }}</h3>
-        <!-- Shop receivable flows wait for the M0 Weidian settlement net; the type stays reserved. -->
-        <el-alert type="info" :closable="false" :title="t('order.chain.financeLedgerNote')" />
-        <DataTable
-          v-if="flowsView === 'table' || flowsView === 'empty'"
-          data-test="chain-flows"
-          plain
-          table-id="chain-finance-flows"
-          :rows="flows"
-          :columns="flowColumns"
-          :total="flows.length"
-          :paged="false"
-        >
-          <template #cell-flowNo="{ row }">
-            <CopyText :value="row.flowNo" />
-            <div class="chain-product__secondary">{{ flowProductName(row.orderItemId) }}</div>
-          </template>
-          <template #cell-type="{ row }">{{ flowTypeText(row.type) }}</template>
-          <template #cell-direction="{ row }">{{ flowDirectionText(row.direction) }}</template>
-          <template #cell-amount="{ row }"
-            ><span class="chain-money">{{ formatAmountWithCurrency(row.amount) }}</span></template
-          >
-          <template #cell-businessAt="{ row }">{{ formatInstant(row.businessAt) }}</template>
-          <template #cell-transferredAt="{ row }">{{ formatInstant(row.transferredAt) }}</template>
-          <template #cell-withdrawalNo="{ row }">{{ row.withdrawalNo ?? "-" }}</template>
-        </DataTable>
-        <div v-if="flowsView === 'empty'" class="chain-ledger-empty">
-          {{ t("order.chain.noFlows") }}
+      <section class="chain-page__card" data-test="chain-reconciliation">
+        <h2 class="chain-page__title">{{ t("order.chain.fundMovements") }}</h2>
+        <div class="chain-overview" data-test="chain-funds">
+          <div class="chain-overview__group">
+            <h3>{{ t("order.chain.orderAmounts") }}</h3>
+            <dl class="chain-overview__values chain-overview__values--order">
+              <div>
+                <dt>{{ t("order.payAmount") }}</dt>
+                <dd>{{ displayAmount(detail?.payAmount ?? chain.funds?.payAmount) }}</dd>
+              </div>
+              <div>
+                <dt>{{ t("order.chain.successfulRefunds") }}</dt>
+                <dd>{{ displayAmount(refundTotalAmount) }}</dd>
+              </div>
+              <div>
+                <dt>{{ t("order.amounts.netReceived") }}</dt>
+                <dd>{{ displayAmount(detail?.netReceived) }}</dd>
+              </div>
+            </dl>
+          </div>
+          <div class="chain-overview__group">
+            <h3>{{ t("order.chain.fundSummary") }}</h3>
+            <dl class="chain-overview__values">
+              <div>
+                <dt>{{ t("order.chain.weidianSettlementAmount") }}</dt>
+                <dd>{{ displayAmount(platform?.settlementAmount) }}</dd>
+                <span
+                  v-if="platform?.settlementAmount == null && settlementState !== '—'"
+                  class="chain-product__secondary"
+                  >{{ settlementState }}</span
+                >
+              </div>
+              <div>
+                <dt>{{ t("order.chain.paidWithdrawal") }}</dt>
+                <dd>{{ displayAmount(paidWithdrawalTotal) }}</dd>
+                <span
+                  v-if="
+                    canSeeCommission &&
+                    chain.funds &&
+                    !withdrawalRecords.some(record => record.status === 'PAID')
+                  "
+                  class="chain-product__secondary"
+                  >{{ t("order.chain.noPaidWithdrawal") }}</span
+                >
+              </div>
+            </dl>
+          </div>
         </div>
+
         <el-alert
-          v-else-if="flowsView === 'noPermission'"
+          v-if="flowsView === 'noPermission'"
           type="warning"
           :closable="false"
           :title="t('order.chain.noCommissionPermission')"
@@ -928,9 +848,46 @@ onMounted(load);
           v-else-if="flowsView === 'incomplete'"
           type="warning"
           :closable="false"
-          :title="t('order.chain.incompleteFlows')"
+          :title="t('order.chain.incompleteWeidianFlows')"
           data-test="chain-flows-incomplete"
         />
+        <DataTable
+          v-if="flowsView === 'table' || (flowsView === 'incomplete' && fundMovements.length)"
+          data-test="chain-flows"
+          plain
+          table-id="chain-fund-movements"
+          :rows="fundMovements"
+          :columns="flowColumns"
+          :total="fundMovements.length"
+          :empty-text="t('order.chain.noFundMovements')"
+          :paged="false"
+          :fixed-columns="false"
+        >
+          <template #cell-type="{ row }">
+            <el-tag round :class="{ 'chain-fund-tag--commission': row.type === 'commissionFund' }">
+              {{ t(`order.chain.${row.type}`) }}
+            </el-tag>
+          </template>
+          <template #cell-direction="{ row }">
+            {{ row.direction ? t(`order.chain.${row.direction}`) : "—" }}
+          </template>
+          <template #cell-amount="{ row }">
+            <span :class="amountTone(row.amount)">{{ displayAmount(row.amount) }}</span>
+          </template>
+          <template #cell-time="{ row }">{{ displayTime(row.time) }}</template>
+          <template #cell-reference="{ row }">
+            <el-button
+              v-if="row.withdrawalId && row.reference"
+              link
+              type="primary"
+              data-test="chain-withdrawal-link"
+              @click="openWithdrawal(row.withdrawalId)"
+              >{{ row.reference }}</el-button
+            >
+            <CopyText v-else-if="row.reference" :value="row.reference" hide-tooltip />
+            <span v-else>—</span>
+          </template>
+        </DataTable>
       </section>
     </template>
     <el-result
@@ -954,250 +911,297 @@ onMounted(load);
   flex-direction: column;
   gap: var(--tcrm-space-4);
   min-width: 0;
-}
-
-.chain-page__heading {
-  margin: 0;
+  container: order-chain / inline-size;
 }
 
 .chain-page__card {
+  min-width: 0;
   padding: var(--tcrm-space-4);
   background: var(--tcrm-color-card);
   border: 1px solid var(--tcrm-color-border);
   border-radius: var(--tcrm-radius-card);
 }
-.chain-page__card--nested {
-  margin-bottom: var(--tcrm-space-3);
-  padding: var(--tcrm-space-3);
-  background: var(--tcrm-color-order-band);
-}
-.chain-order-band {
-  display: flex;
-  flex-wrap: wrap;
-  gap: var(--tcrm-space-3) var(--tcrm-space-5);
-  margin: 0;
-}
-.chain-order-band > div {
-  display: flex;
-  align-items: center;
-  gap: var(--tcrm-space-2);
+
+.chain-page__heading {
   min-width: 0;
-}
-.chain-order-band dt {
-  color: var(--tcrm-color-text-secondary);
-  flex-shrink: 0;
-}
-.chain-order-band dd {
   margin: 0;
   overflow-wrap: anywhere;
 }
+
+.chain-header__title,
+.chain-meta {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: var(--tcrm-space-2) var(--tcrm-space-3);
+}
+
+.chain-header__title {
+  margin-block: var(--tcrm-space-1) var(--tcrm-space-2);
+}
+
+.chain-meta {
+  margin: 0;
+}
+
+.chain-meta div {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--tcrm-space-1) var(--tcrm-space-2);
+  min-width: 0;
+}
+
+.chain-meta dt,
+.chain-overview dt,
 .chain-product__secondary {
   color: var(--tcrm-color-text-secondary);
   overflow-wrap: anywhere;
 }
-.chain-stages {
-  display: flex;
-  gap: var(--tcrm-space-3);
+
+.chain-meta dd,
+.chain-overview dd {
   margin: 0;
-  padding: var(--tcrm-space-3) 0;
-  list-style: none;
-  overflow-x: auto;
-  min-width: 0;
 }
-.chain-stages li {
+
+.chain-creators,
+.chain-creator {
   display: flex;
-  align-items: flex-start;
-  position: relative;
-  flex: 1 0 150px;
-  gap: var(--tcrm-space-2);
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: var(--tcrm-space-1) var(--tcrm-space-2);
   min-width: 0;
-  padding-right: var(--tcrm-space-2);
+  overflow-wrap: anywhere;
 }
-.chain-stage__icon {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  width: 32px;
-  height: 32px;
-  flex-shrink: 0;
-  border: 1px solid currentColor;
-  border-radius: 50%;
-  color: var(--tcrm-color-text-secondary);
-  background: var(--tcrm-color-muted);
+
+.chain-creator + .chain-creator {
+  border-inline-start: 1px solid var(--tcrm-color-border);
+  padding-inline-start: var(--tcrm-space-2);
 }
-.chain-stage--success .chain-stage__icon {
-  color: var(--tcrm-color-success);
-  background: var(--tcrm-color-success-bg);
+
+.chain-product-details :deep(td[rowspan]:not([rowspan="1"]):has(.chain-order-freight)) {
+  vertical-align: top;
 }
-.chain-stage--finance .chain-stage__icon {
-  color: var(--tcrm-color-chain-finance);
-  background: color-mix(in srgb, var(--tcrm-color-chain-finance) 8%, var(--tcrm-color-card));
-}
-.chain-stage__content {
+
+.chain-product__stack {
   display: flex;
   flex-direction: column;
-  align-items: flex-start;
   gap: var(--tcrm-space-1);
-  min-width: 0;
-  flex: 1;
 }
-.chain-stage__label {
-  color: var(--tcrm-color-text);
-}
-.chain-stage__state {
-  color: var(--tcrm-color-text-secondary);
-}
-.chain-stage__state--danger {
-  color: var(--tcrm-color-danger);
-  background: var(--tcrm-color-danger-bg);
-}
-.chain-stage__state--success {
-  color: var(--tcrm-color-success);
-  background: var(--tcrm-color-success-bg);
-}
-.chain-stage__state--warning {
-  color: var(--tcrm-color-warning);
-  background: var(--tcrm-color-warning-bg);
-}
-.chain-stage__state--primary {
-  color: var(--tcrm-color-primary);
-  background: var(--tcrm-color-order-band);
-}
-.chain-stage__state--danger,
-.chain-stage__state--success,
-.chain-stage__state--warning,
-.chain-stage__state--primary {
-  border-radius: var(--tcrm-radius-tag);
-  padding: 0 var(--tcrm-space-1);
-  min-height: 28px;
-  display: inline-flex;
-  align-items: center;
-}
-.chain-stage__arrow {
-  flex-shrink: 0;
-  color: var(--tcrm-color-text-secondary);
-  margin-top: var(--tcrm-space-2);
-}
-.chain-money {
-  white-space: nowrap;
-  font-variant-numeric: tabular-nums;
-}
-/* Rate plus its supplement marker stay on one line, so the marker never wraps under the number. */
-.chain-rate {
-  display: inline-flex;
-  align-items: center;
-  gap: var(--tcrm-space-2);
-  font-variant-numeric: tabular-nums;
-}
-.chain-rate__tag {
-  flex: none;
-}
-.chain-wiring-details > summary {
-  cursor: pointer;
-  color: var(--tcrm-color-primary);
-  padding: var(--tcrm-space-3) 0;
-}
-.chain-wiring-details .chain-line {
-  margin-bottom: var(--tcrm-space-3);
-}
-.chain-order-info {
-  display: flex;
-  flex-direction: column;
-  gap: var(--tcrm-space-3);
-}
-.chain-account-status {
-  display: flex;
-  align-items: center;
-  gap: var(--tcrm-space-2);
-  margin-top: var(--tcrm-space-3);
-}
-.chain-no-permission {
-  color: var(--el-text-color-secondary);
-  font-size: var(--tcrm-font-size-body);
-  font-weight: 400;
-}
-.chain-ledger-empty {
-  padding: var(--tcrm-space-5);
-  color: var(--tcrm-color-text-secondary);
-  text-align: center;
-}
+
 .chain-page__title {
   margin: 0 0 var(--tcrm-space-3);
   font-size: var(--tcrm-font-size-section);
   line-height: var(--tcrm-line-height-section);
   font-weight: 600;
 }
-.chain-page__empty {
-  color: var(--tcrm-color-text-secondary);
-}
-.chain-line__title {
-  display: flex;
-  flex-wrap: wrap;
-  gap: var(--tcrm-space-2);
-  align-items: baseline;
-  margin: 0 0 var(--tcrm-space-3);
-  font-size: var(--tcrm-font-size-section);
-  line-height: var(--tcrm-line-height-section);
-  font-weight: 600;
-}
-.chain-line__sku {
-  font-size: var(--tcrm-font-size-body);
-  line-height: var(--tcrm-line-height-body);
-  font-weight: 400;
-  color: var(--tcrm-color-text-secondary);
-}
-.chain-line__blocks {
+
+.chain-stages {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
-  gap: var(--tcrm-space-3);
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: var(--tcrm-space-4);
+  margin: 0;
+  padding: 0;
+  list-style: none;
 }
-.chain-block {
+
+.chain-stages--afterOrder {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+.chain-stages__divider {
+  display: flex;
+  align-items: center;
+  gap: var(--tcrm-space-2);
+  margin: var(--tcrm-space-3) 0 var(--tcrm-space-2);
+  color: var(--tcrm-color-text-secondary);
+  font: inherit;
+}
+
+.chain-stages__divider::after {
+  flex: 1;
+  border-top: 1px solid var(--tcrm-color-border);
+  content: "";
+}
+
+.chain-stages li {
+  display: grid;
+  position: relative;
   min-width: 0;
-  padding: var(--tcrm-space-3);
+}
+
+.chain-stage {
+  display: grid;
+  min-width: 0;
+  align-content: start;
+  justify-items: start;
+  gap: var(--tcrm-space-2);
+  padding: var(--tcrm-space-2) var(--tcrm-space-3);
   border: 1px solid var(--tcrm-color-border);
   border-radius: var(--tcrm-radius-card);
 }
-.chain-block--wide {
-  /* L-003: the refund table needs the whole row so amounts and finish times stop truncating. */
-  grid-column: 1 / -1;
+
+.chain-stage--order {
+  border-color: color-mix(in srgb, var(--tcrm-color-primary) 30%, var(--tcrm-color-border));
+  background: var(--tcrm-color-order-band);
 }
-@media (max-width: 900px) {
-  .chain-commission-fields {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-  }
+
+.chain-stage__arrow {
+  position: absolute;
+  inset-block-start: 50%;
+  inset-inline-end: calc(-1 * var(--tcrm-space-4));
+  inline-size: var(--tcrm-space-4);
+  transform: translateY(-50%);
+  color: var(--tcrm-color-text-secondary);
 }
-.chain-block__title {
-  margin-bottom: var(--tcrm-space-2);
+
+.chain-stage__heading {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--tcrm-space-1) var(--tcrm-space-2);
+  min-width: 0;
+  max-width: 100%;
+}
+
+.chain-stage__label {
+  display: flex;
+  align-items: center;
+  gap: var(--tcrm-space-2);
   font-weight: 600;
 }
-.chain-block__subtitle {
-  margin: var(--tcrm-space-2) 0 var(--tcrm-space-2);
-  font-weight: 600;
+
+.chain-stage__label .el-icon {
+  flex-shrink: 0;
+  color: var(--el-color-primary);
 }
-.chain-commission-fields {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
-  gap: var(--tcrm-space-2) var(--tcrm-space-3);
-}
-.chain-block__text {
-  line-height: var(--tcrm-line-height-body);
-  word-break: break-all;
-}
-/* R-05: a code stays on one line and ellipsizes; the other block texts keep breaking freely. */
-.chain-block__code {
+
+.chain-stage :deep(.el-tag) {
   max-width: 100%;
   height: auto;
-  padding: 0;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-  vertical-align: baseline;
-  line-height: var(--tcrm-line-height-body);
+  white-space: normal;
 }
-.chain-line__product-label {
-  color: var(--tcrm-color-text-secondary);
+
+.chain-stage :deep(.copy-text__value) {
+  white-space: normal;
+  overflow-wrap: anywhere;
+}
+
+.chain-stage > .chain-product__secondary,
+.chain-stage > :deep(.copy-text) {
   font-size: var(--tcrm-font-size-body);
-  line-height: var(--tcrm-line-height-body);
-  font-weight: 400;
+}
+
+.chain-product__identity {
+  display: flex;
+  align-items: baseline;
+  flex-wrap: wrap;
+  gap: var(--tcrm-space-1);
+}
+
+.chain-fund-tag--commission {
+  --el-tag-text-color: color-mix(
+    in srgb,
+    var(--tcrm-color-chain-finance) 70%,
+    var(--tcrm-color-text)
+  );
+  --el-tag-bg-color: color-mix(
+    in srgb,
+    var(--tcrm-color-chain-finance) 10%,
+    var(--tcrm-color-card)
+  );
+  --el-tag-border-color: color-mix(
+    in srgb,
+    var(--tcrm-color-chain-finance) 16%,
+    var(--tcrm-color-card)
+  );
+}
+
+.chain-money--positive {
+  color: var(--tcrm-color-success);
+}
+
+.chain-money--negative {
+  color: var(--tcrm-color-danger);
+}
+
+.chain-overview {
+  display: grid;
+  grid-template-columns: minmax(0, 3fr) minmax(0, 2fr);
+  padding: var(--tcrm-space-3);
+  margin-bottom: var(--tcrm-space-3);
+  background: var(--tcrm-color-muted);
+  border-radius: var(--tcrm-radius-card);
+}
+
+.chain-overview__group + .chain-overview__group {
+  padding-inline-start: var(--tcrm-space-3);
+  border-inline-start: 1px solid var(--tcrm-color-border);
+}
+
+.chain-overview__group h3 {
+  margin: 0;
+  font: inherit;
+  font-weight: 600;
+}
+
+.chain-overview__values {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: var(--tcrm-space-2);
+  margin: var(--tcrm-space-2) 0 0;
+}
+
+.chain-overview__values--order {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  padding-inline-end: var(--tcrm-space-3);
+}
+
+.chain-overview dd {
+  font-size: var(--tcrm-font-size-section);
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  overflow-wrap: anywhere;
+}
+
+.chain-rate {
+  display: inline-flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: center;
+  gap: var(--tcrm-space-1);
+}
+
+@container order-chain (max-width: 720px) {
+  .chain-stages {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: var(--tcrm-space-2);
+  }
+
+  .chain-stage__arrow {
+    display: none;
+  }
+}
+
+@container order-chain (max-width: 550px) {
+  .chain-overview {
+    grid-template-columns: minmax(0, 1fr);
+    gap: var(--tcrm-space-3);
+  }
+
+  .chain-overview__group + .chain-overview__group {
+    padding: var(--tcrm-space-3) 0 0;
+    border-inline-start: 0;
+    border-top: 1px solid var(--tcrm-color-border);
+  }
+
+  .chain-overview__values--order {
+    padding-inline-end: 0;
+  }
+}
+
+@container order-chain (max-width: 400px) {
+  .chain-stages {
+    grid-template-columns: minmax(0, 1fr);
+  }
 }
 </style>

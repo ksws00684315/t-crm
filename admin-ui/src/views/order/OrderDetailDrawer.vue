@@ -7,7 +7,7 @@ import type { OrderDetailItemVO, OrderDetailVO } from "@/api/types";
 import CopyText from "@/components/CopyText.vue";
 import DataTable, { type DataColumn } from "@/components/DataTable.vue";
 import { useDescriptionColumns } from "@/composables/useDescriptionColumns";
-import { formatNameWithCode, formatAmountWithCurrency } from "@/utils/format";
+import { formatAmountWithCurrency, formatInstant } from "@/utils/format";
 import { notifyError } from "@/utils/notify";
 import {
   channelText,
@@ -24,6 +24,7 @@ const emit = defineEmits<{ (event: "update:modelValue", value: boolean): void }>
 const { t, locale } = useI18n();
 const detailRegion = ref<HTMLElement | null>(null);
 const detailColumns = useDescriptionColumns(detailRegion);
+const detailLabelWidth = computed(() => (locale.value.startsWith("en") ? 150 : 112));
 const loading = ref(false);
 const detail = ref<OrderDetailVO | null>(null);
 watch(
@@ -55,16 +56,17 @@ function lineStatusText(status: string | null | undefined): string {
 }
 
 const columns = computed<DataColumn[]>(() => [
-  { key: "product", align: "left", label: t("order.drawerProduct"), minWidth: 250 },
-  { key: "kol", align: "center", label: t("order.kol"), minWidth: 145 },
-  { key: "unitPrice", label: t("order.detail.unitPrice"), width: 140, amount: true },
+  { key: "product", align: "left", label: t("order.drawerProductIdentity"), minWidth: 190 },
+  { key: "sku", align: "left", label: t("order.drawerSku"), minWidth: 100 },
+  { key: "kol", align: "center", label: t("order.drawerCreator"), minWidth: 120 },
+  { key: "unitPrice", label: t("order.detail.unitPrice"), width: 115, amount: true },
   {
     key: "quantity",
     label: t("order.line.quantity"),
     width: locale.value.startsWith("en") ? 90 : 65
   },
   { key: "totalAmount", label: t("order.amounts.productTotal"), width: 130, amount: true },
-  { key: "status", label: t("common.status"), width: 100 }
+  { key: "status", label: t("common.status"), width: 85 }
 ]);
 </script>
 <template>
@@ -75,17 +77,22 @@ const columns = computed<DataColumn[]>(() => [
     size="min(var(--tcrm-order-detail-width), calc(100vw - 24px))"
     @update:model-value="emit('update:modelValue', $event)"
   >
-    <div ref="detailRegion" v-loading="loading">
+    <div ref="detailRegion" v-loading="loading" class="drawer-detail">
       <template v-if="detail">
-        <el-descriptions :column="detailColumns" border data-test="order-detail">
+        <el-descriptions
+          :column="detailColumns"
+          :label-width="detailLabelWidth"
+          border
+          data-test="order-detail"
+        >
           <el-descriptions-item :label="t('order.orderId')"
             ><CopyText :value="detail.orderNo"
           /></el-descriptions-item>
           <el-descriptions-item :label="t('order.channel')">{{
             channelText(detail.channel)
           }}</el-descriptions-item>
-          <el-descriptions-item :label="t('order.shop')">{{
-            formatNameWithCode(detail.shopName ?? "-", detail.shopCode ?? "-")
+          <el-descriptions-item :label="t('order.drawerShopName')">{{
+            detail.shopName || "-"
           }}</el-descriptions-item>
           <el-descriptions-item :label="t('order.detail.merchantNo')">{{
             detail.merchantNo ?? "-"
@@ -98,8 +105,20 @@ const columns = computed<DataColumn[]>(() => [
               orderRefundStatusText(detail.refundStatus)
             }}</el-tag></el-descriptions-item
           >
+          <el-descriptions-item :label="t('order.detail.orderTime')">{{
+            formatInstant(detail.orderTime)
+          }}</el-descriptions-item>
+          <el-descriptions-item :label="t('order.payTime')">{{
+            formatInstant(detail.payTime)
+          }}</el-descriptions-item>
         </el-descriptions>
-        <OrderAmounts class="drawer-amounts" :detail="detail" :columns="detailColumns" show-times />
+        <OrderAmounts
+          class="drawer-amounts"
+          :detail="detail"
+          :columns="detailColumns"
+          :label-width="detailLabelWidth"
+          show-settlement
+        />
         <DataTable
           plain
           class="drawer-products"
@@ -115,11 +134,12 @@ const columns = computed<DataColumn[]>(() => [
               :image-url="asLine(row).imageUrl"
               :name="asLine(row).itemName"
               :product-id="asLine(row).weidianItemId"
-              :sku="asLine(row).skuName"
+              separate-sku
           /></template>
+          <template #cell-sku="{ row }">{{ asLine(row).skuName || "-" }}</template>
           <template #cell-kol="{ row }"
             ><NameCode
-              v-if="asLine(row).kolCode"
+              v-if="asLine(row).kolName || asLine(row).kolCode"
               :name="asLine(row).kolName"
               :code="asLine(row).kolCode"
             /><span v-else>-</span></template
@@ -146,8 +166,14 @@ const columns = computed<DataColumn[]>(() => [
   </el-drawer>
 </template>
 <style scoped>
-:deep(.el-descriptions__label) {
-  width: 112px;
+.drawer-detail :deep(.el-descriptions__table) {
+  table-layout: fixed;
+}
+.drawer-detail :deep(.el-descriptions__label.is-bordered-label) {
+  background-color: var(--tcrm-color-muted);
+}
+.drawer-detail :deep(.el-descriptions__content) {
+  overflow-wrap: anywhere;
 }
 .drawer-amounts,
 .drawer-products {

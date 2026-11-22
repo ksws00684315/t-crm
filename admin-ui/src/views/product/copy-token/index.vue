@@ -9,6 +9,8 @@ import {
   revokeCopyToken,
   type CopyTokenDisplayStatus
 } from "@/api/kol/copy-token";
+import { listJobsByToken, type TokenJobVO } from "@/api/product/copy-job";
+import CopyText from "@/components/CopyText.vue";
 import { listKols } from "@/api/kol/kol";
 import type { CopyTokenVO, KolVO } from "@/api/types";
 import DataTable, { type DataColumn } from "@/components/DataTable.vue";
@@ -37,6 +39,7 @@ const loading = ref(false);
 const loadFailed = ref(false);
 const rows = ref<CopyTokenVO[]>([]);
 const total = ref(0);
+let listRequest = 0;
 const createVisible = ref(false);
 const revealing = ref<string | null>(null);
 const kolOptions = ref<KolVO[]>([]);
@@ -46,17 +49,20 @@ const query = reactive<{
   page: number;
   size: number;
   hint: string;
+  jobCode: string;
   kolId?: string;
   targetChannel?: string;
   status?: CopyTokenDisplayStatus;
 }>({
   page: 1,
   size: readPageSize("copy-tokens", 20),
-  hint: ""
+  hint: "",
+  jobCode: ""
 });
 
 const applied = ref({
   hint: "",
+  jobCode: "",
   kolId: undefined as string | undefined,
   targetChannel: undefined as string | undefined,
   status: undefined as CopyTokenDisplayStatus | undefined
@@ -105,7 +111,7 @@ const columns = computed<DataColumn[]>(() => {
   ];
   if (canManage.value) {
     // Copy + Revoke: zh DOM 66px / en canvas 83px + gap and cell padding (task 59 measurements).
-    list.push({ key: "actions", label: t("common.actions"), width: px(124, 130) });
+    list.push({ key: "actions", label: t("common.actions"), width: px(200, 235) });
   }
   return list;
 });
@@ -114,6 +120,9 @@ const chips = computed<SearchChip[]>(() => {
   const list: SearchChip[] = [];
   if (applied.value.hint) {
     list.push({ key: "hint", label: t("copyToken.hint"), text: applied.value.hint });
+  }
+  if (applied.value.jobCode) {
+    list.push({ key: "jobCode", label: t("copyJob.jobCode"), text: applied.value.jobCode });
   }
   if (applied.value.kolId) {
     const kol = kolOptions.value.find(k => k.id === applied.value.kolId);
@@ -141,6 +150,7 @@ const chips = computed<SearchChip[]>(() => {
 });
 
 async function load() {
+  const request = ++listRequest;
   if (!canManage.value) {
     rows.value = [];
     total.value = 0;
@@ -153,23 +163,27 @@ async function load() {
       page: query.page,
       size: query.size,
       hint: applied.value.hint || undefined,
+      ...(applied.value.jobCode ? { jobCode: applied.value.jobCode } : {}),
       kolId: applied.value.kolId,
       targetChannel: applied.value.targetChannel,
       status: applied.value.status
     });
+    if (request !== listRequest) return;
     rows.value = page.items;
     total.value = Number(page.total);
   } catch (error) {
+    if (request !== listRequest) return;
     loadFailed.value = true;
     notifyError(error);
   } finally {
-    loading.value = false;
+    if (request === listRequest) loading.value = false;
   }
 }
 
 function search() {
   applied.value = {
     hint: query.hint.trim(),
+    jobCode: query.jobCode.trim(),
     kolId: query.kolId,
     targetChannel: query.targetChannel,
     status: query.status
@@ -180,6 +194,7 @@ function search() {
 
 function reset() {
   query.hint = "";
+  query.jobCode = "";
   query.kolId = undefined;
   query.targetChannel = undefined;
   query.status = undefined;
@@ -187,6 +202,7 @@ function reset() {
 }
 
 function removeChip(key: string) {
+  if (key === "jobCode") query.jobCode = "";
   if (key === "hint") query.hint = "";
   if (key === "kol") query.kolId = undefined;
   if (key === "channel") query.targetChannel = undefined;
@@ -259,8 +275,71 @@ function canRevoke(row: CopyTokenVO): boolean {
   return row.displayStatus === "ACTIVE";
 }
 
+const jobsVisible = ref(false);
+const jobsToken = ref("");
+const jobRows = ref<TokenJobVO[]>([]);
+const jobsTotal = ref(0);
+const jobsLoading = ref(false);
+const jobsFailed = ref(false);
+const jobsPage = reactive({ page: 1, size: readPageSize("copy-token-jobs", 20) });
+let jobsRequest = 0;
+
+const jobColumns = computed<DataColumn[]>(() => [
+  { key: "jobCode", label: t("copyJob.jobCode"), minWidth: 195, align: "left", tooltip: false },
+  { key: "status", label: t("copyJob.status"), minWidth: 100 },
+  { key: "totalCount", label: t("copyToken.jobTotalCount"), minWidth: 90 },
+  { key: "createTime", label: t("copyJob.createTime"), minWidth: 175 }
+]);
+
+function asJob(row: object) {
+  return row as TokenJobVO;
+}
+
+async function loadJobs() {
+  const request = ++jobsRequest;
+  jobsLoading.value = true;
+  jobsFailed.value = false;
+  try {
+    const result = await listJobsByToken(jobsToken.value, { ...jobsPage });
+    if (request !== jobsRequest) return;
+    jobRows.value = result.items;
+    jobsTotal.value = Number(result.total);
+  } catch (error) {
+    if (request !== jobsRequest) return;
+    jobsFailed.value = true;
+    notifyError(error);
+  } finally {
+    if (request === jobsRequest) jobsLoading.value = false;
+  }
+}
+
+function openJobs(id: string) {
+  jobsToken.value = id;
+  jobsPage.page = 1;
+  jobRows.value = [];
+  jobsTotal.value = 0;
+  jobsVisible.value = true;
+  void loadJobs();
+}
+
+function changeJobsPage(page: number) {
+  jobsPage.page = page;
+  void loadJobs();
+}
+
+function changeJobsSize(size: number) {
+  jobsPage.size = size;
+  changeJobsPage(1);
+}
+
 function rowActions(row: CopyTokenVO): RowAction[] {
   return [
+    {
+      key: "jobs",
+      testId: "token-jobs",
+      label: t("copyToken.jobDetails"),
+      onClick: () => openJobs(row.id)
+    },
     {
       key: "copy",
       label: t("common.copy"),
@@ -313,6 +392,9 @@ onMounted(() => {
             :placeholder="t('copyToken.hintPlaceholder')"
             data-test="filter-hint"
           />
+        </el-form-item>
+        <el-form-item :label="t('copyJob.jobCode')">
+          <el-input v-model="query.jobCode" maxlength="64" clearable data-test="filter-job-code" />
         </el-form-item>
         <el-form-item :label="t('copyToken.kol')">
           <el-select
@@ -413,6 +495,31 @@ onMounted(() => {
         <RowActions :actions="rowActions(asRow(row))" />
       </template>
     </DataTable>
+
+    <el-drawer v-model="jobsVisible" :title="t('copyToken.jobDetails')" size="min(760px, 100%)">
+      <DataTable
+        table-id="copy-token-jobs"
+        row-key="id"
+        plain
+        :rows="jobRows"
+        :columns="jobColumns"
+        :loading="jobsLoading"
+        :failed="jobsFailed"
+        :total="jobsTotal"
+        :page="jobsPage.page"
+        :size="jobsPage.size"
+        :empty-text="t('copyToken.noJobs')"
+        @update:page="changeJobsPage"
+        @update:size="changeJobsSize"
+        @retry="loadJobs"
+      >
+        <template #cell-jobCode="{ row }"><CopyText :value="asJob(row).jobCode" /></template>
+        <template #cell-status="{ row }">{{
+          asJob(row).status ? t(`copyJob.jobStatus.${asJob(row).status}`) : ""
+        }}</template>
+        <template #cell-createTime="{ row }">{{ formatInstant(asJob(row).createTime) }}</template>
+      </DataTable>
+    </el-drawer>
 
     <CopyTokenCreateDialog v-model="createVisible" @created="load" />
   </div>

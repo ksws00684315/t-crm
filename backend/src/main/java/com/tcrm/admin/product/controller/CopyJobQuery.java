@@ -11,9 +11,18 @@ public record CopyJobQuery(
     @Size(max = 16) String targetChannel,
     @Size(max = 32) String status,
     @Min(1) @Max(PageResult.MAX_PAGE) Integer page,
-    @Min(1) @Max(100) Integer size) {
+    @Min(1) @Max(100) Integer size,
+    @Min(1) Long kolId,
+    @Size(max = 32) String targetItemId) {
   CopyJobQueryDTO toFilter() {
     return new CopyJobQueryDTO(
-        jobCode, targetChannel, status, page == null ? 1 : page, size == null ? 20 : size);
+        jobCode,
+        targetChannel,
+        status,
+        page == null ? 1 : page,
+        size == null ? 20 : size,
+        kolId,
+        targetItemId,
+        null);
   }
 }

@@ -83,10 +83,24 @@ export function syncSourceText(source: SyncSource | null | undefined): string {
   return source ? translate(`order.source.${source}`) : "-";
 }
 
-/**
- * Converts the locally picked platform-order interval into UTC query params (task 70 B01). The
- * same inclusive/exclusive bounds as the payment window, but over `crm_order.order_time`.
- */
+export const MAX_ORDER_DATE_DAYS = 30;
+
+export function orderDateRangeDays(from: string, to: string): number {
+  return (Date.parse(`${to}T00:00:00Z`) - Date.parse(`${from}T00:00:00Z`)) / 86_400_000 + 1;
+}
+
+/** Calendar days in Beijing, including all of the end date. */
+export function orderDateRangeToQuery(
+  range: [string, string] | null
+): Pick<OrderQuery, "orderTimeFrom" | "orderTimeTo"> {
+  if (!range) return {};
+  const [from, to] = range;
+  const end = new Date(`${to}T00:00:00+08:00`);
+  end.setUTCDate(end.getUTCDate() + 1);
+  return orderTimeRangeToQuery([new Date(`${from}T00:00:00+08:00`), end]);
+}
+
+/** Convert inclusive/exclusive platform order-time bounds to UTC query parameters. */
 export function orderTimeRangeToQuery(
   range: [Date, Date] | null
 ): Pick<OrderQuery, "orderTimeFrom" | "orderTimeTo"> {

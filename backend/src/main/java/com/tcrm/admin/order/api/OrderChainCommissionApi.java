@@ -27,7 +27,7 @@ public interface OrderChainCommissionApi {
       String reason,
       long actorId);
 
-  /** Flow types of {@link FlowDTO#type()}; shop receivables wait for the M0 net-amount hookup. */
+  /** Shop receivables are assembled by the order module from payments and refunds. */
   String FLOW_SHOP_RECEIVABLE = "SHOP_RECEIVABLE";
 
   String FLOW_KOL_COMMISSION = "KOL_COMMISSION";
@@ -115,7 +115,7 @@ public interface OrderChainCommissionApi {
    * @param orderItemId the line the flow belongs to
    * @param flowNo stable, traceable number: {@code CL{ledgerId}} for wallet entries, {@code
    *     WA{allocationId}} for withdrawal allocations
-   * @param type {@link #FLOW_KOL_COMMISSION}; {@link #FLOW_SHOP_RECEIVABLE} stays reserved for M0
+   * @param type {@link #FLOW_KOL_COMMISSION} for the commission-side wallet flows
    * @param direction {@link #DIRECTION_INCREASE} or {@link #DIRECTION_DECREASE}
    * @param amountCny magnitude of the flow, scale 2
    * @param businessAt the business fact time (ledger {@code occurred_at}; allocation = application

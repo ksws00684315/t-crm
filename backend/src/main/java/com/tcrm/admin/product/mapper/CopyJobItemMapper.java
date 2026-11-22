@@ -13,6 +13,21 @@ public interface CopyJobItemMapper extends BaseMapper<CopyJobItemDO> {
   String SELECT_FROM =
       "SELECT id, job_id, tenant_id, source_channel, source_product_id, source_shop_id, rule_id, status, target_item_id, error_message, update_time FROM crm_copy_job_item ";
 
+  record ItemSequence(long id, int seq) {}
+
+  @Select(
+      """
+      <script>
+      SELECT id, seq FROM (
+        SELECT id, row_number() OVER (ORDER BY id) AS seq
+        FROM crm_copy_job_item WHERE job_id = #{jobId}
+      ) numbered
+      WHERE id IN
+      <foreach collection="ids" item="id" open="(" separator="," close=")">#{id}</foreach>
+      </script>
+      """)
+  List<ItemSequence> sequences(@Param("jobId") long jobId, @Param("ids") List<Long> ids);
+
   @Select(
       SELECT_FROM
           + """

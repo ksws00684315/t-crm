@@ -9,6 +9,7 @@ import com.tcrm.admin.order.api.OrderChainCommissionApi;
 import com.tcrm.admin.order.api.OrderStatsDateChangedEvent;
 import com.tcrm.admin.order.mapper.OrderItemMapper;
 import com.tcrm.admin.order.mapper.OrderMapper;
+import com.tcrm.admin.order.mapper.OrderSettlementFlowMapper;
 import com.tcrm.admin.order.mapper.OrderSyncFailureMapper;
 import com.tcrm.admin.order.mapper.OrderSyncStateMapper;
 import com.tcrm.admin.order.mapper.RefundMapper;
@@ -62,6 +63,7 @@ public class OrderService {
   private final OrderMapper orders;
   private final OrderItemMapper items;
   private final RefundMapper refunds;
+  private final OrderSettlementFlowMapper settlementFlows;
   private final OrderSyncStateMapper syncStates;
   private final OrderSyncFailureMapper syncFailures;
   private final KolApi kols;
@@ -83,6 +85,7 @@ public class OrderService {
       OrderMapper orders,
       OrderItemMapper items,
       RefundMapper refunds,
+      OrderSettlementFlowMapper settlementFlows,
       OrderSyncStateMapper syncStates,
       OrderSyncFailureMapper syncFailures,
       KolApi kols,
@@ -102,6 +105,7 @@ public class OrderService {
     this.orders = orders;
     this.items = items;
     this.refunds = refunds;
+    this.settlementFlows = settlementFlows;
     this.syncStates = syncStates;
     this.syncFailures = syncFailures;
     this.kols = kols;
@@ -174,7 +178,11 @@ public class OrderService {
                   .or()
                   .in(OrderDO::getAttributionStatus, List.of("UNMATCHED", "CONFLICT")));
     }
-    query.orderByDesc(OrderDO::getPayTime, OrderDO::getId);
+    if (unmatched) {
+      query.orderByDesc(OrderDO::getPayTime, OrderDO::getId);
+    } else {
+      query.last("ORDER BY order_time DESC NULLS LAST, id DESC");
+    }
     var result = orders.selectPage(new Page<>(filter.page(), filter.size()), query);
     if (result.getRecords().isEmpty()) {
       return new PageResult<>(List.of(), result.getTotal(), filter.page(), filter.size());
@@ -392,6 +400,9 @@ public class OrderService {
     }
     return new OrderDetailDTO.CommissionDTO(
         commission.allVerified() ? commission.commissionableCny() : null,
+        order.getShopId() == null
+            ? null
+            : settlementFlows.orderReceivable(order.getShopId(), order.getWeidianOrderId()),
         List.copyOf(rates),
         commission.allVerified() ? commission.netCommissionCny() : null,
         commission.afterSales());
@@ -437,6 +448,15 @@ public class OrderService {
             .collect(
                 Collectors.toMap(
                     KolItemLinkCodeDTO::kolItemId, KolItemLinkCodeDTO::linkCode, (a, b) -> a));
+    var originalProducts =
+        products
+            .listProducts(
+                mappingById.values().stream()
+                    .map(KolMappingEvidenceDTO::productId)
+                    .filter(Objects::nonNull)
+                    .collect(Collectors.toSet()))
+            .stream()
+            .collect(Collectors.toMap(ProductAccessApi.ProductRefDTO::id, Function.identity()));
     Set<Long> kolIds = new HashSet<>();
     if (order.getKolId() != null) {
       kolIds.add(order.getKolId());
@@ -454,12 +474,14 @@ public class OrderService {
       OrderChainDTO.ChainLinkDTO link = null;
       OrderChainDTO.ChainCopyJobDTO job = null;
       if (mapping != null) {
+        var originalProduct = originalProducts.get(mapping.productId());
         var kol = mapping.kolId() == null ? null : kolById.get(mapping.kolId());
         link =
             new OrderChainDTO.ChainLinkDTO(
                 mapping.kolItemId(),
                 linkCodeById.get(mapping.kolItemId()),
                 mapping.productId(),
+                originalProduct == null ? null : originalProduct.sourceItemId(),
                 mapping.weidianItemId(),
                 mapping.kolId(),
                 kol == null ? null : kol.kolCode(),
@@ -494,7 +516,18 @@ public class OrderService {
               finance.byItem().get(line.getId())));
     }
     return new OrderChainDTO(
-        order.getId(), order.getWeidianOrderId(), finance.funds(), chainLines, finance.flows());
+        order.getId(),
+        order.getWeidianOrderId(),
+        finance.funds(),
+        chainLines,
+        finance.flows(),
+        finance.funds() == null
+            ? null
+            : OrderChainReconciliation.of(
+                order.getShopId() == null
+                    ? List.of()
+                    : settlementFlows.listByRemoteOrderId(
+                        order.getShopId(), order.getWeidianOrderId())));
   }
 
   /**
@@ -545,8 +578,47 @@ public class OrderService {
                         f.amountCny(),
                         f.businessAt(),
                         f.transferredAt(),
-                        f.withdrawalNo()))
+                        f.withdrawalNo(),
+                        f.withdrawalNo() == null
+                                && OrderChainCommissionApi.DIRECTION_INCREASE.equals(f.direction())
+                                && order.getSettledTime() != null
+                            ? "SETTLEABLE"
+                            : null,
+                        f.withdrawalNo() != null
+                            ? "WITHDRAWN"
+                            : OrderChainCommissionApi.DIRECTION_INCREASE.equals(f.direction())
+                                ? "WITHDRAWABLE"
+                                : "INVALID",
+                        null,
+                        null))
             .toList();
+    var accrual = OrderChainAccrual.of(order, lines, refunds, commission, shopName);
+    var chainFlows = new ArrayList<>(flows);
+    chainFlows.addAll(accrual.flows());
+    if (order.getSettledTime() != null && order.getShopId() != null) {
+      chainFlows.add(
+          new OrderChainDTO.FlowDTO(
+              "WS" + order.getWeidianOrderId(),
+              null,
+              shopName,
+              "ORDER_SETTLEMENT",
+              null,
+              settlementFlows.orderReceivable(order.getShopId(), order.getWeidianOrderId()),
+              order.getSettledTime(),
+              null,
+              null,
+              "SETTLEABLE",
+              null,
+              order.getSettledTime(),
+              null));
+    }
+    String settlementStatus =
+        order.getPayTime() == null
+            ? null
+            : "REFUNDING".equals(accrual.status()) || "REFUNDED".equals(accrual.status())
+                ? "DEDUCTION"
+                : order.getSettledTime() != null ? "SETTLEABLE" : "PENDING_SETTLEMENT";
+    String commissionStatus = chainCommissionStatus(commission, accrual.status());
     var funds =
         new OrderChainDTO.FundsDTO(
             order.getPayAmount(),
@@ -554,8 +626,26 @@ public class OrderService {
             // Any unverified line hides the order total as unknown — a 0 would read as a real
             // zero commission while the line-level blocks correctly say 待核实.
             commission.allVerified() ? commission.netCommissionCny() : null,
-            commission.allVerified() ? "POSTED" : "UNVERIFIED");
-    return new ChainFinance(funds, Map.copyOf(byItem), flows);
+            commission.allVerified() ? "POSTED" : "UNVERIFIED",
+            accrual.status(),
+            accrual.amount(),
+            settlementStatus,
+            commissionStatus);
+    return new ChainFinance(funds, Map.copyOf(byItem), List.copyOf(chainFlows));
+  }
+
+  private static String chainCommissionStatus(
+      OrderChainCommissionApi.OrderCommissionChainDTO commission, String financeStatus) {
+    if (financeStatus == null) {
+      return null;
+    }
+    if ("REFUNDING".equals(financeStatus) || "REFUNDED".equals(financeStatus)) {
+      return "INVALID";
+    }
+    if (commission.lines().stream().anyMatch(line -> line.occupiedCny().signum() > 0)) {
+      return "WITHDRAWN";
+    }
+    return "POSTED".equals(financeStatus) ? "WITHDRAWABLE" : financeStatus;
   }
 
   /**

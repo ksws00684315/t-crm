@@ -5,7 +5,14 @@ import jakarta.validation.constraints.Max;
 import jakarta.validation.constraints.Min;
 
 public record CopyJobItemPageQuery(
-    @Min(1) @Max(PageResult.MAX_PAGE) Integer page, @Min(1) @Max(100) Integer size) {
+    @Min(1) @Max(PageResult.MAX_PAGE) Integer page,
+    @Min(1) @Max(100) Integer size,
+    StatusOrder statusOrder) {
+  public enum StatusOrder {
+    ASCENDING,
+    DESCENDING
+  }
+
   int pageOrDefault() {
     return page == null ? 1 : page;
   }

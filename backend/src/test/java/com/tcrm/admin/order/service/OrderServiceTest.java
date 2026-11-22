@@ -94,6 +94,7 @@ class OrderServiceTest {
           orders,
           items,
           refunds,
+          mock(OrderSettlementFlowMapper.class),
           syncStates,
           syncFailures,
           kols,
@@ -440,7 +441,7 @@ class OrderServiceTest {
     ArgumentCaptor<LambdaQueryWrapper<OrderDO>> query = ArgumentCaptor.captor();
     verify(orders).selectPage(any(), query.capture());
     assertThat(query.getValue().getSqlSegment())
-        .contains("ORDER BY pay_time DESC,id DESC")
+        .contains("ORDER BY order_time DESC NULLS LAST, id DESC")
         .doesNotContain("shop_id", "order_status", "attribution_status", "bd_user_id");
   }
 
@@ -1214,7 +1215,9 @@ class OrderServiceTest {
     assertThat(block.withdrawals()).hasSize(2);
     assertThat(block.withdrawals().getFirst().applicationNo()).isEqualTo("W20261016000001");
     assertThat(block.withdrawals().getFirst().paidAt()).isEqualTo(PAID);
-    assertThat(chain.financeFlows()).hasSize(2);
+    assertThat(chain.financeFlows()).hasSize(7);
+    assertThat(chain.funds().financeStatus()).isEqualTo("REFUNDING");
+    assertThat(chain.funds().financeAmount()).isNull();
     assertThat(chain.financeFlows().getFirst().flowNo()).isEqualTo("CL900");
     assertThat(chain.financeFlows().getFirst().shopName()).isEqualTo("Main shop");
     assertThat(chain.financeFlows().get(1).transferredAt()).isEqualTo(PAID.plusSeconds(3600));

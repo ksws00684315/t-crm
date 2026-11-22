@@ -540,6 +540,7 @@ export interface OrderDetailVO {
 export interface OrderDetailCommissionVO {
   /** Commissionable amount; null while any line is unverified (shown as pending verification). */
   commissionableAmount: string | null;
+  settlementAmount?: string | null;
   /** Distinct pay-time rate snapshots; empty when nothing accrued. */
   rates: string[];
   /** Estimated commission; null while any line is unverified. */
@@ -603,8 +604,10 @@ export interface ChainCopyJobVO {
 export interface ChainLinkVO {
   kolItemId: string;
   linkCode: string | null;
-  /** The source product the mapping points at (the chain's source item id). */
-  sourceProductId: string;
+  /** Internal identity of the source product. */
+  sourceProductId: string | null;
+  /** The source product's Weidian item ID. */
+  sourceItemId?: string | null;
   targetItemId: string;
   kolId: string | null;
   kolName: string | null;
@@ -651,22 +654,36 @@ export interface OrderChainFundsVO {
   refundTotal: string;
   kolCommission: string;
   accountStatus: "POSTED" | "UNVERIFIED";
+  financeStatus?: "FROZEN" | "POSTED" | "REFUNDING" | "REFUNDED" | "UNVERIFIED" | null;
+  financeAmount?: string | null;
+  orderSettlementStatus?: string | null;
+  commissionStatus?: string | null;
 }
 
 /**
- * One finance flow of the chain (task 72, B08). Amounts are always positive; `direction` carries
- * the sign. Shop receivables wait for the M0 settlement net, so only KOL_COMMISSION rows exist.
+ * One finance flow of the chain. The direction carries the sign for monetary changes.
+ * Shop receivables, creator commission and Weidian settlement are distinct event types.
  */
 export interface ChainFinanceFlowVO {
   flowNo: string;
-  orderItemId: string;
+  orderItemId: string | null;
   shopName: string | null;
-  type: "KOL_COMMISSION" | "SHOP_RECEIVABLE";
-  direction: "INCREASE" | "DECREASE";
-  amount: string;
+  type:
+    | "KOL_COMMISSION"
+    | "SHOP_RECEIVABLE"
+    | "COMMISSION_ACCRUAL"
+    | "COMMISSION_REFUND_PENDING"
+    | "COMMISSION_REFUND"
+    | "ORDER_SETTLEMENT";
+  direction: "INCREASE" | "DECREASE" | null;
+  amount: string | null;
   businessAt: string | null;
   transferredAt: string | null;
   withdrawalNo: string | null;
+  orderStatus?: string | null;
+  commissionStatus?: string | null;
+  settlementAt?: string | null;
+  settlementNo?: string | null;
 }
 
 /**
@@ -692,6 +709,22 @@ export interface OrderChainVO {
   funds: OrderChainFundsVO | null;
   lines: ChainLineVO[];
   financeFlows: ChainFinanceFlowVO[] | null;
+  weidianReconciliation: WeidianReconciliationVO | null;
+}
+
+export interface WeidianReconciliationVO {
+  settlementAmount: string | null;
+  settlementAt: string | null;
+  flows: WeidianFlowVO[];
+}
+
+export interface WeidianFlowVO {
+  id: string;
+  type: "GOODS_INCOME" | "REFUND_DEDUCTION" | "COMMISSION_EXPENSE";
+  amount: string | null;
+  tradeTime: string | null;
+  settlementAt: string | null;
+  settlementNo: string | null;
 }
 
 /** Which of the two sync streams a monitoring row describes. */

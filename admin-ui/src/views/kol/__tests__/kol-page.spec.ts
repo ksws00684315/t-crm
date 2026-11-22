@@ -471,7 +471,11 @@ describe("creator list page (task 32 §2.2)", () => {
     // Reopened after approval the profile is read-only until Edit is pressed (task 156).
     await element("action-edit").trigger("click");
     await flushPromises();
-    expect(document.body.textContent).toContain("资料编辑 - KOL-ASD001（Alice）");
+    expect(document.body.querySelector(".kol-profile-dialog .el-dialog__title")?.textContent).toBe(
+      "基础资料"
+    );
+    expect(element("profile-view-name").text()).toBe("Alice");
+    expect(element("profile-code").text()).toBe("KOL-ASD001");
     expect(element("profile-edit").text()).toBe("编辑");
     await element("profile-edit").trigger("click");
     await flushPromises();

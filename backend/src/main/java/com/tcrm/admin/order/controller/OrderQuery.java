@@ -8,6 +8,7 @@ import jakarta.validation.constraints.Min;
 import jakarta.validation.constraints.Pattern;
 import jakarta.validation.constraints.Positive;
 import jakarta.validation.constraints.Size;
+import java.time.Duration;
 import java.time.Instant;
 import org.springframework.format.annotation.DateTimeFormat;
 
@@ -50,7 +51,10 @@ public record OrderQuery(
   /** The order-time window follows the payment window: inclusive from, exclusive to. */
   @AssertTrue
   public boolean isValidOrderTimePeriod() {
-    return orderTimeFrom == null || orderTimeTo == null || orderTimeFrom.isBefore(orderTimeTo);
+    return orderTimeFrom == null
+        || orderTimeTo == null
+        || (orderTimeFrom.isBefore(orderTimeTo)
+            && Duration.between(orderTimeFrom, orderTimeTo).compareTo(Duration.ofDays(30)) <= 0);
   }
 
   OrderFilterDTO filter() {

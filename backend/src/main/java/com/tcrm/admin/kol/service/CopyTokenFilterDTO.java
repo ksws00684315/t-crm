@@ -9,4 +9,15 @@ public record CopyTokenFilterDTO(
     String targetChannel,
     CopyTokenDisplayStatus status,
     int page,
-    int size) {}
+    int size,
+    String jobCode) {
+  public CopyTokenFilterDTO(
+      String hint,
+      Long kolId,
+      String targetChannel,
+      CopyTokenDisplayStatus status,
+      int page,
+      int size) {
+    this(hint, kolId, targetChannel, status, page, size, null);
+  }
+}
