@@ -39,23 +39,11 @@ class OrderChainAccrualTest {
         new OrderCommissionChainDTO(
             new BigDecimal("31.00"),
             true,
+            List.of(confirmedLine(11L, "0.20", "16", "80"), confirmedLine(12L, "0.30", "15", "50")),
             List.of(
-                new LineCommissionDTO(
-                    11L, new BigDecimal("0.20"), false, new BigDecimal("16"), "CONFIRMED",
-                    BigDecimal.ZERO, List.of(), new BigDecimal("80")),
-                new LineCommissionDTO(
-                    12L, new BigDecimal("0.30"), false, new BigDecimal("15"), "CONFIRMED",
-                    BigDecimal.ZERO, List.of(), new BigDecimal("50"))),
-            List.of(
-                new FlowDTO(
-                    11L, "CL1", "KOL_COMMISSION", "INCREASE", new BigDecimal("20"), PAID, null,
-                    null),
-                new FlowDTO(
-                    12L, "CL2", "KOL_COMMISSION", "INCREASE", new BigDecimal("15"), PAID, null,
-                    null),
-                new FlowDTO(
-                    11L, "CL3", "KOL_COMMISSION", "DECREASE", new BigDecimal("4"),
-                    refund.getFinishTime(), null, null)),
+                releasedFlow(11L, "CL1", "INCREASE", "20", PAID),
+                releasedFlow(12L, "CL2", "INCREASE", "15", PAID),
+                releasedFlow(11L, "CL3", "DECREASE", "4", refund.getFinishTime())),
             new BigDecimal("130"),
             false);
 
@@ -74,6 +62,25 @@ class OrderChainAccrualTest {
             order, List.of(refundedItem, unaffectedItem), List.of(refund), commission, "XD");
     assertThat(unmatched.amount()).isNull();
     assertThat(unmatched.flows().getLast().amount()).isNull();
+  }
+
+  private static LineCommissionDTO confirmedLine(
+      long itemId, String rate, String net, String basis) {
+    return new LineCommissionDTO(
+        itemId,
+        new BigDecimal(rate),
+        false,
+        new BigDecimal(net),
+        "CONFIRMED",
+        BigDecimal.ZERO,
+        List.of(),
+        new BigDecimal(basis));
+  }
+
+  private static FlowDTO releasedFlow(
+      long itemId, String id, String direction, String amount, Instant at) {
+    return new FlowDTO(
+        itemId, id, "KOL_COMMISSION", direction, new BigDecimal(amount), at, null, null);
   }
 
   @Test
