@@ -454,11 +454,18 @@ class OrderStatsIT {
   private static void checkCreatorCommissionExpenses(JdbcTemplate jdbc, SqlSessionFactory factory) {
     jdbc.execute(
         """
+        INSERT INTO crm_order (
+          id, tenant_id, shop_id, weidian_order_id, bd_user_id, kol_id, settled_time,
+          attribution_status, order_status, raw_status, order_time, pay_time, total_amount,
+          pay_amount, freight, discount, source, last_sync_time, create_time, update_time
+        ) VALUES (974, 4, 1, 't144-974', 10, 11, NULL,
+                  'ATTRIBUTED', 'PAID', '1', '2026-11-03T00:00:00Z', '2026-11-03T00:00:00Z',
+                  200, 200, 0, 0, 1, now(), now(), now());
         INSERT INTO crm_order_item (
           id, tenant_id, order_id, sub_order_id, weidian_item_id, sku_id, item_name, sku_name,
           quantity, pay_amount, refund_amount, attribution_type, kol_id, create_time, update_time
         ) VALUES (975, 4, 2, 't144-previous', 'B', '', 'Earlier order', '', 1, 80, 0, 1, 11, now(), now()),
-                 (976, 4, 3, 't144-other', 'C', '', 'Other owner', '', 1, 200, 0, 1, 11, now(), now());
+                 (976, 4, 974, 't144-other', 'C', '', 'Other owner', '', 1, 200, 0, 1, 11, now(), now());
         INSERT INTO crm_commission_withdrawal (
           id, tenant_id, kol_id, application_no, request_id, request_fingerprint, amount_cny,
           status, account_type, account_cipher, account_masked, account_currency, account_holder,
@@ -469,7 +476,7 @@ class OrderStatsIT {
           id, tenant_id, withdrawal_id, order_item_id, order_no, item_name, occupied_cny,
           remaining_snapshot_cny, source_released_cny, create_time
         ) VALUES (971, 4, 970, 975, 't144-2', 'Earlier order', 12, 0, 12, now()),
-                 (972, 4, 970, 976, 't144-3', 'Other owner', 18, 0, 18, now());
+                 (972, 4, 970, 976, 't144-974', 'Other owner', 18, 0, 18, now());
         INSERT INTO crm_commission_withdrawal_payment (
           id, tenant_id, withdrawal_id, request_id, request_fingerprint, amount_cny,
           actual_amount, actual_currency, paid_at, method, voucher_file_id, operator_id,
