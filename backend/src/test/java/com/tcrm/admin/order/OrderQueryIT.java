@@ -489,7 +489,13 @@ class OrderQueryIT {
         .andExpect(jsonPath("$.data.lines[0].commission.occupiedTotal").value("0.00"))
         .andExpect(jsonPath("$.data.lines[0].commission.withdrawals").isEmpty())
         .andExpect(jsonPath("$.data.funds.accountStatus").value("UNVERIFIED"))
-        .andExpect(jsonPath("$.data.financeFlows").isEmpty());
+        .andExpect(jsonPath("$.data.financeFlows.length()").value(3))
+        .andExpect(jsonPath("$.data.financeFlows[0].type").value("SHOP_RECEIVABLE"))
+        .andExpect(jsonPath("$.data.financeFlows[0].amount").value("10.00"))
+        .andExpect(jsonPath("$.data.financeFlows[1].direction").value("DECREASE"))
+        .andExpect(jsonPath("$.data.financeFlows[1].amount").value("5.00"))
+        .andExpect(jsonPath("$.data.financeFlows[2].type").value("COMMISSION_REFUND"))
+        .andExpect(jsonPath("$.data.financeFlows[2].amount").isEmpty());
   }
 
   @Test
@@ -748,8 +754,9 @@ class OrderQueryIT {
     mapping(2, 200, "91", null, early, null);
     mapping(3, 300, "92", null, early, null);
     mapping(4, 400, "93", null, early, null);
-    saveAt("1000", "pay", PAID.minusSeconds(50), PAID, line("90", "1"));
-    saveAt("1001", "pay", PAID.minusSeconds(50), PAID.minusSeconds(10), line("91", "2"));
+    // Newer order time wins even though this order was paid earlier.
+    saveAt("1000", "pay", PAID.minusSeconds(50), PAID.minusSeconds(10), line("90", "1"));
+    saveAt("1001", "pay", PAID.minusSeconds(51), PAID, line("91", "2"));
     saveAt("1002", "pay", PAID.minusSeconds(50), PAID.minusSeconds(20), line("92", "3"));
     saveAt("1003", "pay", PAID.minusSeconds(50), PAID.minusSeconds(30), line("93", "4"));
 
@@ -899,10 +906,10 @@ class OrderQueryIT {
     refund(2, mixed, mixedItem, "R2", "SUCCESS", "REFUND_ONLY", "3.00");
     refund(3, mixed, null, "R3", "PROCESSING", "REFUND_ONLY", "2.00");
     long fullyRefunded =
-        saveAt("1001", "pay", PAID.minusSeconds(50), PAID.minusSeconds(10), line("90", "2"));
+        saveAt("1001", "pay", PAID.minusSeconds(51), PAID.minusSeconds(10), line("90", "2"));
     refund(4, fullyRefunded, null, "R4", "SUCCESS", "REFUND_ONLY", "10.00");
     long processingOnly =
-        saveAt("1002", "pay", PAID.minusSeconds(50), PAID.minusSeconds(20), line("90", "3"));
+        saveAt("1002", "pay", PAID.minusSeconds(52), PAID.minusSeconds(20), line("90", "3"));
     refund(5, processingOnly, null, "R5", "PROCESSING", "REFUND_ONLY", "1.00");
     long closedOnly =
         saveAt("1003", "pay", PAID.minusSeconds(50), PAID.minusSeconds(30), line("90", "4"));

@@ -124,7 +124,7 @@ record OrderChainAccrual(String status, BigDecimal amount, List<OrderChainDTO.Fl
               null,
               null,
               "DEDUCTION",
-              "INVALID",
+              pending(refund) ? "FROZEN" : "INVALID",
               null,
               null));
     }
@@ -136,19 +136,45 @@ record OrderChainAccrual(String status, BigDecimal amount, List<OrderChainDTO.Fl
     if (gross == null) {
       return new OrderChainAccrual("UNVERIFIED", null, List.copyOf(flows));
     }
-    BigDecimal released =
-        commission.flows().stream()
-            .filter(flow -> flow.withdrawalNo() == null && flow.flowNo().startsWith("CL"))
-            .map(
-                flow ->
-                    OrderChainCommissionApi.DIRECTION_DECREASE.equals(flow.direction())
-                        ? flow.amountCny().negate()
-                        : flow.amountCny())
-            .reduce(ZERO, BigDecimal::add)
-            .max(ZERO);
+    BigDecimal released = releasedCommission(commission);
     boolean frozen = released.compareTo(gross) < 0 || released.signum() == 0;
     return new OrderChainAccrual(
         frozen ? "FROZEN" : "POSTED", frozen ? ZERO : released, List.copyOf(flows));
+  }
+
+  String commissionStatus(OrderCommissionChainDTO commission) {
+    if (commission.lines().stream().anyMatch(line -> line.occupiedCny().signum() > 0)) {
+      return "WITHDRAWN";
+    }
+    if ("REFUNDING".equals(status)) {
+      return amount == null ? "UNVERIFIED" : "FROZEN";
+    }
+    if ("REFUNDED".equals(status)) {
+      BigDecimal remaining =
+          commission.allVerified() && !commission.afterSales()
+              ? commission.netCommissionCny()
+              : amount;
+      if (remaining == null) {
+        return "UNVERIFIED";
+      }
+      if (remaining.signum() == 0) {
+        return "INVALID";
+      }
+      return releasedCommission(commission).compareTo(remaining) < 0 ? "FROZEN" : "WITHDRAWABLE";
+    }
+    return "POSTED".equals(status) ? "WITHDRAWABLE" : status;
+  }
+
+  private static BigDecimal releasedCommission(OrderCommissionChainDTO commission) {
+    return commission.flows().stream()
+        .filter(flow -> flow.withdrawalNo() == null && flow.flowNo().startsWith("CL"))
+        .map(
+            flow ->
+                OrderChainCommissionApi.DIRECTION_DECREASE.equals(flow.direction())
+                    ? flow.amountCny().negate()
+                    : flow.amountCny())
+        .reduce(ZERO, BigDecimal::add)
+        .max(ZERO);
   }
 
   private static OrderChainDTO.FlowDTO shopFlow(

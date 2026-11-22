@@ -8,6 +8,7 @@ import type { OrderChainVO, OrderDetailVO, Role } from "@/api/types";
 import { i18n } from "@/locales";
 import { routes } from "@/router/routes";
 import { useUserStore } from "@/stores/user";
+import { formatInstant } from "@/utils/format";
 import { notifyError } from "@/utils/notify";
 import { saveSession } from "@/utils/session";
 import { defaultPrefs, saveTablePrefs } from "@/utils/table-prefs";
@@ -527,15 +528,29 @@ describe("order chain page (task 40)", () => {
       "方向",
       "金额",
       "状态",
-      "结算/付款时间",
+      "结算/发生/付款时间",
       "结算单号/提现单号"
     ]);
     const rows = flows.findAll("tbody tr").map(row => row.findAll("td").map(cell => cell.text()));
     expect(rows).toHaveLength(5);
     expect(rows[0].slice(0, 4)).toEqual(["货款", "应收增加", "+¥180.00", "已结算"]);
     expect(rows[0][5]).toBe("WD-SETTLEMENT-1");
-    expect(rows[1]).toEqual(["货款", "应收减少", "-¥20.00", "已结算", "—", "—"]);
-    expect(rows[2]).toEqual(["佣金", "支出", "-¥11.00", "已结算", "—", "—"]);
+    expect(rows[1]).toEqual([
+      "货款",
+      "应收减少",
+      "-¥20.00",
+      "已结算",
+      formatInstant("2026-10-22T00:00:00Z"),
+      "—"
+    ]);
+    expect(rows[2]).toEqual([
+      "佣金",
+      "支出",
+      "-¥11.00",
+      "已结算",
+      formatInstant("2026-10-23T00:00:00Z"),
+      "—"
+    ]);
     expect(rows[3].slice(0, 4)).toEqual(["佣金", "支出", "-¥10.00", "已提现"]);
     expect(rows[3][4]).not.toBe("—");
     expect(rows[3][5]).toBe("W20261023000001");
@@ -582,6 +597,53 @@ describe("order chain page (task 40)", () => {
     expect(wrapper.get('[data-test="chain-stage-withdrawal"]').text()).not.toContain("W202610");
     expect(wrapper.find('[data-test="chain-flows-no-permission"]').exists()).toBe(true);
     expect(wrapper.find('[data-test="chain-flows"]').exists()).toBe(false);
+    wrapper.unmount();
+  });
+
+  it("keeps the estimated commission after a pending partial refund frozen", async () => {
+    signIn("SUPER_ADMIN", ["order:view", "commission:view"]);
+    vi.mocked(orderApi.getOrderChain).mockResolvedValue({
+      ...financedChain,
+      funds: {
+        ...financedChain.funds!,
+        financeStatus: "REFUNDING",
+        financeAmount: "26.00",
+        kolCommission: "0.00",
+        commissionStatus: "FROZEN"
+      },
+      financeFlows: [],
+      lines: financedChain.lines.map(line => ({
+        ...line,
+        commission: { ...line.commission!, occupiedTotal: "0.00", withdrawals: [] }
+      }))
+    });
+    vi.mocked(orderApi.getOrder).mockResolvedValue({
+      ...financedDetail,
+      commission: { ...financedDetail.commission!, afterSales: true }
+    });
+    const { wrapper } = await mountPage();
+    const rows = wrapper.get('[data-test="chain-flows"]').findAll("tbody tr");
+    expect(rows.map(row => row.findAll("td").map(cell => cell.text()))).toContainEqual([
+      "佣金",
+      "—",
+      "¥26.00",
+      "冻结中",
+      "—",
+      "—"
+    ]);
+    expect(wrapper.get('[data-test="chain-stage-withdrawal"]').text()).toContain("冻结中");
+    wrapper.unmount();
+  });
+
+  it("shows an unverified settlement when platform goods flows cannot establish a total", async () => {
+    signIn("SUPER_ADMIN", ["order:view", "commission:view"]);
+    vi.mocked(orderApi.getOrderChain).mockResolvedValue({
+      ...financedChain,
+      weidianReconciliation: { ...financedChain.weidianReconciliation!, settlementAmount: null }
+    });
+    const { wrapper } = await mountPage();
+    expect(wrapper.get('[data-test="chain-stage-settlement"]').text()).toContain("待核实");
+    expect(wrapper.get('[data-test="chain-funds"]').text()).toContain("微店结算金额—待核实");
     wrapper.unmount();
   });
 

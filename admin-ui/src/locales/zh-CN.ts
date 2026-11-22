@@ -2223,7 +2223,7 @@ const zhCN = {
       withdrawalReady: "待提现",
       withdrawalStatusCount: "{status} {count} 笔",
       noActiveWithdrawal: "暂无有效提现申请",
-      settlementPaymentTime: "结算/付款时间",
+      settlementPaymentTime: "结算/发生/付款时间",
       settlementWithdrawalNo: "结算单号/提现单号",
       noFundMovements: "暂无资金变动",
       incompleteWeidianFlows: "微店资金流水暂不可用。",

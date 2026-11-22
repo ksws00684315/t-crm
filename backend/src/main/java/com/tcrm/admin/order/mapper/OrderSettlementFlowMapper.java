@@ -46,16 +46,16 @@ public interface OrderSettlementFlowMapper extends BaseMapper<OrderSettlementFlo
       @Param("from") Instant from,
       @Param("until") Instant until);
 
-  /** The same signed RMB goods and refund flows as shop receivables, scoped to one order. */
+  /** Signed goods and refund flows in yuan. A single complete goods income is required. */
   @Select(
       """
-      SELECT ROUND(SUM(amount_raw), 2)
+      SELECT SUM(amount_cny)
       FROM crm_order_settlement_flow
       WHERE shop_id = #{shopId} AND weidian_order_id = #{orderNo}
         AND NOT is_deleted AND query_type = 'INCOME_DETAIL'
         AND trade_sub_type IN ('货款收入', '退款')
-      HAVING COUNT(*) FILTER (WHERE trade_sub_type = '货款收入') > 0
-        AND COUNT(*) = COUNT(amount_raw)
+      HAVING COUNT(*) FILTER (WHERE trade_sub_type = '货款收入') = 1
+        AND COUNT(*) = COUNT(amount_cny)
       """)
   BigDecimal orderReceivable(@Param("shopId") long shopId, @Param("orderNo") String orderNo);
 

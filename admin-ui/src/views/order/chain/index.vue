@@ -151,6 +151,8 @@ const flowsView = computed(() => {
 const settlementState = computed(() => {
   if (!platform.value) return "—";
   if (platform.value.settlementAmount != null) return t("order.chain.orderMoneyStatus.SETTLED");
+  if (flows.value.some(flow => flow.type === "GOODS_INCOME" || flow.type === "REFUND_DEDUCTION"))
+    return t("finance.unverified");
   return (detail.value ? detail.value.payTime : chain.value?.funds?.orderSettlementStatus)
     ? t("order.chain.orderMoneyStatus.PENDING_SETTLEMENT")
     : "—";
@@ -235,11 +237,23 @@ const commissionBalances = computed(() => {
   if (
     !canSeeCommission.value ||
     !funds?.financeStatus ||
-    ["REFUNDING", "UNVERIFIED"].includes(funds.financeStatus) ||
-    detail.value?.commission?.afterSales ||
+    funds.financeStatus === "UNVERIFIED" ||
+    (funds.financeStatus !== "REFUNDING" && detail.value?.commission?.afterSales) ||
+    occupiedTotal.value == null
+  )
+    return null;
+
+  // A pending refund temporarily blocks availability. Show its estimated surviving commission.
+  if (funds.financeStatus === "REFUNDING") {
+    const amount = funds.financeAmount;
+    const remaining =
+      amount != null && validMoney(amount, false) ? cents(amount) - cents(occupiedTotal.value) : 0n;
+    return { frozen: remaining > 0n ? decimal(remaining) : null, available: null };
+  }
+
+  if (
     !funds.kolCommission ||
     !validMoney(funds.kolCommission, false) ||
-    occupiedTotal.value == null ||
     !Array.isArray(financeFlows)
   )
     return null;
@@ -282,7 +296,7 @@ const fundMovements = computed<FundMovement[]>(() => {
         flow.tradeTime || flow.settlementAt || flow.settlementNo
           ? t("order.chain.orderMoneyStatus.SETTLED")
           : "—",
-      time: flow.settlementAt,
+      time: flow.type === "GOODS_INCOME" ? (flow.settlementAt ?? flow.tradeTime) : flow.tradeTime,
       reference: flow.settlementNo
     };
   });
@@ -338,13 +352,13 @@ const stageGroups = computed(() => {
   const currentCommission = canSeeCommission.value ? chain.value?.funds?.commissionStatus : null;
   const commissionState = activeWithdrawals.value.some(record => record.status !== "PAID")
     ? t("order.chain.withdrawalInProgress")
-    : commissionBalances.value?.available
-      ? t("order.chain.withdrawalReady")
-      : commissionBalances.value?.frozen
-        ? financeStatusText("FROZEN")
-        : paidWithdrawalTotal.value != null
-          ? financeStatusText("WITHDRAWN")
-          : financeStatusText(currentCommission === "WITHDRAWN" ? null : currentCommission);
+    : paidWithdrawalTotal.value != null || currentCommission === "WITHDRAWN"
+      ? financeStatusText("WITHDRAWN")
+      : commissionBalances.value?.available
+        ? t("order.chain.withdrawalReady")
+        : commissionBalances.value?.frozen
+          ? financeStatusText("FROZEN")
+          : financeStatusText(currentCommission);
   return [
     {
       key: "journey",

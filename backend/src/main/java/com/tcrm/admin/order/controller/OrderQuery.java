@@ -51,10 +51,11 @@ public record OrderQuery(
   /** The order-time window follows the payment window: inclusive from, exclusive to. */
   @AssertTrue
   public boolean isValidOrderTimePeriod() {
-    return orderTimeFrom == null
-        || orderTimeTo == null
-        || (orderTimeFrom.isBefore(orderTimeTo)
-            && Duration.between(orderTimeFrom, orderTimeTo).compareTo(Duration.ofDays(30)) <= 0);
+    if (orderTimeFrom == null || orderTimeTo == null) {
+      return orderTimeFrom == null && orderTimeTo == null;
+    }
+    return orderTimeFrom.isBefore(orderTimeTo)
+        && Duration.between(orderTimeFrom, orderTimeTo).compareTo(Duration.ofDays(30)) <= 0;
   }
 
   OrderFilterDTO filter() {

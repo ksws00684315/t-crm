@@ -823,7 +823,17 @@ class BusinessChainIT {
     BigDecimal increase = BigDecimal.ZERO;
     BigDecimal decrease = BigDecimal.ZERO;
     for (JsonNode flow : chain.path("financeFlows")) {
-      assertThat(flow.path("type").asString()).isEqualTo("KOL_COMMISSION");
+      String type = flow.path("type").asString();
+      if (!"KOL_COMMISSION".equals(type)) {
+        assertThat(type)
+            .isIn(
+                "SHOP_RECEIVABLE",
+                "COMMISSION_ACCRUAL",
+                "COMMISSION_REFUND_PENDING",
+                "COMMISSION_REFUND",
+                "ORDER_SETTLEMENT");
+        continue;
+      }
       BigDecimal amount = new BigDecimal(flow.path("amount").asString());
       assertThat(amount).isPositive();
       if ("INCREASE".equals(flow.path("direction").asString())) {

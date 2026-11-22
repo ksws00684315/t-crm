@@ -22,6 +22,9 @@ spring:
       database: 0
   flyway:
     locations: classpath:db/migration
+    # CREATE INDEX CONCURRENTLY requires session-level migration locks on PostgreSQL.
+    postgresql:
+      transactional-lock: false
     # Lenient by default (a newer schema only logs a warning): local development and the preview
     # share one database with branches of different ages (#106). The production template overrides
     # this to strict (empty pattern) via TCRM_FLYWAY_IGNORE_MIGRATION_PATTERNS so a schema newer

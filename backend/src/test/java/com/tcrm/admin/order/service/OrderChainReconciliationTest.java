@@ -13,6 +13,20 @@ class OrderChainReconciliationTest {
   private static final Instant REFUNDED = PAID_IN.plusSeconds(1200);
 
   @Test
+  void usesNormalizedYuanAndRejectsAmbiguousGoodsIncome() {
+    var income = row(1, "货款收入", "6.00", PAID_IN, "INCOME_DETAIL");
+    assertThat(income.getAmountRaw()).isEqualByComparingTo("600");
+    assertThat(OrderChainReconciliation.of(List.of(income)).settlementAmount())
+        .isEqualByComparingTo("6.00");
+
+    var extra = row(2, "货款收入", "2.00", REFUNDED, "INCOME_DETAIL");
+    var duplicateIncome = OrderChainReconciliation.of(List.of(income, extra));
+    assertThat(duplicateIncome.settlementAmount()).isNull();
+    assertThat(duplicateIncome.settlementAt()).isNull();
+    assertThat(duplicateIncome.flows()).hasSize(2);
+  }
+
+  @Test
   void reconcilesSignedPostedFlowsAndKeepsPlatformFeesOutsideCommissionExpense() {
     var result =
         OrderChainReconciliation.of(
@@ -58,6 +72,7 @@ class OrderChainReconciliationTest {
                 row(3, "佣金支出", "26.00", REFUNDED, "INCOME_DETAIL")));
 
     assertThat(result.settlementAmount()).isNull();
+    assertThat(result.settlementAt()).isNull();
     assertThat(result.flows().getLast().amount()).isNull();
     assertThat(result.flows()).hasSize(3);
   }
@@ -67,7 +82,11 @@ class OrderChainReconciliationTest {
     var row = new OrderSettlementFlowDO();
     row.setId(id);
     row.setTradeSubType(subtype);
-    row.setAmountRaw(amount == null ? null : new BigDecimal(amount));
+    if (amount != null) {
+      BigDecimal yuan = new BigDecimal(amount);
+      row.setAmountRaw(yuan.movePointRight(2));
+      row.setAmountCny(yuan);
+    }
     row.setTradeTime(time);
     row.setQueryType(queryType);
     return row;

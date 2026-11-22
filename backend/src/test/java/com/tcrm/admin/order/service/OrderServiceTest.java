@@ -1218,6 +1218,7 @@ class OrderServiceTest {
     assertThat(chain.financeFlows()).hasSize(7);
     assertThat(chain.funds().financeStatus()).isEqualTo("REFUNDING");
     assertThat(chain.funds().financeAmount()).isNull();
+    assertThat(chain.funds().commissionStatus()).isEqualTo("WITHDRAWN");
     assertThat(chain.financeFlows().getFirst().flowNo()).isEqualTo("CL900");
     assertThat(chain.financeFlows().getFirst().shopName()).isEqualTo("Main shop");
     assertThat(chain.financeFlows().get(1).transferredAt()).isEqualTo(PAID.plusSeconds(3600));

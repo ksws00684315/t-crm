@@ -618,7 +618,6 @@ public class OrderService {
             : "REFUNDING".equals(accrual.status()) || "REFUNDED".equals(accrual.status())
                 ? "DEDUCTION"
                 : order.getSettledTime() != null ? "SETTLEABLE" : "PENDING_SETTLEMENT";
-    String commissionStatus = chainCommissionStatus(commission, accrual.status());
     var funds =
         new OrderChainDTO.FundsDTO(
             order.getPayAmount(),
@@ -630,22 +629,8 @@ public class OrderService {
             accrual.status(),
             accrual.amount(),
             settlementStatus,
-            commissionStatus);
+            accrual.commissionStatus(commission));
     return new ChainFinance(funds, Map.copyOf(byItem), List.copyOf(chainFlows));
-  }
-
-  private static String chainCommissionStatus(
-      OrderChainCommissionApi.OrderCommissionChainDTO commission, String financeStatus) {
-    if (financeStatus == null) {
-      return null;
-    }
-    if ("REFUNDING".equals(financeStatus) || "REFUNDED".equals(financeStatus)) {
-      return "INVALID";
-    }
-    if (commission.lines().stream().anyMatch(line -> line.occupiedCny().signum() > 0)) {
-      return "WITHDRAWN";
-    }
-    return "POSTED".equals(financeStatus) ? "WITHDRAWABLE" : financeStatus;
   }
 
   /**

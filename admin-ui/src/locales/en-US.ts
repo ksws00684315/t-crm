@@ -2312,7 +2312,7 @@ const enUS: MessageSchema = {
       withdrawalReady: "Ready to Withdraw",
       withdrawalStatusCount: "{status} ({count})",
       noActiveWithdrawal: "No active or completed withdrawals",
-      settlementPaymentTime: "Settlement / Payment Time",
+      settlementPaymentTime: "Settlement / Transaction / Payment Time",
       settlementWithdrawalNo: "Settlement / Withdrawal No.",
       noFundMovements: "No fund movements",
       incompleteWeidianFlows: "Weidian fund movements are unavailable.",

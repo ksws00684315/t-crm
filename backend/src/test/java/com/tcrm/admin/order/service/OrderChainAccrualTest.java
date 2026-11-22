@@ -52,6 +52,8 @@ class OrderChainAccrualTest {
     assertThat(pending.flows().get(2).amount()).isEqualByComparingTo("20");
     assertThat(pending.flows().getLast().amount()).isEqualByComparingTo("4");
     assertThat(pending.flows().getLast().type()).isEqualTo("COMMISSION_REFUND_PENDING");
+    assertThat(pending.flows().getLast().commissionStatus()).isEqualTo("FROZEN");
+    assertThat(pending.commissionStatus(commission("0", true))).isEqualTo("FROZEN");
 
     refund.setRefundStatus("SUCCESS");
     refund.setFinishTime(PAID.plusSeconds(120));
@@ -61,12 +63,15 @@ class OrderChainAccrualTest {
     assertThat(confirmed.amount()).isEqualByComparingTo("26");
     assertThat(confirmed.flows().getLast().flowNo()).isEqualTo(pending.flows().getLast().flowNo());
     assertThat(confirmed.flows().getLast().type()).isEqualTo("COMMISSION_REFUND");
+    assertThat(confirmed.flows().getLast().commissionStatus()).isEqualTo("INVALID");
+    assertThat(confirmed.commissionStatus(commission("26", false))).isEqualTo("FROZEN");
     assertThat(confirmed.flows().getLast().businessAt()).isEqualTo(refund.getFinishTime());
 
     refund.setAmount(new BigDecimal("150"));
     var full =
         OrderChainAccrual.of(order, List.of(item), List.of(refund), commission("0", false), "XD");
     assertThat(full.amount()).isEqualByComparingTo("0");
+    assertThat(full.commissionStatus(commission("0", false))).isEqualTo("INVALID");
     assertThat(full.flows().getLast().amount()).isEqualByComparingTo("30");
   }
 

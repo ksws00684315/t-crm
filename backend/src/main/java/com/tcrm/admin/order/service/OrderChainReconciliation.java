@@ -2,7 +2,6 @@ package com.tcrm.admin.order.service;
 
 import com.tcrm.admin.order.model.OrderSettlementFlowDO;
 import java.math.BigDecimal;
-import java.math.RoundingMode;
 import java.time.Instant;
 import java.util.Comparator;
 import java.util.List;
@@ -30,10 +29,10 @@ final class OrderChainReconciliation {
             .toList();
     var goods = flows.stream().filter(flow -> GOODS.equals(flow.type())).toList();
     BigDecimal settlement =
-        goods.isEmpty()
+        goods.size() != 1
             ? null
             : total(flows.stream().filter(flow -> !EXPENSE.equals(flow.type())).toList());
-    Instant settlementAt = goods.size() == 1 ? goods.getFirst().settlementAt() : null;
+    Instant settlementAt = settlement == null ? null : goods.getFirst().settlementAt();
     return new OrderChainDTO.WeidianReconciliationDTO(settlement, settlementAt, flows);
   }
 
@@ -53,13 +52,10 @@ final class OrderChainReconciliation {
     if (type == null) {
       return null;
     }
-    BigDecimal amount = row.getAmountRaw();
-    if (amount != null) {
-      amount = amount.setScale(2, RoundingMode.HALF_UP);
-      if (EXPENSE.equals(type) && amount.signum() > 0) {
-        // The wallet uses signed amounts. An inconsistent expense cannot confirm an outflow.
-        amount = null;
-      }
+    BigDecimal amount = row.getAmountCny();
+    if (EXPENSE.equals(type) && amount != null && amount.signum() > 0) {
+      // The wallet uses signed amounts. An inconsistent expense cannot confirm an outflow.
+      amount = null;
     }
     return new OrderChainDTO.WeidianFlowDTO(
         row.getId(),
