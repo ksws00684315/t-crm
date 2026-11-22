@@ -1,6 +1,5 @@
 package com.tcrm.admin.stats.service;
 
-import com.tcrm.admin.commission.api.CommissionPaymentStatsApi;
 import com.tcrm.admin.kol.api.KolApi;
 import com.tcrm.admin.kol.api.KolOwnershipApi;
 import com.tcrm.admin.kol.api.KolOwnershipDTO;
@@ -52,7 +51,6 @@ public class AnalyticsRankingService {
   private final KolApi creators;
   private final BdUserApi inviters;
   private final KolOwnershipApi ownership;
-  private final CommissionPaymentStatsApi payments;
 
   public AnalyticsRankingService(
       StatsOverviewService overview,
@@ -61,8 +59,7 @@ public class AnalyticsRankingService {
       ProductAccessApi catalog,
       KolApi creators,
       BdUserApi inviters,
-      KolOwnershipApi ownership,
-      CommissionPaymentStatsApi payments) {
+      KolOwnershipApi ownership) {
     this.overview = overview;
     this.orders = orders;
     this.shops = shops;
@@ -70,7 +67,6 @@ public class AnalyticsRankingService {
     this.creators = creators;
     this.inviters = inviters;
     this.ownership = ownership;
-    this.payments = payments;
   }
 
   public enum Board {
@@ -129,9 +125,6 @@ public class AnalyticsRankingService {
             scope.matchedInviterIds(),
             scope.productKeyword(),
             scope.affiliateOnly());
-    var lifetimeScope =
-        new ScopeDTO(
-            scope.tenantId(), scope.ownerId(), null, null, null, scope.visibleShopIds(), ids, null);
     var period = filter.period();
     var estimated =
         orders.creatorRankingCommissions(periodScope, period.from(), period.until()).stream()
@@ -140,21 +133,17 @@ public class AnalyticsRankingService {
                     OrderStatsApi.CreatorRankingCommission::creatorId,
                     OrderStatsApi.CreatorRankingCommission::estimated));
     var cumulative =
-        orders.creatorRankingCommissions(lifetimeScope, null, Instant.now()).stream()
+        orders.creatorRankingCommissions(periodScope, null, Instant.now()).stream()
             .collect(
                 Collectors.toMap(
                     OrderStatsApi.CreatorRankingCommission::creatorId,
                     OrderStatsApi.CreatorRankingCommission::total));
-    var expenseIds = ids;
-    if (scope.ownerId() != null) {
-      var ownedIds =
-          creators.listByBdUserId(scope.ownerId()).stream()
-              .map(KolRefDTO::id)
-              .collect(Collectors.toSet());
-      expenseIds = ids.stream().filter(ownedIds::contains).toList();
-    }
-    var expenses = payments.paidByCreator(expenseIds, period.from(), period.until());
-    var visibleExpenseIds = Set.copyOf(expenseIds);
+    var expenses =
+        orders.creatorCommissionExpenses(periodScope, period.from(), period.until()).stream()
+            .collect(
+                Collectors.toMap(
+                    OrderStatsApi.CreatorCommissionExpense::creatorId,
+                    OrderStatsApi.CreatorCommissionExpense::amount));
     var rows =
         page.items().stream()
             .map(
@@ -163,9 +152,7 @@ public class AnalyticsRankingService {
                   return row.withCreatorMoney(
                       new CreatorMoney(
                           estimated.get(id),
-                          visibleExpenseIds.contains(id)
-                              ? expenses.getOrDefault(id, BigDecimal.ZERO)
-                              : null,
+                          expenses.getOrDefault(id, BigDecimal.ZERO),
                           cumulative.get(id)));
                 })
             .toList();

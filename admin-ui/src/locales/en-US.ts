@@ -465,11 +465,11 @@ const enUS: MessageSchema = {
         commissionRate:
           "The creator’s current default commission rate. Historical orders use the rate effective at payment.",
         estimatedCommission:
-          "Estimated commission on unsettled orders, based on each order’s commissionable amount and applicable rate. Dashboard integration is pending.",
+          "Estimated commission on unsettled orders paid in the selected period, using each order’s commissionable amount and applicable rate.",
         commissionExpense:
-          "Commission withdrawals with completed payment. Dashboard integration is pending.",
+          "Paid commission allocated to orders matching the current filters, based on the payout date in the selected period.",
         cumulativeCommission:
-          "Commission on verified orders, using estimates for unsettled orders and actual amounts for settled orders. Withdrawn commission remains included once. Dashboard integration is pending."
+          "Commission through now under the current filters, using estimates for unsettled orders and actual amounts for settled orders. Withdrawn commission remains included once."
       }
     },
     "inviter-performance": {

@@ -185,7 +185,7 @@ const cellKeys = columnsByBoard[board].filter(
   key =>
     key !== "rank" &&
     !(product && key === "kolCount") &&
-    (sortable.has(key) || pendingColumns.has(key))
+    (sortable.has(key) || money.has(key) || pendingColumns.has(key))
 );
 const selectedDetail = ref<{ row: RankRow; filters: DetailQuery }>();
 

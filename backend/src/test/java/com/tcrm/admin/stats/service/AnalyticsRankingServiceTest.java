@@ -50,8 +50,6 @@ class AnalyticsRankingServiceTest {
   private final ProductAccessApi catalog = mock(ProductAccessApi.class);
   private final AccountDTO account = mock(AccountDTO.class);
   private final CurrentUserContext current = mock(CurrentUserContext.class);
-  private final com.tcrm.admin.commission.api.CommissionPaymentStatsApi payments =
-      mock(com.tcrm.admin.commission.api.CommissionPaymentStatsApi.class);
   private final AnalyticsRankingService service =
       new AnalyticsRankingService(
           new StatsOverviewService(orders, current, creators, inviters),
@@ -60,8 +58,7 @@ class AnalyticsRankingServiceTest {
           catalog,
           creators,
           inviters,
-          ownership,
-          payments);
+          ownership);
 
   @BeforeEach
   void setup() {
@@ -267,8 +264,8 @@ class AnalyticsRankingServiceTest {
             List.of(
                 new OrderStatsApi.CreatorRankingCommission(
                     11L, new BigDecimal("3"), new BigDecimal("18"))));
-    when(payments.paidByCreator(List.of(11L), FROM, until))
-        .thenReturn(java.util.Map.of(11L, new BigDecimal("5")));
+    when(orders.creatorCommissionExpenses(any(), eq(FROM), eq(until)))
+        .thenReturn(List.of(new OrderStatsApi.CreatorCommissionExpense(11L, new BigDecimal("5"))));
 
     var result = service.query(Board.CREATOR, FILTER, null, 1, 20, null, null);
     var cards = result.summary().creatorCards();
@@ -288,6 +285,29 @@ class AnalyticsRankingServiceTest {
   }
 
   @Test
+  void creatorCommissionColumnsUseTheSameFiltersForOrdersAndHistoricalPaymentAllocations() {
+    var until = new StatsPeriod(DAY, DAY).until();
+    when(current.effectivePermissions(account)).thenReturn(List.of("commission:view"));
+    when(account.ownScope()).thenReturn(true);
+    when(orders.rankFacts(any(), any(), any(), any())).thenReturn(List.of(person(11, 1)));
+    var filters = new FilterDTO(DAY, DAY, 1L, 11L, 9L, null, null, null, "source", true);
+    var expected =
+        new OrderStatsApi.ScopeDTO(40L, 9L, 1L, 11L, 9L, null, List.of(11L), null, "source", true);
+    when(orders.creatorCommissionExpenses(eq(expected), eq(FROM), eq(until)))
+        .thenReturn(List.of(new OrderStatsApi.CreatorCommissionExpense(11L, new BigDecimal("5"))));
+
+    var result = service.query(Board.CREATOR, filters, null, 1, 20, null, null);
+
+    org.mockito.Mockito.verify(orders).creatorRankingCommissions(eq(expected), eq(FROM), eq(until));
+    org.mockito.Mockito.verify(orders)
+        .creatorRankingCommissions(eq(expected), org.mockito.ArgumentMatchers.isNull(), any());
+    assertThat(result.ranking().items())
+        .singleElement()
+        .satisfies(
+            row -> assertThat(row.creatorMoney().commissionExpense()).isEqualByComparingTo("5"));
+  }
+
+  @Test
   void putsEarlierAchievementFirstInEitherDirection() {
     when(orders.rankFacts(any(), any(), any(), any()))
         .thenReturn(
@@ -303,7 +323,8 @@ class AnalyticsRankingServiceTest {
     assertThat(restricted.summary().creatorCards().totalCommission()).isNull();
     assertThat(restricted.ranking().items())
         .allSatisfy(row -> assertThat(row.creatorMoney()).isNull());
-    org.mockito.Mockito.verifyNoInteractions(payments);
+    org.mockito.Mockito.verify(orders, org.mockito.Mockito.never())
+        .creatorCommissionExpenses(any(), any(), any());
     org.mockito.Mockito.verify(orders, org.mockito.Mockito.never())
         .creatorCommission(any(), any(), any());
     for (String direction : List.of("asc", "desc")) {

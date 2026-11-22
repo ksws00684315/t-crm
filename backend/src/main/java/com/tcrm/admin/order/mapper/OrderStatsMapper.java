@@ -4,6 +4,7 @@ import com.baomidou.mybatisplus.annotation.InterceptorIgnore;
 import com.tcrm.admin.order.api.OrderStatsApi.BestCreatorDTO;
 import com.tcrm.admin.order.api.OrderStatsApi.CommissionWindowDTO;
 import com.tcrm.admin.order.api.OrderStatsApi.CreatorCommissionDTO;
+import com.tcrm.admin.order.api.OrderStatsApi.CreatorCommissionExpense;
 import com.tcrm.admin.order.api.OrderStatsApi.CreatorCommissionTotal;
 import com.tcrm.admin.order.api.OrderStatsApi.CreatorRankingCommission;
 import com.tcrm.admin.order.api.OrderStatsApi.InviterCommissionDTO;
@@ -243,6 +244,28 @@ public interface OrderStatsMapper {
       </script>
       """)
   List<CreatorRankingCommission> creatorRankingCommissions(
+      @Param("scope") ScopeDTO scope, @Param("from") Instant from, @Param("until") Instant until);
+
+  // A paid withdrawal is fully allocated. Its order-item shares preserve historical ownership.
+  @InterceptorIgnore(tenantLine = "true")
+  @Select(
+      SCOPED_ORDERS
+          + """
+      SELECT o.kol_id AS creator_id, SUM(a.occupied_cny) AS amount
+      FROM crm_commission_withdrawal_payment p
+      JOIN crm_commission_withdrawal w ON w.id = p.withdrawal_id AND w.tenant_id = p.tenant_id
+        AND w.status = 'PAID'
+      JOIN crm_commission_withdrawal_allocation a ON a.withdrawal_id = w.id AND a.tenant_id = w.tenant_id
+      JOIN crm_order_item i ON i.id = a.order_item_id AND i.tenant_id = a.tenant_id AND NOT i.is_deleted
+      JOIN scoped_orders o ON o.id = i.order_id AND o.kol_id = w.kol_id
+      WHERE p.tenant_id = #{scope.tenantId} AND p.paid_at &gt;= #{from} AND p.paid_at &lt; #{until}
+      """
+          + MATCHED_ITEM
+          + """
+      GROUP BY o.kol_id
+      </script>
+      """)
+  List<CreatorCommissionExpense> creatorCommissionExpenses(
       @Param("scope") ScopeDTO scope, @Param("from") Instant from, @Param("until") Instant until);
 
   // This read model uses wallet postings, not mutable release balances, for confirmed deductions.
