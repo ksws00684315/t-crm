@@ -2,6 +2,7 @@ package com.tcrm.admin.task;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
+import com.tcrm.admin.PostgresTestMigrations;
 import java.time.OffsetDateTime;
 import java.util.List;
 import java.util.Map;
@@ -33,7 +34,7 @@ class TaskLocaleMigrationIT {
 
   private Flyway flyway(String target) {
     var config =
-        Flyway.configure()
+        PostgresTestMigrations.configure()
             .dataSource(POSTGRES.getJdbcUrl(), POSTGRES.getUsername(), POSTGRES.getPassword());
     if (target != null) {
       config.target(target);
