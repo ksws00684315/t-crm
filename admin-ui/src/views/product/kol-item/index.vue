@@ -140,7 +140,7 @@ const chips = computed<SearchChip[]>(() => {
     list.push({
       key: "shop",
       label: t("mapping.targetShop"),
-      text: shop?.shopName ?? applied.value.shopId
+      text: shop?.shopName || "—"
     });
   }
   if (applied.value.status) {

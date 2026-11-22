@@ -5,6 +5,7 @@ export type CopyTokenDisplayStatus = "ACTIVE" | "EXHAUSTED" | "EXPIRED" | "REVOK
 
 export interface CopyTokenQuery {
   hint?: string;
+  jobCode?: string;
   kolId?: string;
   targetChannel?: string;
   status?: CopyTokenDisplayStatus;

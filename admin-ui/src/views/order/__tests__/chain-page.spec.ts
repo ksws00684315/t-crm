@@ -8,24 +8,21 @@ import type { OrderChainVO, OrderDetailVO, Role } from "@/api/types";
 import { i18n } from "@/locales";
 import { routes } from "@/router/routes";
 import { useUserStore } from "@/stores/user";
+import { formatInstant } from "@/utils/format";
 import { notifyError } from "@/utils/notify";
 import { saveSession } from "@/utils/session";
+import { defaultPrefs, saveTablePrefs } from "@/utils/table-prefs";
 import OrderChainPage from "../chain/index.vue";
 
 vi.mock("@/api/order/order");
 vi.mock("@/utils/notify", () => ({ notifyError: vi.fn() }));
 
-/**
- * The order chain (task 40 §4): every product line carries the copy job (with its jump to the
- * product task page), the creator item link, the order line and its refunds. Task 72 wires the
- * commission data: funds cards, per-line commission blocks and the finance flows; the base fixture
- * mirrors a backend answer without financial data (all blocks null).
- */
 const chain: OrderChainVO = {
   orderId: "101",
   orderNo: "2026102100001",
   funds: null,
   financeFlows: null,
+  weidianReconciliation: null,
   lines: [
     {
       orderItemId: "301",
@@ -35,6 +32,7 @@ const chain: OrderChainVO = {
         kolItemId: "701",
         linkCode: "LC001",
         sourceProductId: "8001",
+        sourceItemId: "7900222333",
         targetItemId: "9001",
         kolId: "201",
         kolName: "Zoe",
@@ -74,7 +72,38 @@ const financedChain: OrderChainVO = {
     payAmount: "180.00",
     refundTotal: "20.00",
     kolCommission: "16.00",
-    accountStatus: "UNVERIFIED"
+    accountStatus: "UNVERIFIED",
+    commissionStatus: "FROZEN"
+  },
+  weidianReconciliation: {
+    settlementAmount: "160.00",
+    settlementAt: "2026-10-21T00:00:00Z",
+    flows: [
+      {
+        id: "91001",
+        type: "GOODS_INCOME",
+        amount: "180.00",
+        tradeTime: "2026-10-21T00:00:00Z",
+        settlementAt: "2026-10-21T00:00:00Z",
+        settlementNo: "WD-SETTLEMENT-1"
+      },
+      {
+        id: "91002",
+        type: "REFUND_DEDUCTION",
+        amount: "-20.00",
+        tradeTime: "2026-10-22T00:00:00Z",
+        settlementAt: null,
+        settlementNo: null
+      },
+      {
+        id: "91003",
+        type: "COMMISSION_EXPENSE",
+        amount: "-11.00",
+        tradeTime: "2026-10-23T00:00:00Z",
+        settlementAt: null,
+        settlementNo: null
+      }
+    ]
   },
   financeFlows: [
     {
@@ -86,7 +115,11 @@ const financedChain: OrderChainVO = {
       amount: "18.00",
       businessAt: "2026-10-21T00:00:00Z",
       transferredAt: null,
-      withdrawalNo: null
+      withdrawalNo: null,
+      orderStatus: "SETTLEABLE",
+      commissionStatus: "WITHDRAWABLE",
+      settlementAt: "2026-10-21T00:00:00Z",
+      settlementNo: "WD-SETTLEMENT-1"
     },
     {
       flowNo: "CL9002",
@@ -108,7 +141,8 @@ const financedChain: OrderChainVO = {
       amount: "10.00",
       businessAt: "2026-10-23T00:00:00Z",
       transferredAt: "2026-10-24T00:00:00Z",
-      withdrawalNo: "W20261023000001"
+      withdrawalNo: "W20261023000001",
+      commissionStatus: "WITHDRAWN"
     },
     {
       flowNo: "WA7002",
@@ -200,7 +234,7 @@ const orderDetail: OrderDetailVO = {
   items: [
     {
       id: "301",
-      imageUrl: null,
+      imageUrl: "https://example.com/t1121-preview-product.jpg",
       itemName: "t40 Item",
       weidianItemId: "9001",
       skuName: "Blue / L",
@@ -292,95 +326,149 @@ describe("order chain page (task 40)", () => {
     setActivePinia(createPinia());
   });
 
-  it("loads the chain for the route id and renders one block per line", async () => {
+  it("loads the chain for the route id and renders all product rows", async () => {
     signIn("SUPER_ADMIN", ["order:view"]);
     const { wrapper } = await mountPage();
     expect(vi.mocked(orderApi.getOrderChain)).toHaveBeenCalledWith("101");
-    expect(wrapper.findAll('[data-test="chain-line"]')).toHaveLength(2);
+    expect(wrapper.get('[data-test="chain-product-summary"]').findAll("tbody tr")).toHaveLength(2);
     const text = wrapper.text();
-    expect(text).toContain("LC001");
-    expect(text).toContain("8001");
+    expect(text).not.toContain("LC001");
+    const orderNode = wrapper.get('[data-test="chain-stage-order"]');
+    expect(orderNode.text()).toContain("2026102100001");
+    expect(text).toContain("7900222333");
+    expect(text).not.toContain("8001");
     expect(text).toContain("9001");
-    expect(wrapper.findAll('[data-test="identity-name"]').some(item => item.text() === "Zoe")).toBe(
-      true
-    );
-    expect(
-      wrapper.findAll('[data-test="identity-code"]').some(item => item.text() === "KOL-ZS01")
-    ).toBe(true);
+    const header = wrapper.get('[data-test="chain-header"]');
+    expect(header.text()).toContain("订单信息");
+    const creators = header.get('[data-test="chain-creators"]');
+    expect(creators.get('[data-test="identity-name"]').text()).toBe("Zoe");
+    const code = creators.get('[data-test="identity-code"]');
+    expect(code.get('[data-test="value"]').text()).toBe("KOL-ZS01");
+    expect(code.find('[data-test="copy"]').exists()).toBe(true);
     expect(text).toContain("t40 Shop（S001）");
     wrapper.unmount();
   });
 
-  it("jumps to the product task page with the jobCode filter", async () => {
+  it("shows each creator once and uses the chain link when an item has no creator details", async () => {
     signIn("SUPER_ADMIN", ["order:view"]);
-    const { wrapper, router } = await mountPage();
-    const link = document.body.querySelector<HTMLButtonElement>(
-      '[data-test="chain-copy-job-link"]'
-    );
-    expect(link?.textContent).toContain("JOB-20261020-01");
-    link?.click();
-    // The task route lazy-loads its page; poll instead of guessing flush counts.
-    await vi.waitFor(() => expect(router.currentRoute.value.path).toBe("/product/tasks"));
-    expect(router.currentRoute.value.query.jobCode).toBe("JOB-20261020-01");
-    wrapper.unmount();
-  });
-
-  it("jumps to the refund list and the creator item list with filter params (task 59)", async () => {
-    signIn("SUPER_ADMIN", ["order:view"]);
-    const { wrapper, router } = await mountPage();
-    // el-table renders a hidden calc copy of each row; take the link that actually has the text.
-    const refundLink = [
-      ...document.body.querySelectorAll<HTMLButtonElement>('[data-test="chain-refund-link"]')
-    ].find(item => item.textContent?.includes("R20261021001"));
-    expect(refundLink).toBeTruthy();
-    refundLink?.click();
-    await vi.waitFor(() => expect(router.currentRoute.value.path).toBe("/order/refunds"));
-    expect(router.currentRoute.value.query.refundNo).toBe("R20261021001");
-
-    const itemLink = document.body.querySelector<HTMLButtonElement>(
-      '[data-test="chain-kol-item-link"]'
-    );
-    itemLink?.click();
-    await vi.waitFor(() => expect(router.currentRoute.value.path).toBe("/kol/kol-items"));
-    expect(router.currentRoute.value.query.linkCode).toBe("LC001");
-    wrapper.unmount();
-  });
-
-  it("labels the product line title with a field label (R-18)", async () => {
-    signIn("SUPER_ADMIN", ["order:view"]);
+    const [first, second] = chain.lines;
+    vi.mocked(orderApi.getOrderChain).mockResolvedValue({
+      ...chain,
+      lines: [
+        first,
+        {
+          ...second,
+          link: { ...first.link!, kolId: "202", kolName: "Lena", kolCode: "KOL-LN02" }
+        },
+        { ...first, orderItemId: "303" }
+      ]
+    });
     const { wrapper } = await mountPage();
-    const title = wrapper.get('[data-test="chain-line"] .chain-line__title');
-    expect(title.text()).toContain("商品");
-    expect(title.text()).toContain("t40 Item");
-    expect(title.text()).toContain("Blue / L");
+    const creators = wrapper.get('[data-test="chain-creators"]');
+    expect(creators.findAll('[data-test="identity-name"]').map(name => name.text())).toEqual([
+      "Zoe",
+      "Lena"
+    ]);
+    expect(creators.findAll('[data-test="value"]').map(code => code.text())).toEqual([
+      "KOL-ZS01",
+      "KOL-LN02"
+    ]);
+    expect(creators.findAll('[data-test="copy"]')).toHaveLength(2);
     wrapper.unmount();
   });
 
-  it("shows missing-link states and keeps unknown fund amounts distinct from zero", async () => {
+  it("shows product IDs only with their respective item rows, and keeps the copy job in the journey", async () => {
     signIn("SUPER_ADMIN", ["order:view"]);
-    const { wrapper } = await mountPage();
-    const lines = wrapper.findAll('[data-test="chain-line"]');
-    const second = lines[1].element as HTMLElement;
-    // No copy job and no creator link: the blocks keep their title and show "-".
-    const copyJobBlock = second.querySelector('[data-test="chain-copy-job"]')?.textContent ?? "";
-    expect(copyJobBlock).toContain("商品创建任务");
-    expect(copyJobBlock).not.toContain("JOB-");
-    expect(second.querySelector('[data-test="chain-kol-item"]')?.textContent).toContain("-");
-    expect(second.querySelector('[data-test="chain-refunds"]')?.textContent).toContain("无退款");
-    expect(wrapper.find('[data-test="chain-funds"]').text()).toContain("180.00");
-    // Task 112: the order-level amounts come from the detail for every viewer; a commission
-    // block missing for a viewer who may see it reads 待核实, never a fake 0 or 开发中.
-    const funds = wrapper.find('[data-test="chain-funds"]').text();
-    expect(funds).toContain("¥20.00");
-    expect(funds).toContain("¥160.00");
-    expect(funds).toContain("待核实");
-    expect(funds).not.toContain("开发中");
-    expect(wrapper.find('[data-test="chain-flows-incomplete"]').exists()).toBe(true);
-    expect(wrapper.find('[data-test="chain-order-info"]').exists()).toBe(true);
+    const [first, second] = chain.lines;
+    vi.mocked(orderApi.getOrderChain).mockResolvedValue({
+      ...chain,
+      lines: [
+        first,
+        {
+          ...second,
+          link: {
+            ...first.link!,
+            kolItemId: "702",
+            linkCode: "LC002",
+            sourceItemId: "7900222444",
+            targetItemId: "9002"
+          }
+        }
+      ]
+    });
+    const { wrapper, router } = await mountPage();
+    const journey = wrapper.get('[data-test="chain-order-info"]');
+    expect(journey.find("details, a").exists()).toBe(false);
+    expect(journey.get('[data-test="chain-stage-source"]').text()).toBe("原商品已关联");
+    expect(journey.get('[data-test="chain-stage-link"]').text()).toBe("达人商品链接已生成");
+    const copyJob = journey.get('[data-test="chain-stage-copy"]');
+    expect(copyJob.get('[data-test="value"]').text()).toBe("JOB-20261020-01");
+    expect(journey.findAll("button").map(button => button.attributes("data-test"))).toEqual([
+      "copy"
+    ]);
+    await copyJob.trigger("click");
+    expect(router.currentRoute.value.name).toBe("OrderChain");
+
+    const rows = wrapper.get('[data-test="chain-product-summary"]').findAll("tbody tr");
+    expect(rows).toHaveLength(2);
+    for (const [index, ids] of [
+      [0, ["9001", "7900222333"]],
+      [1, ["9002", "7900222444"]]
+    ] as const) {
+      const row = rows[index];
+      expect(row.findAll('[data-test="value"]').map(value => value.text())).toEqual([...ids]);
+      expect(row.findAll('[data-test="copy"]')).toHaveLength(2);
+    }
     wrapper.unmount();
   });
 
-  it("marks a supplemented rate on the summary row and the line block", async () => {
+  it("renders the item fields directly and keeps both platform IDs in the product cell", async () => {
+    signIn("SUPER_ADMIN", ["order:view"]);
+    saveTablePrefs("chain-order-items", defaultPrefs(["status", "product", "sku"], 20));
+    const { wrapper } = await mountPage();
+    const summary = wrapper.get('[data-test="chain-product-summary"]');
+    expect(summary.findAll("thead th").map(item => item.text())).toEqual([
+      "商品图",
+      "商品名/SKU",
+      "新商品ID/原商品ID",
+      "状态",
+      "单价",
+      "件数",
+      "商品总价",
+      "运费",
+      "实付金额",
+      "佣金比例",
+      "预估佣金",
+      "提现占用"
+    ]);
+    const rows = summary.findAll("tbody tr");
+    expect(rows).toHaveLength(2);
+    expect(rows[0].findAll("td")[0]?.find('[data-test="detail-product-image"]').exists()).toBe(
+      true
+    );
+    expect(rows[0].text()).toContain("t40 Item");
+    expect(rows[0].text()).toContain("Blue / L");
+    const cells = rows[0].findAll("td");
+    expect(cells[2]?.text()).toContain("新商品ID9001");
+    expect(cells[2]?.text()).toContain("原商品ID7900222333");
+    expect(cells[3]?.classes()).toContain("is-left");
+    expect(summary.findAll("thead th")[3]?.classes()).toContain("is-left");
+    expect(rows[1].text()).toContain("9002");
+    expect(rows[1].text()).toContain("—");
+    expect(summary.findAll('[data-test="chain-item-total"]').map(cell => cell.text())).toEqual([
+      "¥120.00",
+      "¥60.00"
+    ]);
+    expect(summary.findAll('tbody [data-test="chain-order-freight"]')).toHaveLength(1);
+    const freightCell = rows[0].get('td[rowspan="2"]');
+    expect(freightCell.get('[data-test="chain-order-freight"]').text()).toContain("¥5.00");
+    expect(freightCell.text()).toContain("整单");
+    expect(summary.find('[data-test="identity-code"]').exists()).toBe(false);
+    expect(summary.find("details").exists()).toBe(false);
+    wrapper.unmount();
+  });
+
+  it("marks a supplemented rate on the corresponding product row", async () => {
     signIn("SUPER_ADMIN", ["order:view", "commission:view"]);
     const supplemented: OrderChainVO = {
       ...financedChain,
@@ -394,152 +482,196 @@ describe("order chain page (task 40)", () => {
     vi.mocked(orderApi.getOrderChain).mockResolvedValue(supplemented);
     const { wrapper } = await mountPage();
 
-    // Both the product summary row and the commission block of that line carry the marker.
     const tags = wrapper.findAll('[data-test="rate-supplemented"]');
-    expect(tags).toHaveLength(2);
+    expect(tags).toHaveLength(1);
     expect(tags[0].text()).toBe("补录");
 
     // The second line keeps the pay-time config rate, so it must not claim to be supplemented.
-    const lines = wrapper.findAll('[data-test="chain-line"]');
+    const lines = wrapper.get('[data-test="chain-product-summary"]').findAll("tbody tr");
     expect(lines).toHaveLength(2);
     expect(lines[1].text()).not.toContain("补录");
 
     wrapper.unmount();
   });
 
-  it("renders commission funds, line blocks and finance flows (task 72)", async () => {
+  it("keeps the chain first and displays platform and creator funds in one table", async () => {
     signIn("SUPER_ADMIN", ["order:view", "commission:view"]);
     vi.mocked(orderApi.getOrderChain).mockResolvedValue(financedChain);
     vi.mocked(orderApi.getOrder).mockResolvedValue(financedDetail);
     const { wrapper } = await mountPage();
 
-    const funds = wrapper.find('[data-test="chain-funds"]').text();
-    expect(funds).toContain("¥16.00");
-    // Shop profit is gone from the funds card (task 81, L-024).
-    expect(funds).not.toContain("店铺获利");
-
-    // Line 1: rate snapshot, occupation split by application state machine, rejected released.
-    const blocks = wrapper.findAll('[data-test="chain-commission"]');
-    expect(blocks).toHaveLength(2);
-    const first = blocks[0].text();
-    expect(first).toContain("佣金与提现");
-    expect(first).toContain("10%");
-    expect(first).toContain("¥16.00");
-    expect(first).toContain("微店确认结算");
-    expect(first).toContain("W20261023000001");
-    expect(first).toContain("W20261025000002");
-    expect(first).toContain("W20261025000003");
-    expect(first).toContain("已支付");
-    expect(first).toContain("待支付");
-    expect(first).toContain("已驳回");
-    // Line 2 stays unverified: null amounts read 待核实, the known occupation zero reads 0.00 CNY.
-    const secondText = blocks[1].text();
-    expect(secondText).toContain("待核实");
-    expect(secondText).toContain("¥0.00");
-    expect(secondText).toContain("无提现申请");
-
-    // Finance flows: increase for the release credit, decrease for clawback and allocations,
-    // per-withdrawal numbers with payment times, "-" when no withdrawal is linked.
-    const flows = wrapper.find('[data-test="chain-flows"]').text();
-    expect(flows).toContain("CL9001");
-    expect(flows).toContain("CL9002");
-    expect(flows).toContain("WA7001");
-    expect(flows).toContain("WA7002");
-    expect(flows).toContain("达人佣金");
-    expect(flows).toContain("增加");
-    expect(flows).toContain("减少");
-    expect(flows).toContain("W20261023000001");
-    expect(flows).toContain("W20261025000002");
-    expect(flows).toContain("-");
-    expect(flows).not.toContain("－");
-    expect(flows).toContain("t40 Shop");
-    expect(flows).toContain("t40 Item");
-    wrapper.unmount();
-  });
-
-  it("keeps the 1024 product summary and eight finance columns without guessing missing values", async () => {
-    signIn("SUPER_ADMIN", ["order:view", "commission:view"]);
-    vi.mocked(orderApi.getOrderChain).mockResolvedValue(financedChain);
-    const { wrapper } = await mountPage();
-    const summary = wrapper.get('[data-test="chain-product-summary"]');
-    expect(summary.text()).toContain("t40 Item");
-    expect(summary.text()).toContain("Blue / L");
-    expect(summary.text()).toContain("Zoe");
-    expect(summary.text()).toContain("10%");
-    expect(summary.text()).toContain("¥16.00");
-    expect(summary.text()).toContain("待核实");
-    const summaryTable = wrapper
-      .findAllComponents({ name: "DataTable" })
-      .find(table => table.props("tableId") === "chain-product-summary");
     expect(
-      summaryTable?.props("columns").find((column: { key: string }) => column.key === "kol")?.align
-    ).toBe("left");
-    const flowTable = wrapper
-      .findAllComponents({ name: "DataTable" })
-      .find(table => table.props("tableId") === "chain-finance-flows");
-    expect(flowTable?.props("columns").map((column: { key: string }) => column.key)).toEqual([
-      "flowNo",
-      "shopName",
-      "type",
-      "direction",
-      "amount",
-      "businessAt",
-      "transferredAt",
-      "withdrawalNo"
-    ]);
-    expect(wrapper.get('[data-test="chain-wiring-details"]').text()).toContain("8001");
-    // Task 115 (§2.3): the per-order occupation is 提现占用 everywhere on the chain.
-    const withdrawalTable = wrapper
-      .findAllComponents({ name: "DataTable" })
-      .find(table => String(table.props("tableId")).startsWith("chain-withdrawals-"));
-    expect(
-      withdrawalTable
-        ?.props("columns")
-        .find((column: { key: string }) => column.key === "occupiedCny")?.label
-    ).toBe("提现占用");
-    expect(wrapper.text()).toContain("提现占用");
-    expect(wrapper.text()).not.toContain("已申请提现");
-    wrapper.unmount();
-  });
-
-  it("explains missing financial data without commission:view (task 72)", async () => {
-    signIn("STAFF", ["order:view"]);
-    const { wrapper } = await mountPage();
-    const funds = wrapper.find('[data-test="chain-funds"]').text();
-    expect(funds).toContain("无权限查看佣金");
-    // The order wiring itself stays visible; only the financial blocks disappear.
-    expect(wrapper.findAll('[data-test="chain-line"]')).toHaveLength(2);
-    expect(wrapper.find('[data-test="chain-commission"]').exists()).toBe(false);
-    expect(wrapper.find('[data-test="chain-flows-no-permission"]').exists()).toBe(true);
-    wrapper.unmount();
-  });
-
-  it("shows the six lifecycle nodes and backend occupation total without mixing finance flow amounts", async () => {
-    signIn("SUPER_ADMIN", ["order:view", "commission:view"]);
-    vi.mocked(orderApi.getOrderChain).mockResolvedValue(financedChain);
-    const { wrapper } = await mountPage();
-    expect(wrapper.findAll(".chain-stages > li")).toHaveLength(6);
-    expect(wrapper.get('[data-test="chain-stage-order"]').text()).toContain("2026102100001");
-    expect(wrapper.get('[data-test="chain-stage-withdrawal"]').text()).toContain("¥16.00");
-    expect(wrapper.get('[data-test="chain-stage-withdrawal"]').text()).toContain("2 条");
-    expect(wrapper.get('[data-test="chain-stage-withdrawal"]').text()).not.toContain("3 条");
-    expect(wrapper.get('[data-test="chain-stage-finance"]').text()).toContain("待核实");
+      wrapper
+        .findAll(".chain-page > section[data-test]")
+        .map(section => section.attributes("data-test"))
+    ).toEqual(["chain-order-info", "chain-product-details", "chain-reconciliation"]);
+    expect(wrapper.findAll(".chain-stages > li")).toHaveLength(7);
+    const withdrawalNode = wrapper.get('[data-test="chain-stage-withdrawal"]').text();
+    expect(withdrawalNode).toContain("提现中");
+    expect(withdrawalNode).toContain("提现中 1 笔");
+    expect(withdrawalNode).toContain("已提现 1 笔");
     const band = wrapper.get('[data-test="chain-header"]').text();
-    expect(band).not.toContain("Zoe");
-    expect(band).not.toContain("订单状态");
-    const summary = wrapper.get('[data-test="chain-product-summary"]');
-    expect(summary.findAll("thead th").map(item => item.text())).toEqual([
-      "商品",
+    expect(band).toContain("2026102100001");
+    expect(band).not.toContain("7900222333");
+    expect(band).not.toContain("9001");
+
+    const finance = wrapper.get('[data-test="chain-reconciliation"]');
+    expect(finance.get("h2").text()).toBe("资金变动");
+    const funds = finance.get('[data-test="chain-funds"]').text();
+    expect(funds).toContain("微店结算金额¥160.00");
+    expect(funds).toContain("¥10.00");
+    expect(funds).not.toContain("已入账");
+    const flows = finance.get('[data-test="chain-flows"]');
+    expect(finance.findAll("table thead")).toHaveLength(1);
+    expect(flows.findAll("thead th").map(item => item.text())).toEqual([
+      "资金类型",
+      "方向",
+      "金额",
       "状态",
-      "所属达人",
-      "单价",
-      "件数",
-      "商品总价",
-      "佣金比例",
-      "预估佣金",
-      "提现占用",
-      "操作"
+      "结算/发生/付款时间",
+      "结算单号/提现单号"
     ]);
+    const rows = flows.findAll("tbody tr").map(row => row.findAll("td").map(cell => cell.text()));
+    expect(rows).toHaveLength(5);
+    expect(rows[0].slice(0, 4)).toEqual(["货款", "应收增加", "+¥180.00", "已结算"]);
+    expect(rows[0][5]).toBe("WD-SETTLEMENT-1");
+    expect(rows[1]).toEqual([
+      "货款",
+      "应收减少",
+      "-¥20.00",
+      "已结算",
+      formatInstant("2026-10-22T00:00:00Z"),
+      "—"
+    ]);
+    expect(rows[2]).toEqual([
+      "佣金",
+      "支出",
+      "-¥11.00",
+      "已结算",
+      formatInstant("2026-10-23T00:00:00Z"),
+      "—"
+    ]);
+    expect(rows[3].slice(0, 4)).toEqual(["佣金", "支出", "-¥10.00", "已提现"]);
+    expect(rows[3][4]).not.toBe("—");
+    expect(rows[3][5]).toBe("W20261023000001");
+    expect(rows[4]).toEqual(["佣金", "待支出", "¥6.00", "提现中", "—", "W20261025000002"]);
+    const flowRows = flows.findAll("tbody tr");
+    expect(flowRows[0].findAll("td")[1]?.find(".el-tag").exists()).toBe(false);
+    expect(flowRows[0].get(".chain-money--positive").text()).toBe("+¥180.00");
+    expect(flowRows[3].get(".chain-money--negative").text()).toBe("-¥10.00");
+    expect(flowRows[3].get(".chain-fund-tag--commission").text()).toBe("佣金");
+    expect(flows.text()).not.toContain("待支付");
+    expect(flows.text()).not.toContain("W20261025000003");
+    expect(flows.text()).not.toContain("¥18.00");
+    wrapper.unmount();
+  });
+
+  it("shows frozen commission and the available balance after subtracting occupied allocations", async () => {
+    signIn("SUPER_ADMIN", ["order:view", "commission:view"]);
+    vi.mocked(orderApi.getOrderChain).mockResolvedValue({
+      ...financedChain,
+      funds: { ...financedChain.funds!, financeStatus: "FROZEN", kolCommission: "25.00" },
+      financeFlows: financedChain.financeFlows!.map((flow, index) =>
+        index === 0 ? { ...flow, amount: "24.00" } : flow
+      )
+    });
+    const { wrapper } = await mountPage();
+    const rows = wrapper.get('[data-test="chain-flows"]').findAll("tbody tr");
+    expect(rows.map(row => row.findAll("td").map(cell => cell.text()))).toEqual(
+      expect.arrayContaining([
+        ["佣金", "—", "¥3.00", "冻结中", "—", "—"],
+        ["佣金", "—", "¥6.00", "待提现", "—", "—"]
+      ])
+    );
+    wrapper.unmount();
+  });
+
+  it("keeps order amounts and products visible without letting financial rows leak", async () => {
+    signIn("STAFF", ["order:view"]);
+    vi.mocked(orderApi.getOrderChain).mockResolvedValue(financedChain);
+    const { wrapper } = await mountPage();
+    expect(wrapper.get('[data-test="chain-funds"]').text()).toContain("¥180.00");
+    expect(wrapper.get('[data-test="chain-funds"]').text()).not.toContain("¥11.00");
+    expect(wrapper.get('[data-test="chain-product-summary"]').text()).not.toContain("10%");
+    expect(wrapper.get('[data-test="chain-product-summary"]').text()).toContain("无权限查看佣金");
+    expect(wrapper.get('[data-test="chain-stage-withdrawal"]').text()).not.toContain("W202610");
+    expect(wrapper.find('[data-test="chain-flows-no-permission"]').exists()).toBe(true);
+    expect(wrapper.find('[data-test="chain-flows"]').exists()).toBe(false);
+    wrapper.unmount();
+  });
+
+  it("keeps the estimated commission after a pending partial refund frozen", async () => {
+    signIn("SUPER_ADMIN", ["order:view", "commission:view"]);
+    vi.mocked(orderApi.getOrderChain).mockResolvedValue({
+      ...financedChain,
+      funds: {
+        ...financedChain.funds!,
+        financeStatus: "REFUNDING",
+        financeAmount: "26.00",
+        kolCommission: "0.00",
+        commissionStatus: "FROZEN"
+      },
+      financeFlows: [],
+      lines: financedChain.lines.map(line => ({
+        ...line,
+        commission: { ...line.commission!, occupiedTotal: "0.00", withdrawals: [] }
+      }))
+    });
+    vi.mocked(orderApi.getOrder).mockResolvedValue({
+      ...financedDetail,
+      commission: { ...financedDetail.commission!, afterSales: true }
+    });
+    const { wrapper } = await mountPage();
+    const rows = wrapper.get('[data-test="chain-flows"]').findAll("tbody tr");
+    expect(rows.map(row => row.findAll("td").map(cell => cell.text()))).toContainEqual([
+      "佣金",
+      "—",
+      "¥26.00",
+      "冻结中",
+      "—",
+      "—"
+    ]);
+    expect(wrapper.get('[data-test="chain-stage-withdrawal"]').text()).toContain("冻结中");
+    wrapper.unmount();
+  });
+
+  it("shows an unverified settlement when platform goods flows cannot establish a total", async () => {
+    signIn("SUPER_ADMIN", ["order:view", "commission:view"]);
+    vi.mocked(orderApi.getOrderChain).mockResolvedValue({
+      ...financedChain,
+      weidianReconciliation: { ...financedChain.weidianReconciliation!, settlementAmount: null }
+    });
+    const { wrapper } = await mountPage();
+    expect(wrapper.get('[data-test="chain-stage-settlement"]').text()).toContain("待核实");
+    expect(wrapper.get('[data-test="chain-funds"]').text()).toContain("微店结算金额—待核实");
+    wrapper.unmount();
+  });
+
+  it("combines this order's allocations on one paid application and opens its withdrawal drawer", async () => {
+    signIn("SUPER_ADMIN", ["order:view", "commission:view"]);
+    const paid = financedChain.lines[0].commission!.withdrawals[0];
+    vi.mocked(orderApi.getOrderChain).mockResolvedValue({
+      ...financedChain,
+      lines: financedChain.lines.map((line, index) =>
+        index === 0
+          ? line
+          : {
+              ...line,
+              commission: { ...line.commission!, withdrawals: [{ ...paid, occupiedCny: "5.00" }] }
+            }
+      )
+    });
+    const { wrapper, router } = await mountPage();
+    expect(wrapper.get('[data-test="chain-funds"]').text()).toContain("¥15.00");
+    const rows = wrapper.get('[data-test="chain-flows"]').findAll("tbody tr");
+    const paidRows = rows.filter(row => row.text().includes(paid.applicationNo));
+    expect(paidRows).toHaveLength(1);
+    expect(paidRows[0].text()).toContain("-¥15.00");
+    await paidRows[0].get('[data-test="chain-withdrawal-link"]').trigger("click");
+    await vi.waitFor(() => expect(router.currentRoute.value.name).toBe("FundPayouts"), {
+      timeout: 5000
+    });
+    expect(router.currentRoute.value.query.withdrawalId).toBe(paid.withdrawalId);
     wrapper.unmount();
   });
 
@@ -555,7 +687,7 @@ describe("order chain page (task 40)", () => {
     const rows = wrapper
       .get('[data-test="chain-product-summary"]')
       .findAll("tbody tr")
-      .map(row => row.findAll("td")[3]?.text());
+      .map(row => row.findAll("td")[4]?.text());
     expect(rows).toEqual(["缺失历史售价", "¥60.00"]);
     wrapper.unmount();
   });
@@ -575,7 +707,7 @@ describe("order chain page (task 40)", () => {
     const { wrapper } = await mountPage();
     const node = wrapper.get('[data-test="chain-stage-copy"]');
     expect(node.text()).toContain(text);
-    expect(node.find(`.chain-stage__state--${tone}`).exists()).toBe(true);
+    expect(node.find(`.el-tag--${tone}`).exists()).toBe(true);
     wrapper.unmount();
   });
 
@@ -594,132 +726,51 @@ describe("order chain page (task 40)", () => {
     wrapper.unmount();
   });
 
-  it("explains an incompatible finance response instead of rendering undefined labels", async () => {
+  it("does not substitute synthetic ledger rows when the response has no platform evidence", async () => {
     signIn("SUPER_ADMIN", ["order:view", "commission:view"]);
     vi.mocked(orderApi.getOrderChain).mockResolvedValue({
       ...financedChain,
-      financeFlows: [{ ledgerId: "legacy-flow", amount: "18.00" }]
-    } as unknown as OrderChainVO);
+      weidianReconciliation: null
+    });
     const { wrapper } = await mountPage();
     expect(wrapper.find('[data-test="chain-flows-incomplete"]').exists()).toBe(true);
-    expect(wrapper.find('[data-test="chain-flows"]').exists()).toBe(false);
-    expect(wrapper.text()).not.toContain("flowType.undefined");
+    const flows = wrapper.get('[data-test="chain-flows"]');
+    expect(flows.findAll("tbody tr")).toHaveLength(2);
+    expect(flows.text()).toContain("W20261023000001");
+    expect(flows.text()).not.toContain("货款");
+    expect(wrapper.get('[data-test="chain-funds"]').text()).not.toContain("¥16.00");
     wrapper.unmount();
   });
 
-  it("does not describe a legacy response without finance fields as an empty ledger", async () => {
+  it("shows a pending settlement and dashes for an explicit empty platform response", async () => {
     signIn("SUPER_ADMIN", ["order:view", "commission:view"]);
     vi.mocked(orderApi.getOrderChain).mockResolvedValue({
-      orderId: chain.orderId,
-      orderNo: chain.orderNo,
-      lines: chain.lines
-    } as OrderChainVO);
+      ...financedChain,
+      weidianReconciliation: {
+        settlementAmount: null,
+        settlementAt: null,
+        flows: []
+      }
+    });
     const { wrapper } = await mountPage();
-    expect(wrapper.find('[data-test="chain-flows-incomplete"]').exists()).toBe(true);
-    expect(wrapper.find('[data-test="chain-finance-ledger"]').text()).not.toContain("暂无财务流水");
+    const reconciliation = wrapper.get('[data-test="chain-reconciliation"]');
+    expect(
+      reconciliation
+        .get('[data-test="chain-funds"]')
+        .findAll("dd")
+        .map(amount => amount.text())
+    ).toEqual(["¥180.00", "¥20.00", "¥160.00", "—", "¥10.00"]);
+    expect(reconciliation.text()).toContain("待结算");
+    expect(reconciliation.get('[data-test="chain-flows"]').findAll("tbody tr")).toHaveLength(2);
     wrapper.unmount();
   });
 
-  it("only calls an explicit empty flow array empty, and rejects blank critical fields", async () => {
-    signIn("SUPER_ADMIN", ["order:view", "commission:view"]);
-    vi.mocked(orderApi.getOrderChain).mockResolvedValueOnce({ ...financedChain, financeFlows: [] });
-    let result = await mountPage();
-    expect(result.wrapper.find('[data-test="chain-finance-ledger"]').text()).toContain(
-      "暂无财务流水"
+  it("treats null financial blocks of an OWN viewer as scope limited", async () => {
+    signIn("STAFF", ["order:view", "commission:view"], "OWN");
+    const { wrapper } = await mountPage();
+    expect(wrapper.get('[data-test="chain-flows-scope-limited"]').text()).toContain(
+      "当前权限仅展示本人范围商品行"
     );
-    result.wrapper.unmount();
-    vi.mocked(orderApi.getOrderChain).mockResolvedValueOnce({
-      ...financedChain,
-      financeFlows: [{ ...financedChain.financeFlows![0], flowNo: " " }]
-    });
-    result = await mountPage();
-    expect(result.wrapper.find('[data-test="chain-flows-incomplete"]').exists()).toBe(true);
-    result.wrapper.unmount();
-  });
-
-  it("treats null financial blocks of an OWN viewer as scope limited (task 72)", async () => {
-    signIn("STAFF", ["order:view", "commission:view"], "OWN");
-    const { wrapper } = await mountPage();
-    const funds = wrapper.find('[data-test="chain-funds"]').text();
-    expect(funds).toContain("当前权限仅展示本人范围商品行；整单金额不可见");
-    expect(wrapper.find('[data-test="chain-flows-scope-limited"]').exists()).toBe(true);
-    wrapper.unmount();
-  });
-
-  it("explains a hidden line commission block for each reason (t87, L-018)", async () => {
-    signIn("STAFF", ["order:view"]);
-    const { wrapper: noPermission } = await mountPage();
-    const hiddenForNoPermission = noPermission.find('[data-test="chain-commission-hidden"]');
-    expect(hiddenForNoPermission.exists()).toBe(true);
-    expect(hiddenForNoPermission.text()).toContain("当前账号无佣金查看权限");
-    const summary = noPermission.get('[data-test="chain-product-summary"]');
-    expect(summary.findAll('[data-test="chain-line-commission-hidden"]')).toHaveLength(2);
-    expect(summary.text()).toContain("无权限查看佣金");
-    noPermission.unmount();
-
-    setActivePinia(createPinia());
-    signIn("STAFF", ["order:view"]);
-    vi.mocked(orderApi.getOrderChain).mockResolvedValue(financedChain);
-    const { wrapper: leaked } = await mountPage();
-    const leakedSummary = leaked.get('[data-test="chain-product-summary"]');
-    expect(leakedSummary.text()).toContain("无权限查看佣金");
-    expect(leakedSummary.text()).not.toContain("10%");
-    expect(leakedSummary.text()).not.toContain("¥16.00");
-    leaked.unmount();
-
-    setActivePinia(createPinia());
-    vi.mocked(orderApi.getOrderChain).mockResolvedValue(chain);
-    signIn("STAFF", ["order:view", "commission:view"], "OWN");
-    const { wrapper: ownScope } = await mountPage();
-    const hiddenForOwnScope = ownScope.find('[data-test="chain-commission-hidden"]');
-    expect(hiddenForOwnScope.exists()).toBe(true);
-    expect(hiddenForOwnScope.text()).toContain("当前权限仅展示本人范围商品行");
-    ownScope.unmount();
-  });
-
-  it("keeps the scope hint off a funds-visible OWN order whose line has no commission (t87, L-018)", async () => {
-    signIn("STAFF", ["order:view", "commission:view"], "OWN");
-    vi.mocked(orderApi.getOrderChain).mockResolvedValue({
-      ...financedChain,
-      lines: [financedChain.lines[0]!, { ...financedChain.lines[1]!, commission: null }]
-    });
-    const { wrapper } = await mountPage();
-    expect(wrapper.findAll('[data-test="chain-commission"]')).toHaveLength(1);
-    expect(wrapper.find('[data-test="chain-commission-hidden"]').exists()).toBe(false);
-    expect(wrapper.find('[data-test="chain-flows-scope-limited"]').exists()).toBe(false);
-    wrapper.unmount();
-  });
-
-  it("shows the ledger status next to the funds cards only when funds are present (t87, L-019)", async () => {
-    signIn("SUPER_ADMIN", ["order:view", "commission:view"]);
-    vi.mocked(orderApi.getOrderChain).mockResolvedValue({
-      ...financedChain,
-      funds: { ...financedChain.funds!, accountStatus: "POSTED" }
-    });
-    const { wrapper: posted } = await mountPage();
-    const status = posted.find('[data-test="chain-account-status"]');
-    expect(status.text()).toContain("账务状态");
-    expect(status.text()).toContain("已入账");
-    posted.unmount();
-
-    vi.mocked(orderApi.getOrderChain).mockResolvedValue(chain);
-    const { wrapper: noFunds } = await mountPage();
-    expect(noFunds.find('[data-test="chain-account-status"]').exists()).toBe(false);
-    noFunds.unmount();
-  });
-
-  it("hides shop profit for an OWN viewer whose funds are visible", async () => {
-    // Mixed orders hide the whole funds block; fully covered orders show it without a shop
-    // profit card (task 81, L-024) and without the scope note.
-    signIn("STAFF", ["order:view", "commission:view"], "OWN");
-    vi.mocked(orderApi.getOrderChain).mockResolvedValue(financedChain);
-    vi.mocked(orderApi.getOrder).mockResolvedValue(financedDetail);
-    const { wrapper } = await mountPage();
-    const funds = wrapper.find('[data-test="chain-funds"]').text();
-    expect(funds).toContain("¥16.00");
-    expect(funds).not.toContain("店铺获利");
-    expect(funds).not.toContain("当前权限仅展示本人范围商品行");
-    expect(wrapper.find('[data-test="chain-flows"]').exists()).toBe(true);
     wrapper.unmount();
   });
 
@@ -747,40 +798,10 @@ describe("order chain page (task 40)", () => {
       }))
     };
     vi.mocked(orderApi.getOrderChain).mockResolvedValue(duplicated);
+    vi.mocked(orderApi.getOrder).mockRejectedValue(new Error("detail unavailable"));
     const { wrapper } = await mountPage();
     expect(wrapper.get('[data-test="chain-stage-refund"]').text()).toContain("¥20.00");
-    expect(wrapper.find('[data-test="chain-funds"]').text()).toContain("¥180.00");
-    wrapper.unmount();
-  });
-
-  it("lists the order-level amounts in the amount-terms order with commission (task 112)", async () => {
-    signIn("SUPER_ADMIN", ["order:view", "commission:view"]);
-    vi.mocked(orderApi.getOrderChain).mockResolvedValue(financedChain);
-    vi.mocked(orderApi.getOrder).mockResolvedValue(financedDetail);
-    const { wrapper } = await mountPage();
-    const labels = wrapper
-      .get('[data-test="chain-funds"]')
-      .findAll(".el-descriptions__label")
-      .map(item => item.text());
-    expect(labels).toEqual([
-      "商品总价",
-      "销量",
-      "运费",
-      "订单金额",
-      "优惠",
-      "支付金额",
-      "退款金额",
-      "订单实收",
-      "计佣金额",
-      "佣金比例",
-      "预估佣金"
-    ]);
-    const funds = wrapper.get('[data-test="chain-funds"]').text();
-    expect(funds).toContain("¥185.00");
-    expect(funds).toContain("¥5.00");
-    expect(funds).toContain("¥160.00");
-    expect(funds).toContain("10%");
-    expect(funds).toContain("¥16.00");
+    expect(wrapper.get('[data-test="chain-funds"]').text()).toContain("¥20.00");
     wrapper.unmount();
   });
 
@@ -797,12 +818,12 @@ describe("order chain page (task 40)", () => {
       }
     });
     const { wrapper } = await mountPage();
-    const funds = wrapper.get('[data-test="chain-funds"]');
-    expect(funds.get('[data-test="order-amounts-estimated"]').text()).toBe("¥0.00");
-    expect(funds.get('[data-test="order-amounts-after-sales"]').text()).toBe(
-      "售后处理中，暂不计佣；已释放部分冻结，退款成功后按退款金额扣减"
-    );
-    expect(funds.get('[data-test="order-amounts"]').text()).not.toContain("待核实");
+    expect(
+      wrapper
+        .get('[data-test="chain-stage-withdrawal"]')
+        .get('[data-test="chain-after-sales"]')
+        .text()
+    ).toBe("售后处理中，暂不计佣；已释放部分冻结，退款成功后按退款金额扣减");
     wrapper.unmount();
   });
 
@@ -811,11 +832,11 @@ describe("order chain page (task 40)", () => {
     vi.mocked(orderApi.getOrderChain).mockResolvedValue(financedChain);
     vi.mocked(orderApi.getOrder).mockResolvedValue(financedDetail);
     const { wrapper } = await mountPage();
-    expect(wrapper.find('[data-test="order-amounts-after-sales"]').exists()).toBe(false);
+    expect(wrapper.find('[data-test="chain-after-sales"]').exists()).toBe(false);
     wrapper.unmount();
   });
 
-  it("shows the product total per line and blanks it when the unit price is missing (task 112)", async () => {
+  it("shows the actual line payment even when the historical unit price is missing", async () => {
     signIn("SUPER_ADMIN", ["order:view"]);
     vi.mocked(orderApi.getOrder).mockResolvedValue({
       ...orderDetail,
@@ -829,11 +850,12 @@ describe("order chain page (task 40)", () => {
     const { wrapper } = await mountPage();
     const totals = wrapper
       .get('[data-test="chain-product-summary"]')
-      .findAll("tbody tr")
-      .map(row => row.findAll("td")[5]?.text());
-    expect(totals).toEqual(["缺失历史售价", "¥60.00"]);
+      .findAll('[data-test="chain-item-pay"]')
+      .map(cell => cell.text());
+    expect(totals).toEqual(["¥120.00", "¥60.00"]);
+    expect(wrapper.get('[data-test="chain-item-total"]').text()).toBe("—");
     const funds = wrapper.get('[data-test="chain-funds"]').text();
-    expect(funds).toContain("缺失历史售价");
+    expect(wrapper.get('[data-test="chain-product-summary"]').text()).toContain("缺失历史售价");
     expect(funds).toContain("¥180.00");
     wrapper.unmount();
   });
@@ -850,7 +872,7 @@ describe("order chain page (task 40)", () => {
     await flushPromises();
     expect(vi.mocked(orderApi.getOrderChain)).toHaveBeenCalledTimes(2);
     expect(wrapper.find('[data-test="chain-load-failed"]').exists()).toBe(false);
-    expect(wrapper.findAll('[data-test="chain-line"]')).toHaveLength(2);
+    expect(wrapper.get('[data-test="chain-product-summary"]').findAll("tbody tr")).toHaveLength(2);
     wrapper.unmount();
   });
 });

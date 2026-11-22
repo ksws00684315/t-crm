@@ -5,6 +5,8 @@ export interface CopyJobQuery {
   page?: number;
   size?: number;
   jobCode?: string;
+  kolId?: string;
+  targetItemId?: string;
   targetChannel?: string;
   status?: string;
 }
@@ -32,11 +34,13 @@ export interface CopyJobItemVO {
   sourceChannel: string;
   sourceProductId: string;
   sourceShopId: string | null;
+  sourceWeidianShopId?: string | null;
   sourceShopName: string | null;
   sourceMerchantNo: string | null;
   targetChannel: string;
   targetShopId: string | null;
   targetShopName: string | null;
+  targetWeidianShopId?: string | null;
   targetItemId: string | null;
   targetItemUrl: string | null;
   status: string;
@@ -51,23 +55,26 @@ export function listCopyJobs(query: CopyJobQuery): Promise<PageResult<CopyJobVO>
   });
 }
 
-export function listCopyJobItems(
+export type TokenJobVO = Pick<CopyJobVO, "id" | "jobCode" | "status" | "totalCount" | "createTime">;
+
+export function listJobsByToken(
   id: string,
   query: { page: number; size: number }
+): Promise<PageResult<TokenJobVO>> {
+  return http.request<PageResult<TokenJobVO>>({
+    method: "get",
+    url: `/product/copy-jobs/by-token/${id}`,
+    params: query
+  });
+}
+
+export function listCopyJobItems(
+  id: string,
+  query: { page: number; size: number; statusOrder?: "ASCENDING" | "DESCENDING" }
 ): Promise<PageResult<CopyJobItemVO>> {
   return http.request<PageResult<CopyJobItemVO>>({
     method: "get",
     url: `/product/copy-jobs/${id}/items`,
     params: query
   });
-}
-
-/** Task 140: product copies (vdian.item.add calls) the company used today and its daily limit. */
-export interface CopyDailyQuotaVO {
-  used: number;
-  limit: number;
-}
-
-export function getCopyDailyQuota(): Promise<CopyDailyQuotaVO> {
-  return http.request<CopyDailyQuotaVO>({ method: "get", url: "/product/copy-jobs/daily-quota" });
 }

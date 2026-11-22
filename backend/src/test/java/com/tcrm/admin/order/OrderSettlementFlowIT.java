@@ -8,7 +8,9 @@ import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
@@ -122,10 +124,11 @@ class OrderSettlementFlowIT {
   private long orderId;
   private long itemA;
   private long itemB;
+  private String adminToken;
 
   @BeforeEach
   void prepare() throws Exception {
-    CompanySessions.companyAdmin(mvc, json, PASSWORD);
+    adminToken = CompanySessions.companyAdmin(mvc, json, PASSWORD);
     jdbc.update(
         "INSERT INTO crm_shop(id,tenant_id,shop_code,shop_name,weidian_shop_id,status,create_time,update_time)"
             + " VALUES(?,1,'SHOP-760001','t76 shop','10',1,now(),now()) ON CONFLICT DO NOTHING",
@@ -195,6 +198,24 @@ class OrderSettlementFlowIT {
     assertThat(itemField(itemA, "release_at")).isEqualTo(Timestamp.from(INCOME_TIME));
     assertThat(itemField(itemB, "basis_cny")).isEqualTo(new BigDecimal("2.00"));
     assertThat(itemField(itemB, "accrued_commission_cny")).isEqualTo(new BigDecimal("0.20"));
+
+    var goods =
+        jdbc.queryForMap(
+            "SELECT o.pay_amount, f.amount_raw, f.amount_cny FROM crm_order o"
+                + " JOIN crm_order_settlement_flow f ON f.order_id = o.id"
+                + " WHERE o.id = ? AND f.trade_sub_type = '货款收入'",
+            orderId);
+    assertThat((BigDecimal) goods.get("pay_amount")).isEqualByComparingTo("6.00");
+    assertThat((BigDecimal) goods.get("amount_raw")).isEqualByComparingTo("600");
+    assertThat((BigDecimal) goods.get("amount_cny")).isEqualByComparingTo("6.00");
+    mvc.perform(get("/admin-api/order/orders/{id}", orderId).header("X-Admin-Token", adminToken))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.data.commission.settlementAmount").value("6.00"));
+    mvc.perform(
+            get("/admin-api/order/orders/{id}/chain", orderId).header("X-Admin-Token", adminToken))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.data.weidianReconciliation.settlementAmount").value("6.00"))
+        .andExpect(jsonPath("$.data.weidianReconciliation.flows[0].amount").value("6.00"));
 
     releaseJob.releaseDue();
 

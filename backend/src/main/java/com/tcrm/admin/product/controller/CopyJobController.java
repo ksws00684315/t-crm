@@ -2,6 +2,7 @@ package com.tcrm.admin.product.controller;
 
 import cn.dev33.satoken.annotation.SaCheckPermission;
 import com.tcrm.admin.product.service.CopyDailyQuota;
+import com.tcrm.admin.product.service.CopyJobQueryDTO;
 import com.tcrm.admin.product.service.CopyJobQueryService;
 import com.tcrm.admin.security.api.CurrentUserContext;
 import com.tcrm.admin.shared.MissingTenantException;
@@ -9,6 +10,7 @@ import com.tcrm.admin.shared.PageResult;
 import com.tcrm.admin.shared.R;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.Min;
+import java.time.Instant;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.ModelAttribute;
 import org.springframework.web.bind.annotation.PathVariable;
@@ -51,11 +53,46 @@ public class CopyJobController {
     return R.ok(jobs.page(query.toFilter()).map(CopyJobVO::from));
   }
 
+  @GetMapping("/by-token/{tokenId}")
+  @SaCheckPermission("kol:copy-token")
+  public R<PageResult<TokenJobVO>> byToken(
+      @PathVariable @Min(1) long tokenId, @Valid @ModelAttribute CopyJobItemPageQuery query) {
+    return R.ok(
+        jobs.page(
+                new CopyJobQueryDTO(
+                    null,
+                    null,
+                    null,
+                    query.pageOrDefault(),
+                    query.sizeOrDefault(),
+                    null,
+                    null,
+                    tokenId))
+            .map(
+                job ->
+                    new TokenJobVO(
+                        Long.toString(job.id()),
+                        job.jobCode(),
+                        job.status(),
+                        job.totalCount(),
+                        job.createTime())));
+  }
+
+  public record TokenJobVO(
+      String id, String jobCode, String status, int totalCount, Instant createTime) {}
+
   @GetMapping("/{id}/items")
   @SaCheckPermission("product:view")
   public R<PageResult<CopyJobItemVO>> items(
       @PathVariable @Min(1) long id, @Valid @ModelAttribute CopyJobItemPageQuery query) {
     return R.ok(
-        jobs.items(id, query.pageOrDefault(), query.sizeOrDefault()).map(CopyJobItemVO::from));
+        jobs.items(
+                id,
+                query.pageOrDefault(),
+                query.sizeOrDefault(),
+                query.statusOrder() == null
+                    ? null
+                    : query.statusOrder() == CopyJobItemPageQuery.StatusOrder.ASCENDING)
+            .map(CopyJobItemVO::from));
   }
 }

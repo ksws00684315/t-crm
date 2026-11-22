@@ -53,6 +53,7 @@ const props = withDefaults(
     rows: readonly object[];
     columns: DataColumn[];
     loading?: boolean;
+    emptyText?: string;
     /** The last request failed: show a failure message and a retry entry instead of an empty table. */
     failed?: boolean;
     total: number;
@@ -731,7 +732,7 @@ function canMove(index: number, delta: -1 | 1): boolean {
             </template>
             <template v-else>
               <p v-if="filterCount > 0">{{ t("table.emptyFiltered", { n: filterCount }) }}</p>
-              <p v-else>{{ t("table.empty") }}</p>
+              <p v-else>{{ emptyText || t("table.empty") }}</p>
               <el-button v-if="filterCount > 0" @click="emit('clearFilters')">
                 {{ t("table.clearFilters") }}
               </el-button>

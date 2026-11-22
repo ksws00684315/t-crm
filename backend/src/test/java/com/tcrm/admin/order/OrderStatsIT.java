@@ -2,6 +2,7 @@ package com.tcrm.admin.order;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
+import com.tcrm.admin.PostgresTestMigrations;
 import com.tcrm.admin.kol.mapper.KolMapper;
 import com.tcrm.admin.order.api.OrderEvidenceApi.DetailSort;
 import com.tcrm.admin.order.api.OrderEvidenceApi.EvidenceRow;
@@ -28,7 +29,6 @@ import org.apache.ibatis.session.Configuration;
 import org.apache.ibatis.session.SqlSessionFactory;
 import org.apache.ibatis.session.SqlSessionFactoryBuilder;
 import org.apache.ibatis.transaction.jdbc.JdbcTransactionFactory;
-import org.flywaydb.core.Flyway;
 import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 import org.slf4j.Logger;
@@ -55,7 +55,7 @@ class OrderStatsIT {
   @Test
   void aggregatesCrossPeriodRefundsAndIsolatesTenantAndBusinessOwner() {
     var source = new DriverManagerDataSource(PG.getJdbcUrl(), PG.getUsername(), PG.getPassword());
-    Flyway.configure().dataSource(source).load().migrate();
+    PostgresTestMigrations.configure().dataSource(source).load().migrate();
     var jdbc = new JdbcTemplate(source);
     jdbc.execute(
         """

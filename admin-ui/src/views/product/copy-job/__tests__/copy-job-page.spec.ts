@@ -52,10 +52,12 @@ function item(overrides: Partial<CopyJobItemVO> = {}): CopyJobItemVO {
     sourceChannel: "WEIDIAN",
     sourceProductId: "10001",
     sourceShopId: "8",
+    sourceWeidianShopId: "1400012345",
     sourceShopName: "Source shop",
     sourceMerchantNo: "800",
     targetChannel: "WEIDIAN",
     targetShopId: "5",
+    targetWeidianShopId: "1400054321",
     targetShopName: "Target shop",
     targetItemId: "90001",
     targetItemUrl: "https://weidian.com/item.html?itemID=90001",
@@ -74,7 +76,6 @@ async function open(
     page: 1,
     size: 20
   });
-  vi.mocked(copyJobApi.getCopyDailyQuota).mockResolvedValue({ used: 4589, limit: 5000 });
   const wrapper = mount(CopyJobPage, {
     global: { plugins: [ElementPlus, i18n, createPinia()] },
     attachTo: document.body
@@ -102,7 +103,8 @@ describe("Copy job page", () => {
     expect(header).toContain("目标渠道");
     expect(header).toContain("状态");
     expect(header).toContain("结果");
-    expect(header).toContain("错误原因");
+    expect(header).not.toContain("错误原因");
+    expect(wrapper.text()).not.toContain("本日已复制商品");
     expect(header).toContain("创建时间");
     expect(header).toContain("完成时间");
     expect(header).not.toContain("达人编号");
@@ -118,40 +120,8 @@ describe("Copy job page", () => {
     expect(body!.get('[data-test="result-fail"]').text()).toContain("失败 1");
     expect(body!.findAll('[data-test="fail-hint"]')).toHaveLength(1);
     expect(body!.get('[data-test="fail-hint"]').text()).toBe("含失败项，请查看明细");
-    expect(wrapper.text()).toContain("目标店铺未完成微店授权");
-    expect(wrapper.text()).toContain("-");
+    expect(wrapper.text()).not.toContain("目标店铺未完成微店授权");
     expect(wrapper.text()).not.toContain("2026-10-21T01:02:03Z");
-    wrapper.unmount();
-  });
-
-  it("shows today's copy usage against the daily limit (task 140)", async () => {
-    const wrapper = await open();
-    expect(wrapper.get('[data-test="copy-daily-quota"]').text()).toBe(
-      "本日已复制商品 4589 条 / 本日最多复制商品 5000 条"
-    );
-    i18n.global.locale.value = "en-US";
-    await nextTick();
-    expect(wrapper.get('[data-test="copy-daily-quota"]').text()).toBe(
-      "Products copied today: 4589 / Daily limit: 5000"
-    );
-    expect(copyJobApi.getCopyDailyQuota).toHaveBeenCalled();
-    wrapper.unmount();
-  });
-
-  it("hides the usage line when it cannot be read", async () => {
-    vi.mocked(copyJobApi.getCopyDailyQuota).mockRejectedValueOnce(new Error("down"));
-    vi.mocked(copyJobApi.listCopyJobs).mockResolvedValue({
-      items: [],
-      total: "0",
-      page: 1,
-      size: 20
-    });
-    const wrapper = mount(CopyJobPage, {
-      global: { plugins: [ElementPlus, i18n, createPinia()] },
-      attachTo: document.body
-    });
-    await flushPromises();
-    expect(wrapper.find('[data-test="copy-daily-quota"]').exists()).toBe(false);
     wrapper.unmount();
   });
 
@@ -176,8 +146,8 @@ describe("Copy job page", () => {
     const wrapper = await open();
     await wrapper.get('[data-test="job-code"]').setValue("ab_c");
     const selects = wrapper.findAllComponents(ElSelect);
-    await selects[0].vm.$emit("update:modelValue", "WEIDIAN");
-    await selects[1].vm.$emit("update:modelValue", "failed");
+    await selects[1].vm.$emit("update:modelValue", "WEIDIAN");
+    await selects[2].vm.$emit("update:modelValue", "failed");
     await wrapper.get('[data-test="search"]').trigger("click");
     await flushPromises();
     expect(copyJobApi.listCopyJobs).toHaveBeenLastCalledWith({
@@ -238,9 +208,22 @@ describe("Copy job page", () => {
       "errorMessage"
     ]);
     expect(dialog.textContent).toContain("Source shop");
-    expect(dialog.textContent).toContain("8");
+    expect(dialog.querySelector("[data-test=source-shop]")?.textContent).toContain("1400012345");
+    expect(dialog.querySelector("[data-test=target-shop]")?.textContent).toContain("1400054321");
     expect(dialog.textContent).toContain("失败");
     expect(dialog.textContent).toContain("额度不足");
+    const oldId = dialog.querySelector(".el-table__body [data-test='value']");
+    expect(oldId?.hasAttribute("title")).toBe(false);
+    expect(
+      detail
+        ?.props("columns")
+        .filter((column: { key: string }) =>
+          ["sourceProductId", "targetItemId"].includes(column.key)
+        )
+    ).toEqual([
+      expect.objectContaining({ tooltip: false }),
+      expect.objectContaining({ tooltip: false })
+    ]);
     const link = dialog.querySelector(
       ".el-table__body [data-test='open-target']"
     ) as HTMLAnchorElement;
@@ -251,6 +234,31 @@ describe("Copy job page", () => {
     copy.click();
     await flushPromises();
     expect(copyUtil.copyText).toHaveBeenCalledWith("10001");
+    wrapper.unmount();
+  });
+
+  it("shows the task-level reason in details and resets status sorting on reopen", async () => {
+    const wrapper = await open();
+    await wrapper.get(".el-table__body [data-test='view-items']").trigger("click");
+    await flushPromises();
+    expect(document.body.querySelector(".el-dialog")?.textContent).toContain(
+      "目标店铺未完成微店授权"
+    );
+    const detail = wrapper
+      .findAllComponents({ name: "DataTable" })
+      .find(table => table.props("tableId") === "copy-job-items");
+    detail?.vm.$emit("sortChange", { prop: "status", order: "ascending" });
+    await flushPromises();
+    expect(copyJobApi.listCopyJobItems).toHaveBeenLastCalledWith("11", {
+      page: 1,
+      size: 20,
+      statusOrder: "ASCENDING"
+    });
+    (document.body.querySelector(".el-dialog__headerbtn") as HTMLElement).click();
+    await nextTick();
+    await wrapper.get(".el-table__body [data-test='view-items']").trigger("click");
+    await flushPromises();
+    expect(copyJobApi.listCopyJobItems).toHaveBeenLastCalledWith("11", { page: 1, size: 20 });
     wrapper.unmount();
   });
 

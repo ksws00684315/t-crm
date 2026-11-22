@@ -3,7 +3,7 @@ import { computed } from "vue";
 import { useI18n } from "vue-i18n";
 import type { OrderDetailVO } from "@/api/types";
 import { useUserStore } from "@/stores/user";
-import { formatAmountWithCurrency, formatInstant } from "@/utils/format";
+import { formatAmountWithCurrency } from "@/utils/format";
 import { formatRate } from "@/utils/rate";
 
 defineOptions({ name: "OrderAmounts" });
@@ -17,8 +17,8 @@ defineOptions({ name: "OrderAmounts" });
 const props = defineProps<{
   detail: OrderDetailVO;
   columns: number;
-  /** The drawer shows the order and pay times at the end; the chain header already has them. */
-  showTimes?: boolean;
+  labelWidth?: number;
+  showSettlement?: boolean;
 }>();
 
 const { t } = useI18n();
@@ -55,7 +55,12 @@ const rateText = computed(() => {
 <template>
   <!-- label-width keeps the widest English label ("Commissionable Amount", L-115) on whole
        words at 1280; the first word alone needs ~114px plus cell padding. -->
-  <el-descriptions :column="columns" border :label-width="150" data-test="order-amounts">
+  <el-descriptions
+    :column="columns"
+    border
+    :label-width="labelWidth ?? 150"
+    data-test="order-amounts"
+  >
     <el-descriptions-item :label="t('order.amounts.productTotal')">{{
       money(detail.itemAmount, t("order.missingHistoricalPrice"))
     }}</el-descriptions-item>
@@ -86,6 +91,9 @@ const rateText = computed(() => {
           money(detail.commission.commissionableAmount, t("finance.unverified"))
         }}</span></el-descriptions-item
       >
+      <el-descriptions-item v-if="showSettlement" :label="t('order.amounts.settlementAmount')">{{
+        money(detail.commission.settlementAmount, "-")
+      }}</el-descriptions-item>
       <el-descriptions-item :label="t('order.amounts.commissionRate')"
         ><span data-test="order-amounts-rate">{{ rateText }}</span></el-descriptions-item
       >
@@ -107,6 +115,9 @@ const rateText = computed(() => {
           commissionHint
         }}</span></el-descriptions-item
       >
+      <el-descriptions-item v-if="showSettlement" :label="t('order.amounts.settlementAmount')">
+        <span class="order-amounts__hidden">{{ commissionHint }}</span>
+      </el-descriptions-item>
       <el-descriptions-item :label="t('order.amounts.commissionRate')"
         ><span class="order-amounts__hidden">{{ commissionHint }}</span></el-descriptions-item
       >
@@ -114,14 +125,7 @@ const rateText = computed(() => {
         ><span class="order-amounts__hidden">{{ commissionHint }}</span></el-descriptions-item
       >
     </template>
-    <template v-if="showTimes">
-      <el-descriptions-item :label="t('order.detail.orderTime')">{{
-        formatInstant(detail.orderTime)
-      }}</el-descriptions-item>
-      <el-descriptions-item :label="t('order.payTime')">{{
-        formatInstant(detail.payTime)
-      }}</el-descriptions-item>
-    </template>
+    <slot />
   </el-descriptions>
 </template>
 

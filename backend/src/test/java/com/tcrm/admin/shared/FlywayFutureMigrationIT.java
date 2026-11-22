@@ -44,7 +44,8 @@ class FlywayFutureMigrationIT {
               "spring.datasource.url=" + POSTGRES.getJdbcUrl(),
               "spring.datasource.username=" + POSTGRES.getUsername(),
               "spring.datasource.password=" + POSTGRES.getPassword(),
-              "spring.flyway.locations=classpath:db/migration");
+              "spring.flyway.locations=classpath:db/migration",
+              "spring.flyway.postgresql.transactional-lock=false");
 
   @Test
   void shouldStartLeniently_byDefault_andFailStartup_whenStrict(CapturedOutput output)

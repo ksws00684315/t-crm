@@ -17,7 +17,21 @@ public record OrderChainDTO(
     String orderNo,
     FundsDTO funds,
     List<ChainLineDTO> lines,
-    List<FlowDTO> financeFlows) {
+    List<FlowDTO> financeFlows,
+    WeidianReconciliationDTO weidianReconciliation) {
+
+  /** Platform evidence, gated by the same permissions as the order's other financial data. */
+  record WeidianReconciliationDTO(
+      BigDecimal settlementAmount, Instant settlementAt, List<WeidianFlowDTO> flows) {}
+
+  /** A single posted Weidian row. Settlement metadata is populated only from platform evidence. */
+  record WeidianFlowDTO(
+      Long id,
+      String type,
+      BigDecimal amount,
+      Instant tradeTime,
+      Instant settlementAt,
+      String settlementNo) {}
 
   /**
    * Order-level funds (B07). The shop-profit field is gone (task 81, L-024): it is not displayed.
@@ -32,7 +46,11 @@ public record OrderChainDTO(
       BigDecimal payAmount,
       BigDecimal refundTotal,
       BigDecimal kolCommission,
-      String accountStatus) {}
+      String accountStatus,
+      String financeStatus,
+      BigDecimal financeAmount,
+      String orderSettlementStatus,
+      String commissionStatus) {}
 
   /** One order line with its chain links. */
   record ChainLineDTO(
@@ -80,18 +98,18 @@ public record OrderChainDTO(
 
   /**
    * One finance flow of the order (B08); null without the finance permission or on hidden mixed
-   * orders. Shop receivables ({@code SHOP_RECEIVABLE}) wait for the M0 Weidian settlement net and
-   * withdrawable time, so the type stays reserved while only {@code KOL_COMMISSION} rows exist.
+   * orders. Shop receivable, commission and platform settlement events retain independent statuses.
    *
-   * @param flowNo stable, traceable number: {@code CL{ledgerId}} wallet entries, {@code
-   *     WA{allocationId}} withdrawal allocations
-   * @param direction INCREASE / DECREASE; the amount itself is always positive and carries no sign
+   * @param flowNo stable reference for the order accrual, refund, wallet entry or withdrawal
+   * @param direction INCREASE / DECREASE for monetary changes, null for a settlement status event
    * @param businessAt business fact time of the flow (ledger {@code occurred_at}; allocation =
    *     application submission)
    * @param transferredAt money movement time: the registered withdrawal payment time, null before
    *     payment
    * @param withdrawalNo the linked withdrawal application number; null on non-withdrawal flows (UI
    *     shows "-")
+   * @param settlementAt confirmed Weidian settlement time, when available
+   * @param settlementNo settlement identifier supplied by Weidian, when available
    */
   record FlowDTO(
       String flowNo,
@@ -102,7 +120,11 @@ public record OrderChainDTO(
       BigDecimal amount,
       Instant businessAt,
       Instant transferredAt,
-      String withdrawalNo) {}
+      String withdrawalNo,
+      String orderStatus,
+      String commissionStatus,
+      Instant settlementAt,
+      String settlementNo) {}
 
   /** The copy job that produced the exclusive item; null when no job item wrote the target id. */
   record ChainCopyJobDTO(String jobCode, Instant createTime, String status) {}
@@ -112,13 +134,15 @@ public record OrderChainDTO(
    *
    * @param kolItemId {@code crm_kol_item.id}
    * @param linkCode link code from {@code crm_kol_item.link_code}
-   * @param sourceProductId original product id
+   * @param sourceProductId internal original product identity
+   * @param sourceItemId original Weidian item ID, when the source product is known
    * @param targetItemId exclusive (copied) Weidian item id
    */
   record ChainLinkDTO(
       Long kolItemId,
       String linkCode,
       Long sourceProductId,
+      String sourceItemId,
       String targetItemId,
       Long kolId,
       String kolCode,

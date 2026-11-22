@@ -62,6 +62,7 @@ public class CopyJobQueryService {
     String channel = channelFilter(filter.targetChannel());
     String status = statusFilter(filter.status());
     String prefix = jobCodePrefix(filter.jobCode());
+    String itemId = filter.targetItemId() == null ? "" : filter.targetItemId().strip();
     List<Long> ownKolIds =
         user.ownScope()
             ? kols.listByBdUserId(user.id()).stream().map(KolRefDTO::id).toList()
@@ -73,6 +74,12 @@ public class CopyJobQueryService {
     var query =
         new LambdaQueryWrapper<CopyJobDO>()
             .in(user.ownScope(), CopyJobDO::getKolId, ownKolIds)
+            .eq(filter.kolId() != null, CopyJobDO::getKolId, filter.kolId())
+            .eq(filter.tokenId() != null, CopyJobDO::getTokenId, filter.tokenId())
+            .apply(
+                !itemId.isEmpty(),
+                "EXISTS (SELECT 1 FROM crm_copy_job_item item WHERE item.job_id = crm_copy_job.id AND item.tenant_id = crm_copy_job.tenant_id AND item.target_item_id = {0})",
+                itemId)
             .eq(channel != null, CopyJobDO::getTargetChannel, channel)
             .eq(status != null && !hasFailure, CopyJobDO::getStatus, status)
             .in(
@@ -96,12 +103,20 @@ public class CopyJobQueryService {
   }
 
   public PageResult<CopyJobItemDTO> items(long jobId, int page, int size) {
+    return items(jobId, page, size, null);
+  }
+
+  public PageResult<CopyJobItemDTO> items(long jobId, int page, int size, Boolean statusAscending) {
     CopyJobDO job = requireVisible(jobId);
     var result =
         items.selectPage(
             new Page<>(page, size),
             new LambdaQueryWrapper<CopyJobItemDO>()
                 .eq(CopyJobItemDO::getJobId, job.getId())
+                .orderBy(
+                    statusAscending != null,
+                    Boolean.TRUE.equals(statusAscending),
+                    CopyJobItemDO::getStatus)
                 .orderByAsc(CopyJobItemDO::getId));
     Set<Long> shopIds = new HashSet<>();
     if (job.getTargetShopId() != null) {
@@ -114,9 +129,15 @@ public class CopyJobQueryService {
     }
     Map<Long, ShopDO> shopMap = shopsById(shopIds);
     int offset = (page - 1) * size;
+    Map<Long, Integer> sequenceById = new HashMap<>();
+    if (statusAscending != null && !result.getRecords().isEmpty()) {
+      List<Long> ids = result.getRecords().stream().map(CopyJobItemDO::getId).toList();
+      items.sequences(jobId, ids).forEach(row -> sequenceById.put(row.id(), row.seq()));
+    }
     List<CopyJobItemDTO> rows = new ArrayList<>();
     for (int i = 0; i < result.getRecords().size(); i++) {
-      rows.add(toItem(result.getRecords().get(i), offset + i + 1, job, shopMap));
+      CopyJobItemDO row = result.getRecords().get(i);
+      rows.add(toItem(row, sequenceById.getOrDefault(row.getId(), offset + i + 1), job, shopMap));
     }
     return new PageResult<>(rows, result.getTotal(), page, size);
   }
@@ -254,10 +275,12 @@ public class CopyJobQueryService {
         row.getSourceChannel(),
         row.getSourceProductId(),
         row.getSourceShopId(),
+        source == null ? null : source.getWeidianShopId(),
         source == null ? null : source.getShopName(),
         source == null ? null : source.getWeidianShopId(),
         job.getTargetChannel(),
         job.getTargetShopId(),
+        target == null ? null : target.getWeidianShopId(),
         target == null ? null : target.getShopName(),
         row.getTargetItemId(),
         targetItemUrl(row.getTargetItemId()),

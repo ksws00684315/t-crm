@@ -272,10 +272,7 @@ describe("order list page (task 40)", () => {
     signIn("SUPER_ADMIN", MANAGER);
     const wrapper = await mountPage();
     const picker = wrapper.findComponent(ElDatePicker);
-    picker.vm.$emit("update:modelValue", [
-      new Date("2026-10-15T16:00:00.000Z"),
-      new Date("2026-10-16T16:00:00.000Z")
-    ]);
+    picker.vm.$emit("update:modelValue", ["2026-10-16", "2026-10-16"]);
     await flushPromises();
     element("search").trigger("click");
     await flushPromises();
@@ -303,7 +300,28 @@ describe("order list page (task 40)", () => {
     const productHeaders = [...(dialog?.querySelectorAll("thead th") ?? [])].map(item =>
       item.textContent?.trim()
     );
-    expect(productHeaders).toEqual(["商品", "达人", "单价", "件数", "商品总价", "状态"]);
+    expect(productHeaders).toEqual([
+      "商品名/ID",
+      "SKU",
+      "达人名/ID",
+      "单价",
+      "件数",
+      "商品总价",
+      "状态"
+    ]);
+    const basicLabels = [
+      ...(dialog?.querySelectorAll('[data-test="order-detail"] .el-descriptions__label') ?? [])
+    ].map(item => item.textContent?.trim());
+    expect(basicLabels).toEqual([
+      "订单号",
+      "渠道",
+      "店铺名",
+      "店铺ID",
+      "订单状态",
+      "退款状态",
+      "下单时间",
+      "支付时间"
+    ]);
     expect(element("filter-order-status").element.closest('[data-test="search-more"]')).toBeNull();
     expect(dialog?.querySelector(".el-dialog__body")?.getAttribute("style") ?? "").not.toContain(
       "overflow-x: scroll"
@@ -317,6 +335,7 @@ describe("order list page (task 40)", () => {
       ...detail,
       commission: {
         commissionableAmount: null,
+        settlementAmount: "92.50",
         rates: ["0.1000", "0.1500"],
         estimatedCommission: null,
         afterSales: false
@@ -339,13 +358,13 @@ describe("order list page (task 40)", () => {
       "退款金额",
       "订单实收",
       "计佣金额",
+      "结算金额",
       "佣金比例",
-      "预估佣金",
-      "下单时间",
-      "支付时间"
+      "预估佣金"
     ]);
     const text = block?.textContent ?? "";
     expect(text).toContain("¥100.00");
+    expect(text).toContain("¥92.50");
     // Unverified commission reads 待核实; different line rates are all listed.
     expect(block?.querySelector('[data-test="order-amounts-commissionable"]')?.textContent).toBe(
       "待核实"

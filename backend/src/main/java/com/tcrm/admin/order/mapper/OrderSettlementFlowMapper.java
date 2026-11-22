@@ -5,6 +5,7 @@ import com.baomidou.mybatisplus.core.mapper.BaseMapper;
 import com.tcrm.admin.order.api.OrderEvidenceApi.SettlementFlowRow;
 import com.tcrm.admin.order.api.OrderStatsApi.ShopSettlementDTO;
 import com.tcrm.admin.order.model.OrderSettlementFlowDO;
+import java.math.BigDecimal;
 import java.time.Instant;
 import java.util.Collection;
 import java.util.List;
@@ -44,6 +45,19 @@ public interface OrderSettlementFlowMapper extends BaseMapper<OrderSettlementFlo
       @Param("shopIds") List<Long> shopIds,
       @Param("from") Instant from,
       @Param("until") Instant until);
+
+  /** Signed goods and refund flows in yuan. A single complete goods income is required. */
+  @Select(
+      """
+      SELECT SUM(amount_cny)
+      FROM crm_order_settlement_flow
+      WHERE shop_id = #{shopId} AND weidian_order_id = #{orderNo}
+        AND NOT is_deleted AND query_type = 'INCOME_DETAIL'
+        AND trade_sub_type IN ('货款收入', '退款')
+      HAVING COUNT(*) FILTER (WHERE trade_sub_type = '货款收入') = 1
+        AND COUNT(*) = COUNT(amount_cny)
+      """)
+  BigDecimal orderReceivable(@Param("shopId") long shopId, @Param("orderNo") String orderNo);
 
   String RECEIVABLES_FILTER =
       """

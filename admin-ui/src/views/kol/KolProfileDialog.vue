@@ -2,7 +2,7 @@
 import CopyText from "@/components/CopyText.vue";
 import { ElMessage, ElMessageBox } from "element-plus";
 import type { FormInstance, FormRules } from "element-plus";
-import { computed, reactive, ref, watch } from "vue";
+import { computed, nextTick, reactive, ref, watch } from "vue";
 import { useI18n } from "vue-i18n";
 import { editKol, resetKolPassword, reviewKol } from "@/api/kol/kol";
 import type { KolVO } from "@/api/types";
@@ -21,12 +21,9 @@ defineOptions({ name: "KolProfileDialog" });
  * saves through the review endpoint, so the first save flips the status to approved.
  *
  * Task 156: the dialog opens as a read-only detail view once the profile has been filled in —
- * label/value rows like the creator detail drawer, not disabled inputs — and the Edit button
- * switches to the form. The second tab holds the inviter's details: the inviter name comes from
- * the current BD and stays read-only, while the business Discord and WhatsApp accounts are
- * recorded per creator by hand (the same BD may use different accounts for different creators).
- * Review mode stays editable and does not accept the inviter accounts (the review endpoint has no
- * such fields), so that tab stays a read-only view there.
+ * Edit switches the three groups to the form. The inviter comes from the current BD and stays
+ * read-only. Business Discord and WhatsApp accounts are recorded per creator and can only be
+ * changed through the ordinary edit endpoint.
  */
 const props = defineProps<{
   modelValue: boolean;
@@ -42,16 +39,8 @@ const emit = defineEmits<{
 const { t } = useI18n();
 const me = useUserStore();
 
-const title = computed(() => {
-  const kol = props.kol;
-  if (!kol) return t("kol.editTitle", { code: "" });
-  if (props.review) return t("kol.reviewTitle", { code: kol.kolCode });
-  return t("kol.editProfileTitle", { code: kol.kolCode, name: kol.name });
-});
-
 const formRef = ref<FormInstance>();
 const saving = ref(false);
-const activeTab = ref("profile");
 /** False = read-only view; the Edit button flips it for this opening only. */
 const editing = ref(false);
 const form = reactive({
@@ -66,9 +55,15 @@ const form = reactive({
 
 const profileEditable = computed(() => Boolean(props.review) || editing.value);
 const inviterEditable = computed(() => !props.review && editing.value);
+const title = computed(() =>
+  props.review
+    ? t("kol.reviewTitle", { code: props.kol?.kolCode ?? "" })
+    : t(editing.value ? "kol.editProfileTitle" : "kol.actionEdit")
+);
 
 /** One-time plaintext of the last super-administrator reset; cleared whenever the dialog opens. */
 const resetResult = ref<string | null>(null);
+const resetResultRef = ref<HTMLElement>();
 const resetting = ref(false);
 
 /**
@@ -89,9 +84,8 @@ function primaryAccount(kol: KolVO | null) {
   return kol?.socialAccounts.find(account => account.primary) ?? null;
 }
 
-/** Detail rows show a dash for an empty value, as the creator detail drawer does. */
 function text(value: string): string {
-  return value.trim() ? value : "-";
+  return value.trim() ? value : "—";
 }
 
 watch(
@@ -107,7 +101,6 @@ watch(
     form.handle = primary?.handle ?? "";
     form.bdDiscord = kol?.bdDiscord ?? "";
     form.bdWhatsapp = kol?.bdWhatsapp ?? "";
-    activeTab.value = "profile";
     editing.value = Boolean(props.review);
     resetResult.value = null;
     formRef.value?.clearValidate();
@@ -140,6 +133,8 @@ async function resetPassword() {
     const result = await resetKolPassword(kol.id);
     resetResult.value = result.password;
     ElMessage.success(t("kol.resetPasswordDone"));
+    await nextTick();
+    resetResultRef.value?.focus();
   } catch (error) {
     notifyError(error);
   } finally {
@@ -180,11 +175,7 @@ async function submit() {
   const kol = props.kol;
   if (!kol || saving.value) return;
   const valid = formRef.value ? await formRef.value.validate().catch(() => false) : false;
-  if (!valid) {
-    // The profile form owns the rules; saving from the inviter tab must not hide its errors.
-    activeTab.value = "profile";
-    return;
-  }
+  if (!valid) return;
   saving.value = true;
   try {
     if (props.review) {
@@ -235,203 +226,306 @@ async function submit() {
   <el-dialog
     :model-value="modelValue"
     :title="title"
-    width="min(680px, calc(100vw - 32px))"
+    class="kol-profile-dialog"
+    width="min(640px, calc(100vw - 32px))"
     @update:model-value="emit('update:modelValue', $event)"
   >
-    <div v-if="resetResult" class="reset-result" data-test="reset-password-result">
+    <div
+      v-if="resetResult"
+      ref="resetResultRef"
+      class="reset-result"
+      tabindex="-1"
+      data-test="reset-password-result"
+    >
       <p class="reset-hint">{{ t("kol.resetPasswordResultHint") }}</p>
-      <CopyText :value="resetResult" />
+      <CopyText :value="resetResult" hide-tooltip />
     </div>
-    <el-tabs v-model="activeTab">
-      <el-tab-pane :label="t('kol.tabProfile')" name="profile">
-        <el-descriptions v-if="!profileEditable" :column="1" border data-test="profile-view">
-          <el-descriptions-item :label="t('common.email')">
-            <div class="readonly-value" data-test="profile-email">
-              <CopyText :value="kol?.email" />
-              <el-button
-                v-if="canResetPassword"
-                type="danger"
-                link
-                data-test="reset-password"
-                :loading="resetting"
-                @click="resetPassword"
-              >
-                {{ t("kol.resetPassword") }}
-              </el-button>
-            </div>
-          </el-descriptions-item>
-          <el-descriptions-item :label="t('kol.kolName')">
-            <span data-test="profile-view-name">{{ text(form.name) }}</span>
-          </el-descriptions-item>
-          <el-descriptions-item :label="t('kol.whatsapp')">
-            <CopyText v-if="form.whatsapp" :value="form.whatsapp" />
-            <span v-else>-</span>
-          </el-descriptions-item>
-          <el-descriptions-item :label="t('kol.phone')">
-            <CopyText v-if="form.phone" :value="form.phone" />
-            <span v-else>-</span>
-          </el-descriptions-item>
-          <el-descriptions-item :label="t('kol.platformLabel')">
-            {{ text(form.platform) }}
-          </el-descriptions-item>
-          <el-descriptions-item :label="t('kol.handleLabel')">
-            {{ text(form.handle) }}
-          </el-descriptions-item>
-        </el-descriptions>
-        <el-form
-          v-else
-          ref="formRef"
-          :model="form"
-          :rules="rules"
-          label-position="top"
-          @submit.prevent
-        >
-          <el-form-item :label="t('common.email')">
-            <div class="readonly-value" data-test="profile-email">
-              <CopyText :value="kol?.email" />
-              <el-button
-                v-if="canResetPassword"
-                type="danger"
-                link
-                data-test="reset-password"
-                :loading="resetting"
-                @click="resetPassword"
-              >
-                {{ t("kol.resetPassword") }}
-              </el-button>
-            </div>
-          </el-form-item>
-          <el-form-item :label="t('kol.kolName')" prop="name">
-            <el-input v-model="form.name" data-test="profile-name" maxlength="64" />
-          </el-form-item>
-          <el-form-item :label="t('kol.whatsapp')" prop="whatsapp">
-            <el-input
-              v-model="form.whatsapp"
-              data-test="profile-whatsapp"
-              maxlength="32"
-              :placeholder="t('kol.whatsappPlaceholder')"
-            />
-          </el-form-item>
-          <el-form-item :label="t('kol.phone')" prop="phone">
-            <el-input
-              v-model="form.phone"
-              data-test="profile-phone"
-              maxlength="32"
-              :placeholder="t('kol.phonePlaceholder')"
-            />
-          </el-form-item>
-          <el-form-item :label="t('kol.platformLabel')">
-            <el-input
-              v-model="form.platform"
-              data-test="profile-platform"
-              maxlength="32"
-              :placeholder="t('kol.platformPlaceholder')"
-            />
-          </el-form-item>
-          <el-form-item :label="t('kol.handleLabel')">
-            <el-input
-              v-model="form.handle"
-              data-test="profile-handle"
-              maxlength="128"
-              :placeholder="t('kol.handlePlaceholder')"
-            />
-          </el-form-item>
-        </el-form>
-      </el-tab-pane>
-      <el-tab-pane :label="t('kol.tabInviter')" name="inviter">
-        <el-descriptions v-if="!inviterEditable" :column="1" border data-test="inviter-view">
-          <el-descriptions-item :label="t('kol.inviter')">
-            <span data-test="profile-inviter">{{ kol?.bdUserName ?? "-" }}</span>
-          </el-descriptions-item>
-          <el-descriptions-item :label="t('kol.bdDiscord')">
-            <span data-test="profile-bd-discord-view">
-              <CopyText v-if="form.bdDiscord" :value="form.bdDiscord" />
-              <template v-else>-</template>
-            </span>
-          </el-descriptions-item>
-          <el-descriptions-item :label="t('kol.bdWhatsapp')">
-            <span data-test="profile-bd-whatsapp-view">
-              <CopyText v-if="form.bdWhatsapp" :value="form.bdWhatsapp" />
-              <template v-else>-</template>
-            </span>
-          </el-descriptions-item>
-        </el-descriptions>
-        <el-form v-else label-position="top" @submit.prevent>
-          <el-form-item :label="t('kol.inviter')">
-            <div class="inviter-block">
-              <div class="readonly-value" data-test="profile-inviter">
-                {{ kol?.bdUserName ?? "-" }}
-              </div>
-              <p class="form-hint">{{ t("kol.inviterHint") }}</p>
-            </div>
-          </el-form-item>
-          <p class="form-hint accounts-hint">{{ t("kol.inviterAccountsHint") }}</p>
-          <el-form-item :label="t('kol.bdDiscord')">
-            <el-input
-              v-model="form.bdDiscord"
-              data-test="profile-bd-discord"
-              maxlength="64"
-              :placeholder="t('kol.bdDiscordPlaceholder')"
-            />
-          </el-form-item>
-          <el-form-item :label="t('kol.bdWhatsapp')">
-            <el-input
-              v-model="form.bdWhatsapp"
-              data-test="profile-bd-whatsapp"
-              maxlength="64"
-              :placeholder="t('kol.bdWhatsappPlaceholder')"
-            />
-          </el-form-item>
-        </el-form>
-      </el-tab-pane>
-    </el-tabs>
-    <template #footer>
-      <el-button @click="close">{{
-        profileEditable ? t("common.cancel") : t("common.close")
-      }}</el-button>
-      <el-button
-        v-if="!profileEditable"
-        type="primary"
-        data-test="profile-edit"
-        @click="editing = true"
-        >{{ t("kol.editProfile") }}</el-button
+
+    <el-form
+      ref="formRef"
+      :model="form"
+      :rules="rules"
+      :data-test="profileEditable ? undefined : 'profile-view'"
+      :class="{ 'profile-layout--view': !profileEditable }"
+      class="profile-layout"
+      label-position="top"
+      scroll-to-error
+      @submit.prevent
+    >
+      <section class="profile-section profile-section--identity">
+        <h2 class="profile-section__title">{{ t("kol.tabProfile") }}</h2>
+        <el-form-item :label="t('kol.kolName')" prop="name">
+          <el-input
+            v-if="profileEditable"
+            v-model="form.name"
+            data-test="profile-name"
+            maxlength="64"
+          />
+          <span v-else class="profile-value" data-test="profile-view-name">{{
+            text(form.name)
+          }}</span>
+        </el-form-item>
+        <el-form-item :label="t('order.kolCode')">
+          <span class="profile-value" data-test="profile-code">{{ kol?.kolCode || "—" }}</span>
+        </el-form-item>
+      </section>
+
+      <section class="profile-section profile-section--contact">
+        <h2 class="profile-section__title">{{ t("kol.profileContact") }}</h2>
+        <el-form-item :label="t('common.email')">
+          <div class="profile-value" data-test="profile-email">
+            <CopyText v-if="kol?.email" :value="kol.email" hide-tooltip />
+            <span v-else>—</span>
+          </div>
+        </el-form-item>
+        <el-form-item :label="t('kol.whatsapp')" prop="whatsapp">
+          <el-input
+            v-if="profileEditable"
+            v-model="form.whatsapp"
+            data-test="profile-whatsapp"
+            maxlength="32"
+            :placeholder="t('kol.whatsappPlaceholder')"
+          />
+          <div v-else class="profile-value">
+            <CopyText v-if="form.whatsapp" :value="form.whatsapp" hide-tooltip />
+            <span v-else>—</span>
+          </div>
+        </el-form-item>
+        <el-form-item :label="t('kol.phone')" prop="phone">
+          <el-input
+            v-if="profileEditable"
+            v-model="form.phone"
+            data-test="profile-phone"
+            maxlength="32"
+            :placeholder="t('kol.phonePlaceholder')"
+          />
+          <div v-else class="profile-value">
+            <CopyText v-if="form.phone" :value="form.phone" hide-tooltip />
+            <span v-else>—</span>
+          </div>
+        </el-form-item>
+        <el-form-item :label="t('kol.platformLabel')">
+          <el-input
+            v-if="profileEditable"
+            v-model="form.platform"
+            data-test="profile-platform"
+            maxlength="32"
+            :placeholder="t('kol.platformPlaceholder')"
+          />
+          <span v-else class="profile-value">{{ text(form.platform) }}</span>
+        </el-form-item>
+        <el-form-item :label="t('kol.handleLabel')">
+          <el-input
+            v-if="profileEditable"
+            v-model="form.handle"
+            data-test="profile-handle"
+            maxlength="128"
+            :placeholder="t('kol.handlePlaceholder')"
+          />
+          <span v-else class="profile-value">{{ text(form.handle) }}</span>
+        </el-form-item>
+      </section>
+
+      <section
+        class="profile-section profile-section--inviter"
+        :data-test="inviterEditable ? undefined : 'inviter-view'"
       >
-      <el-button v-else type="primary" data-test="profile-save" :loading="saving" @click="submit">{{
-        props.review ? t("kol.approveReview") : t("common.save")
-      }}</el-button>
+        <h2 class="profile-section__title">{{ t("kol.tabInviter") }}</h2>
+        <el-form-item :label="t('kol.inviter')">
+          <div class="profile-value">
+            <div data-test="profile-inviter">{{ kol?.bdUserName || "—" }}</div>
+            <p v-if="inviterEditable" class="form-hint">{{ t("kol.inviterHint") }}</p>
+          </div>
+        </el-form-item>
+        <p v-if="inviterEditable" class="form-hint accounts-hint">
+          {{ t("kol.inviterAccountsHint") }}
+        </p>
+        <el-form-item :label="t('kol.bdDiscord')">
+          <el-input
+            v-if="inviterEditable"
+            v-model="form.bdDiscord"
+            data-test="profile-bd-discord"
+            maxlength="64"
+            :placeholder="t('kol.bdDiscordPlaceholder')"
+          />
+          <div v-else class="profile-value" data-test="profile-bd-discord-view">
+            <CopyText v-if="form.bdDiscord" :value="form.bdDiscord" hide-tooltip />
+            <span v-else>—</span>
+          </div>
+        </el-form-item>
+        <el-form-item :label="t('kol.bdWhatsapp')">
+          <el-input
+            v-if="inviterEditable"
+            v-model="form.bdWhatsapp"
+            data-test="profile-bd-whatsapp"
+            maxlength="64"
+            :placeholder="t('kol.bdWhatsappPlaceholder')"
+          />
+          <div v-else class="profile-value" data-test="profile-bd-whatsapp-view">
+            <CopyText v-if="form.bdWhatsapp" :value="form.bdWhatsapp" hide-tooltip />
+            <span v-else>—</span>
+          </div>
+        </el-form-item>
+      </section>
+    </el-form>
+
+    <template #footer>
+      <div class="profile-actions">
+        <el-button
+          v-if="canResetPassword"
+          type="danger"
+          link
+          data-test="reset-password"
+          :loading="resetting"
+          @click="resetPassword"
+        >
+          {{ t("kol.resetPassword") }}
+        </el-button>
+        <div class="profile-actions__main">
+          <el-button @click="close">{{
+            profileEditable ? t("common.cancel") : t("common.close")
+          }}</el-button>
+          <el-button
+            v-if="!profileEditable"
+            type="primary"
+            data-test="profile-edit"
+            @click="editing = true"
+          >
+            {{ t("kol.editProfile") }}
+          </el-button>
+          <el-button
+            v-else
+            type="primary"
+            data-test="profile-save"
+            :loading="saving"
+            @click="submit"
+          >
+            {{ review ? t("kol.approveReview") : t("common.save") }}
+          </el-button>
+        </div>
+      </div>
     </template>
   </el-dialog>
 </template>
 
 <style scoped>
-.readonly-value {
-  display: flex;
-  align-items: center;
-  min-height: var(--tcrm-control-height);
+.profile-layout {
+  display: grid;
+  gap: var(--tcrm-space-4);
+  align-items: start;
 }
-.inviter-block {
-  width: 100%;
+
+.profile-section {
+  min-width: 0;
+  padding: var(--tcrm-space-3);
+  border: 1px solid var(--tcrm-color-border);
+  border-radius: var(--tcrm-radius-card);
+  background: var(--tcrm-color-card);
 }
-.form-hint {
+
+.profile-section__title {
+  margin: 0 0 var(--tcrm-space-3);
+  color: var(--tcrm-color-text);
+  font-size: var(--tcrm-font-size-section);
+  line-height: var(--tcrm-line-height-section);
+  font-weight: 600;
+}
+
+.profile-section :deep(.el-form-item:last-child) {
+  margin-bottom: 0;
+}
+
+.profile-layout--view :deep(.el-form-item) {
+  margin-bottom: var(--tcrm-space-2);
+}
+
+.profile-layout--view :deep(.el-form-item:last-child) {
+  margin-bottom: 0;
+}
+
+.profile-layout--view :deep(.el-form-item__label) {
+  margin-bottom: var(--tcrm-space-1);
+  color: var(--tcrm-color-text-secondary);
+}
+
+.profile-layout--view :deep(.el-form-item__content) {
+  line-height: var(--tcrm-line-height-body);
+}
+
+.profile-value {
+  min-width: 0;
+  color: var(--tcrm-color-text);
+  overflow-wrap: anywhere;
+}
+
+.profile-value :deep(.copy-text__value) {
+  white-space: normal;
+  overflow-wrap: anywhere;
+}
+
+@media (min-width: 601px) {
+  .profile-layout--view {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    grid-template-rows: auto 1fr;
+    grid-template-areas: "identity contact" "inviter contact";
+  }
+
+  .profile-layout--view .profile-section--identity {
+    grid-area: identity;
+  }
+
+  .profile-layout--view .profile-section--contact {
+    grid-area: contact;
+    align-self: stretch;
+  }
+
+  .profile-layout--view .profile-section--inviter {
+    grid-area: inviter;
+  }
+}
+
+.form-hint,
+.reset-hint {
   margin: var(--tcrm-space-1) 0 0;
   color: var(--tcrm-color-text-secondary);
   font-size: var(--tcrm-font-size-help);
   line-height: var(--tcrm-line-height-help);
 }
+
 .accounts-hint {
-  margin: 0 0 var(--tcrm-space-2);
+  margin: 0 0 var(--tcrm-space-3);
 }
+
 .reset-result {
-  margin-bottom: var(--tcrm-space-4);
+  margin-bottom: var(--tcrm-space-3);
   padding: var(--tcrm-space-3) var(--tcrm-space-4);
   border: 1px solid var(--el-color-warning-light-5);
   border-radius: var(--tcrm-radius-control);
-  background: var(--el-color-warning-light-9);
+  background: var(--tcrm-color-warning-bg);
 }
+
 .reset-hint {
   margin: 0 0 var(--tcrm-space-2);
-  color: var(--tcrm-color-text-secondary);
-  font-size: var(--tcrm-font-size-help);
-  line-height: var(--tcrm-line-height-help);
+}
+
+.profile-actions {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: var(--tcrm-space-2) var(--tcrm-space-4);
+  padding-top: var(--tcrm-space-3);
+  border-top: 1px solid var(--tcrm-color-border);
+}
+
+.profile-actions__main {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--tcrm-space-2);
+  margin-inline-start: auto;
+}
+
+.profile-actions__main :deep(.el-button + .el-button) {
+  margin: 0;
 }
 </style>

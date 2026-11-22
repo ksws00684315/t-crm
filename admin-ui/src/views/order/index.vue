@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { ElMessage } from "element-plus";
 import { Picture } from "@element-plus/icons-vue";
 import { computed, onMounted, reactive, ref } from "vue";
 import { useI18n } from "vue-i18n";
@@ -17,7 +18,12 @@ import { formatInstant, formatNameWithCode, formatAmountWithCurrency } from "@/u
 import { notifyError } from "@/utils/notify";
 import { importTemplateFileName, ORDER_IMPORT } from "@/utils/import-types";
 import { orderAbilities } from "@/utils/permission";
-import { orderRefundStatusText, orderTimeRangeToQuery } from "@/utils/order";
+import {
+  MAX_ORDER_DATE_DAYS,
+  orderDateRangeDays,
+  orderDateRangeToQuery,
+  orderRefundStatusText
+} from "@/utils/order";
 import { readPageSize } from "@/utils/table-prefs";
 import OrderDetailDrawer from "./OrderDetailDrawer.vue";
 import SyncStatesDialog from "./SyncStatesDialog.vue";
@@ -52,7 +58,7 @@ const query = reactive<{
   shopId?: string;
   kolKeyword: string;
   status?: OrderFilterStatus;
-  orderTimeRange: [Date, Date] | null;
+  orderTimeRange: [string, string] | null;
 }>({
   page: 1,
   size: readPageSize("orders", 20),
@@ -60,6 +66,17 @@ const query = reactive<{
   kolKeyword: "",
   orderTimeRange: null
 });
+
+const calendarStart = ref<Date>();
+function onCalendarChange([start, end]: [Date | null, Date | null]) {
+  calendarStart.value = start && !end ? start : undefined;
+}
+function disableOrderDate(date: Date) {
+  const start = calendarStart.value;
+  if (!start) return false;
+  const day = (value: Date) => Date.UTC(value.getFullYear(), value.getMonth(), value.getDate());
+  return Math.abs(day(start) - day(date)) >= MAX_ORDER_DATE_DAYS * 86_400_000;
+}
 
 /** Shop cell per 09.04: "name (code)"; the code comes with task 37's backend and may be null. */
 function shopText(order: OrderVO): string {
@@ -209,7 +226,7 @@ function appliedQuery(): OrderQuery {
     orderNo: applied.value.orderNo || undefined,
     shopId: applied.value.shopId || undefined,
     kolKeyword: applied.value.kolKeyword || undefined,
-    ...orderTimeRangeToQuery(applied.value.orderTimeRange)
+    ...orderDateRangeToQuery(applied.value.orderTimeRange)
   };
   if (status === "REFUNDING" || status === "REFUND_SUCCESS") {
     params.refundState = status === "REFUNDING" ? "REFUNDING" : "REFUNDED";
@@ -231,7 +248,7 @@ const chips = computed<SearchChip[]>(() => {
     list.push({
       key: "shop",
       label: t("order.shop"),
-      text: shop?.shopName ?? applied.value.shopId
+      text: shop?.shopName ?? "—"
     });
   }
   if (applied.value.kolKeyword) {
@@ -253,7 +270,7 @@ const chips = computed<SearchChip[]>(() => {
     list.push({
       key: "orderTimeRange",
       label: t("order.orderTime"),
-      text: `${formatInstant(from.toISOString())} ~ ${formatInstant(to.toISOString())}`
+      text: `${from} ~ ${to}`
     });
   }
   return list;
@@ -294,6 +311,13 @@ async function loadShops() {
 }
 
 function search() {
+  if (query.orderTimeRange) {
+    const days = orderDateRangeDays(...query.orderTimeRange);
+    if (!Number.isFinite(days) || days < 1 || days > MAX_ORDER_DATE_DAYS) {
+      ElMessage.warning(t("order.orderDateRangeLimit", { days: MAX_ORDER_DATE_DAYS }));
+      return;
+    }
+  }
   query.page = 1;
   applied.value = snapshot();
   void load();
@@ -370,7 +394,7 @@ onMounted(() => {
 
 <template>
   <div class="list-page order-list-page">
-    <ListSearch :chips="chips" has-more @search="search" @reset="reset" @remove="removeChip">
+    <ListSearch :chips="chips" @search="search" @reset="reset" @remove="removeChip">
       <template #primary>
         <el-form-item :label="t('order.orderId')">
           <el-input
@@ -417,14 +441,19 @@ onMounted(() => {
             />
           </el-select>
         </el-form-item>
-      </template>
-      <template #more>
         <el-form-item :label="t('order.orderTime')">
           <el-date-picker
             v-model="query.orderTimeRange"
-            type="datetimerange"
-            :start-placeholder="t('order.orderTime')"
-            :end-placeholder="t('order.orderTime')"
+            type="daterange"
+            single-panel
+            format="YYYY-MM-DD"
+            value-format="YYYY-MM-DD"
+            placement="bottom-start"
+            :start-placeholder="t('order.orderDateStart')"
+            :end-placeholder="t('order.orderDateEnd')"
+            :disabled-date="disableOrderDate"
+            @calendar-change="onCalendarChange"
+            @visible-change="calendarStart = undefined"
             class="filter-w-lg"
             data-test="filter-order-time"
           />

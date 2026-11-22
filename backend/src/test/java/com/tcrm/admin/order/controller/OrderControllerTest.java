@@ -137,6 +137,29 @@ class OrderControllerTest {
   }
 
   @Test
+  void shouldRejectOrderTimeWindowLongerThanThirtyDays() throws Exception {
+    mvc.perform(
+            get("/admin-api/order/orders")
+                .param("orderTimeFrom", "2026-10-01T16:00:00Z")
+                .param("orderTimeTo", "2026-11-01T16:00:00Z")
+                .header(AdminMvcSupport.TOKEN_HEADER, admin()))
+        .andExpect(status().isBadRequest());
+    verifyNoInteractions(orders);
+  }
+
+  @Test
+  void shouldRejectOrderTimeWindowWithEitherEndpointMissing() throws Exception {
+    for (String endpoint : List.of("orderTimeFrom", "orderTimeTo")) {
+      mvc.perform(
+              get("/admin-api/order/orders")
+                  .param(endpoint, "2026-10-17T00:00:00Z")
+                  .header(AdminMvcSupport.TOKEN_HEADER, admin()))
+          .andExpect(status().isBadRequest());
+    }
+    verifyNoInteractions(orders);
+  }
+
+  @Test
   void shouldUsePoolCondition_whenQueryingUnmatchedOrders() throws Exception {
     when(orders.page(any(), eq(true))).thenReturn(new PageResult<>(List.of(), 0, 2, 5));
     mvc.perform(

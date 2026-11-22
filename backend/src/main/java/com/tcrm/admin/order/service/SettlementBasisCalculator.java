@@ -319,7 +319,7 @@ public final class SettlementBasisCalculator {
    * largest-pay line (ties: the smallest order item id), so line amounts always add up to the
    * total. Returns null when a non-zero amount meets an all-zero line-pay order.
    */
-  private static Map<Long, BigDecimal> allocate(BigDecimal total, List<OrderItemDO> items) {
+  static Map<Long, BigDecimal> allocate(BigDecimal total, List<OrderItemDO> items) {
     Map<Long, BigDecimal> result = new LinkedHashMap<>();
     BigDecimal totalPay = BigDecimal.ZERO;
     for (OrderItemDO item : items) {

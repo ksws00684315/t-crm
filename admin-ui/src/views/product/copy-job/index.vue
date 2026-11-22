@@ -3,13 +3,13 @@ import { computed, onMounted, reactive, ref, watch } from "vue";
 import { useRoute } from "vue-router";
 import { useI18n } from "vue-i18n";
 import {
-  getCopyDailyQuota,
   listCopyJobItems,
   listCopyJobs,
-  type CopyDailyQuotaVO,
   type CopyJobItemVO,
   type CopyJobVO
 } from "@/api/product/copy-job";
+import { listKols } from "@/api/kol/kol";
+import type { KolVO } from "@/api/types";
 import CopyText from "@/components/CopyText.vue";
 import DataTable, { type DataColumn } from "@/components/DataTable.vue";
 import ListSearch from "@/components/ListSearch.vue";
@@ -37,16 +37,31 @@ const loading = ref(false);
 const loadFailed = ref(false);
 const rows = ref<CopyJobVO[]>([]);
 const total = ref(0);
+let listRequest = 0;
 const query = reactive({
   page: 1,
   size: readPageSize("copy-jobs", 20),
   jobCode: "",
+  targetItemId: "",
+  kolId: undefined as string | undefined,
   targetChannel: "",
   status: ""
 });
 
-/** Task 140: today's copy usage; the line stays hidden when it cannot be read. */
-const dailyQuota = ref<CopyDailyQuotaVO | null>(null);
+const kolOptions = ref<KolVO[]>([]);
+const kolSearching = ref(false);
+
+async function searchKols(keyword: string) {
+  if (!keyword.trim()) return;
+  kolSearching.value = true;
+  try {
+    kolOptions.value = (await listKols({ keyword: keyword.trim(), page: 1, size: 20 })).items;
+  } catch (error) {
+    notifyError(error);
+  } finally {
+    kolSearching.value = false;
+  }
+}
 
 const detailVisible = ref(false);
 const detailLoading = ref(false);
@@ -55,6 +70,15 @@ const detailJob = ref<CopyJobVO | null>(null);
 const detailRows = ref<CopyJobItemVO[]>([]);
 const detailTotal = ref(0);
 const detailQuery = reactive({ page: 1, size: readPageSize("copy-job-items", 20) });
+
+const detailSort = ref<"ASCENDING" | "DESCENDING">();
+let detailRequest = 0;
+const detailTableKey = ref(0);
+
+function sortDetail({ order }: { order: "ascending" | "descending" | null }) {
+  detailSort.value = order ? (order === "ascending" ? "ASCENDING" : "DESCENDING") : undefined;
+  onDetailPage(1);
+}
 
 function asJob(row: object): CopyJobVO {
   return row as CopyJobVO;
@@ -117,13 +141,6 @@ const columns = computed<DataColumn[]>(() => [
   // R-01 (browser-measured, assets/task-59/measurements-{zh,en}.md): three nowrap tags need
   // ~232px (zh, 1-digit counts) to ~292px (en, 3-digit counts) including cell padding.
   { key: "result", label: t("copyJob.result"), minWidth: px(240, 300) },
-  {
-    key: "errorMessage",
-    align: "left" as const,
-    label: t("copyJob.error"),
-    minWidth: 160,
-    tooltip: true
-  },
   { key: "createTime", label: t("copyJob.createTime"), width: px(170, 180) },
   { key: "finishTime", label: t("copyJob.finishTime"), width: px(170, 180) },
   {
@@ -158,16 +175,29 @@ const itemColumns = computed<DataColumn[]>(() => [
     key: "sourceProductId",
     align: "left" as const,
     label: t("copyJob.sourceProductId"),
-    minWidth: 150
+    minWidth: 150,
+    tooltip: false
   },
   { key: "sourceChannel", label: t("copyJob.sourceChannel"), width: 110 },
   { key: "sourceShop", align: "left" as const, label: t("copyJob.sourceShop"), minWidth: 140 },
   { key: "targetChannel", label: t("copyJob.targetChannel"), width: 110 },
   { key: "targetShop", align: "left" as const, label: t("copyJob.targetShop"), minWidth: 140 },
-  { key: "targetItemId", align: "left" as const, label: t("copyJob.targetItemId"), minWidth: 140 },
+  {
+    key: "targetItemId",
+    align: "left" as const,
+    label: t("copyJob.targetItemId"),
+    minWidth: 140,
+    tooltip: false
+  },
   { key: "targetItemUrl", align: "left" as const, label: t("copyJob.targetItemUrl"), width: 90 },
-  { key: "status", label: t("copyJob.status"), width: 90 },
-  { key: "errorMessage", align: "left" as const, label: t("copyJob.failReason"), minWidth: 160 }
+  { key: "status", label: t("copyJob.status"), width: 110, sortable: true },
+  {
+    key: "errorMessage",
+    align: "left" as const,
+    label: t("copyJob.failReason"),
+    minWidth: 160,
+    tooltip: false
+  }
 ]);
 
 const detailTitle = computed(() =>
@@ -186,32 +216,28 @@ function listParams() {
     page: query.page,
     size: query.size,
     jobCode: query.jobCode.trim() || undefined,
+    ...(query.targetItemId.trim() ? { targetItemId: query.targetItemId.trim() } : {}),
+    ...(query.kolId ? { kolId: query.kolId } : {}),
     targetChannel: query.targetChannel || undefined,
     status: query.status || undefined
   };
 }
 
-async function loadDailyQuota(): Promise<void> {
-  try {
-    dailyQuota.value = await getCopyDailyQuota();
-  } catch {
-    dailyQuota.value = null;
-  }
-}
-
 async function load(): Promise<void> {
-  void loadDailyQuota();
+  const request = ++listRequest;
   loading.value = true;
   loadFailed.value = false;
   try {
     const page = await listCopyJobs(listParams());
+    if (request !== listRequest) return;
     rows.value = page.items;
     total.value = Number(page.total);
   } catch (error) {
+    if (request !== listRequest) return;
     loadFailed.value = true;
     notifyError(error);
   } finally {
-    loading.value = false;
+    if (request === listRequest) loading.value = false;
   }
 }
 
@@ -222,6 +248,8 @@ function search(): void {
 
 function reset(): void {
   query.jobCode = "";
+  query.targetItemId = "";
+  query.kolId = undefined;
   query.targetChannel = "";
   query.status = "";
   query.page = 1;
@@ -242,25 +270,33 @@ function onSize(size: number): void {
 async function loadItems(): Promise<void> {
   const job = detailJob.value;
   if (!job) return;
+  const request = ++detailRequest;
   detailLoading.value = true;
   detailFailed.value = false;
   try {
     const page = await listCopyJobItems(job.id, {
       page: detailQuery.page,
-      size: detailQuery.size
+      size: detailQuery.size,
+      ...(detailSort.value ? { statusOrder: detailSort.value } : {})
     });
+    if (request !== detailRequest) return;
     detailRows.value = page.items;
     detailTotal.value = Number(page.total);
   } catch (error) {
+    if (request !== detailRequest) return;
     detailFailed.value = true;
     notifyError(error);
   } finally {
-    detailLoading.value = false;
+    if (request === detailRequest) detailLoading.value = false;
   }
 }
 
 function openDetail(row: CopyJobVO): void {
   detailJob.value = row;
+  detailSort.value = undefined;
+  detailTableKey.value++;
+  detailRows.value = [];
+  detailTotal.value = 0;
   detailQuery.page = 1;
   detailVisible.value = true;
   void loadItems();
@@ -325,13 +361,6 @@ onMounted(() => {
 
 <template>
   <div class="list-page" data-test="copy-job-page">
-    <el-alert
-      v-if="dailyQuota"
-      type="info"
-      :closable="false"
-      :title="t('copyJob.dailyQuota', { used: dailyQuota.used, limit: dailyQuota.limit })"
-      data-test="copy-daily-quota"
-    />
     <ListSearch @search="search" @reset="reset">
       <template #primary>
         <el-form-item :label="t('copyJob.jobCode')">
@@ -342,6 +371,34 @@ onMounted(() => {
             data-test="job-code"
             class="copy-job__filter"
           />
+        </el-form-item>
+        <el-form-item :label="t('copyJob.targetItemId')">
+          <el-input
+            v-model="query.targetItemId"
+            maxlength="32"
+            clearable
+            data-test="target-item-id-filter"
+          />
+        </el-form-item>
+        <el-form-item :label="t('copyJob.creatorFilter')">
+          <el-select
+            v-model="query.kolId"
+            filterable
+            remote
+            clearable
+            :remote-method="searchKols"
+            :loading="kolSearching"
+            :placeholder="t('copyJob.creatorPlaceholder')"
+            class="filter-w-md"
+            data-test="job-kol-filter"
+          >
+            <el-option
+              v-for="kol in kolOptions"
+              :key="kol.id"
+              :label="formatNameWithCode(kol.name, kol.kolCode)"
+              :value="kol.id"
+            />
+          </el-select>
         </el-form-item>
         <el-form-item :label="t('copyJob.targetChannel')">
           <el-select
@@ -379,6 +436,7 @@ onMounted(() => {
     </ListSearch>
 
     <DataTable
+      class="copy-job-table"
       table-id="copy-jobs"
       fill-available-height
       :rows="rows"
@@ -426,12 +484,6 @@ onMounted(() => {
           >
         </span>
       </template>
-      <template #cell-errorMessage="{ row }">
-        <span v-if="!asJob(row).errorMessage" data-test="job-error">{{ t("copyJob.none") }}</span>
-        <el-tooltip v-else :content="asJob(row).errorMessage ?? ''" placement="top">
-          <span class="copy-job__error" data-test="job-error">{{ asJob(row).errorMessage }}</span>
-        </el-tooltip>
-      </template>
       <template #cell-createTime="{ row }">{{ formatInstant(asJob(row).createTime) }}</template>
       <template #cell-finishTime="{ row }">{{ formatInstant(asJob(row).finishTime) }}</template>
       <template #cell-targetShopName="{ row }">
@@ -450,9 +502,19 @@ onMounted(() => {
       v-model="detailVisible"
       :title="detailTitle"
       width="92%"
+      destroy-on-close
       data-test="copy-job-items-dialog"
     >
+      <el-alert
+        v-if="detailJob?.errorMessage"
+        :title="detailJob.errorMessage"
+        type="error"
+        :closable="false"
+        show-icon
+      />
       <DataTable
+        :key="detailTableKey"
+        class="copy-job-table"
         table-id="copy-job-items"
         row-key="seq"
         plain
@@ -466,17 +528,18 @@ onMounted(() => {
         @update:page="onDetailPage"
         @update:size="onDetailSize"
         @retry="loadItems"
+        @sort-change="sortDetail"
       >
         <template #cell-sourceChannel="{ row }">{{
           channelText(asItem(row).sourceChannel)
         }}</template>
         <template #cell-sourceProductId="{ row }">
-          <CopyText :value="asItem(row).sourceProductId" />
+          <CopyText class="copy-job__item-id" :value="asItem(row).sourceProductId" hide-tooltip />
         </template>
         <template #cell-sourceShop="{ row }">
           <NameCode
             :name="asItem(row).sourceShopName"
-            :code="asItem(row).sourceShopId"
+            :code="asItem(row).sourceWeidianShopId || t('copyJob.none')"
             data-test="source-shop"
           />
         </template>
@@ -489,12 +552,12 @@ onMounted(() => {
         <template #cell-targetShop="{ row }">
           <NameCode
             :name="asItem(row).targetShopName"
-            :code="asItem(row).targetShopId"
+            :code="asItem(row).targetWeidianShopId || t('copyJob.none')"
             data-test="target-shop"
           />
         </template>
         <template #cell-targetItemId="{ row }">
-          <span data-test="target-item-id">{{
+          <span class="copy-job__item-id" data-test="target-item-id">{{
             asItem(row).targetItemId || t("copyJob.none")
           }}</span>
         </template>
@@ -523,7 +586,13 @@ onMounted(() => {
         >
         <template #cell-errorMessage="{ row }">
           <span v-if="!asItem(row).errorMessage">{{ t("copyJob.none") }}</span>
-          <el-tooltip v-else :content="asItem(row).errorMessage ?? ''" placement="top">
+          <el-tooltip
+            v-else
+            :content="asItem(row).errorMessage ?? ''"
+            :enterable="false"
+            :hide-after="0"
+            placement="top"
+          >
             <span class="copy-job__error" data-test="item-error">{{
               asItem(row).errorMessage
             }}</span>
@@ -535,6 +604,22 @@ onMounted(() => {
 </template>
 
 <style scoped>
+.copy-job-table :deep(.el-table) {
+  --el-table-row-hover-bg-color: var(--tcrm-color-card);
+}
+.copy-job-table :deep(.el-table__body td.el-table__cell) {
+  background-color: var(--tcrm-color-card);
+  transition: none;
+}
+.copy-job-table :deep(.el-table__body tr:hover > td.el-table__cell) {
+  background-color: var(--tcrm-color-muted);
+}
+.copy-job__item-id,
+.copy-job__item-id :deep(.copy-text__value) {
+  overflow-wrap: anywhere;
+  white-space: normal;
+}
+
 .copy-job__filter {
   width: 100%;
 }
