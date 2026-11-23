@@ -572,6 +572,8 @@ function lineStatus(line: ChainLineVO): string {
 const summaryColumns = computed<DataColumn[]>(() => [
   { key: "image", label: t("order.chain.productImage"), width: 76 },
   { key: "product", align: "left", label: t("order.chain.productNameSku"), minWidth: 178 },
+  { key: "sourceItemId", align: "left", label: t("order.chain.sourceItemId"), minWidth: 140 },
+  { key: "newItemId", align: "left", label: t("order.chain.newItemId"), minWidth: 140 },
   { key: "status", label: t("common.status"), minWidth: 90, align: "left" },
   { key: "unitPrice", label: t("order.detail.unitPrice"), minWidth: 104, amount: true },
   { key: "quantity", label: t("order.line.quantity"), minWidth: 80 },
@@ -779,6 +781,26 @@ onMounted(load);
               <span>{{ lineName(row as ChainLineVO) }}</span>
               <span class="chain-product__secondary">{{ lineSku(row as ChainLineVO) || "—" }}</span>
             </div>
+          </template>
+          <template #cell-sourceItemId="{ row }">
+            <CopyText
+              v-if="(row as ChainLineVO).link?.sourceItemId"
+              :value="(row as ChainLineVO).link?.sourceItemId"
+            />
+            <span v-else>—</span>
+          </template>
+          <template #cell-newItemId="{ row }">
+            <CopyText
+              v-if="
+                lineItem(row as ChainLineVO)?.weidianItemId ??
+                (row as ChainLineVO).link?.targetItemId
+              "
+              :value="
+                lineItem(row as ChainLineVO)?.weidianItemId ??
+                (row as ChainLineVO).link?.targetItemId
+              "
+            />
+            <span v-else>—</span>
           </template>
           <template #cell-status="{ row }">{{ lineStatus(row as ChainLineVO) }}</template>
           <template #cell-unitPrice="{ row }">{{

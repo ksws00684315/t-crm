@@ -2383,8 +2383,7 @@ const enUS: MessageSchema = {
       salesAmountLabel: "Sales",
       creatorCommissionAmount: "Creator commission",
       movementTime: "Movement time",
-      orderAfterSalesHint:
-        "Commission stays frozen during after-sales and is reduced when the item refund succeeds.",
+      orderAfterSalesHint: "Commission stays frozen until the refund succeeds, then is reduced.",
       frozenState: "Frozen",
       platformExpense: "Platform expense",
       currentFrozenCommission: "Frozen commission balance",
