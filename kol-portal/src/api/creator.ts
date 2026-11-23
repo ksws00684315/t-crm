@@ -196,12 +196,12 @@ export interface CreatorSalesTotal {
 export interface CreatorOrderSummary {
   /** 订单销售额: the orders' pay-amount sum, freight and refunds included. */
   orderSalesCny: string;
-  /** 预估退款金额: refunding orders count their full pay amount, concluded ones their refunds. */
+  /** Confirmed successful refunds. The field name is kept for API compatibility. */
   estimatedRefundCny: string;
-  /** 计佣金额: order sales − estimated refund; equals the per-order commission bases. */
-  commissionBaseCny: string;
+  /** Sum of verified line bases, including freight. Null if any basis is unavailable. */
+  commissionBaseCny: string | null;
   /** 预估总佣金: the rows' estimated commissions summed. */
-  estimatedCommissionCny: string;
+  estimatedCommissionCny: string | null;
 }
 
 export interface FundSummary {
@@ -628,12 +628,9 @@ export function getCreatorOrderSummary(params: CreatorOrderFilter): Promise<Crea
           )) &&
         (!params.settlementStatus || order.settlementStatus === params.settlementStatus)
     )) {
-      // Task 115 §2.4 (amount terms §5a): a refunding order holds its whole pay amount; a
-      // concluded one counts what was refunded. The base is the difference; the estimated
-      // commission sums the rows' commission amounts.
       const pay = moneyCents(order.payAmount);
       orderSales += pay;
-      estimatedRefund += order.afterSales ? pay : moneyCents(order.refundAmount);
+      estimatedRefund += moneyCents(order.refundAmount);
       for (const item of order.items) {
         estimatedCommission += moneyCents(item.commissionAmount ?? "0");
       }

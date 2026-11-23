@@ -17,7 +17,33 @@ public record StatsOverviewQuery(
     @Size(max = 100) String creatorKeyword,
     @Size(max = 100) String inviterKeyword,
     @Size(max = 100) String productKeyword,
-    Boolean affiliateOnly) {
+    Boolean affiliateOnly,
+    Boolean cumulative) {
+  public StatsOverviewQuery(
+      LocalDate startDate,
+      LocalDate endDate,
+      Long shopId,
+      Long kolId,
+      Long inviterId,
+      String channel,
+      String creatorKeyword,
+      String inviterKeyword,
+      String productKeyword,
+      Boolean affiliateOnly) {
+    this(
+        startDate,
+        endDate,
+        shopId,
+        kolId,
+        inviterId,
+        channel,
+        creatorKeyword,
+        inviterKeyword,
+        productKeyword,
+        affiliateOnly,
+        null);
+  }
+
   public StatsOverviewQuery(
       LocalDate startDate,
       LocalDate endDate,
@@ -73,6 +99,7 @@ public record StatsOverviewQuery(
         creatorKeyword,
         inviterKeyword,
         productKeyword,
-        Boolean.TRUE.equals(affiliateOnly));
+        Boolean.TRUE.equals(affiliateOnly),
+        Boolean.TRUE.equals(cumulative));
   }
 }

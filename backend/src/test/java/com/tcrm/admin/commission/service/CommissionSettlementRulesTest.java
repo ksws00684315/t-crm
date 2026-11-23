@@ -152,7 +152,7 @@ class CommissionSettlementRulesTest {
   }
 
   @Test
-  void shouldReleaseAfterCompletedPlusFreezeDays() {
+  void shouldStayFrozenAfterCompletionWithoutSettlement() {
     var result =
         CommissionSettlementRules.evaluate(
             inputs(
@@ -167,12 +167,12 @@ class CommissionSettlementRulesTest {
                 COMPLETED,
                 false,
                 7));
-    assertThat(result.releaseBasis()).isEqualTo(CommissionSettlementRules.RELEASE_FALLBACK);
-    assertThat(result.releaseAt()).isEqualTo(COMPLETED.plusSeconds(7 * 86400L));
+    assertThat(result.releaseBasis()).isEqualTo(CommissionSettlementRules.RELEASE_UNSETTLED);
+    assertThat(result.releaseAt()).isNull();
   }
 
   @Test
-  void shouldDefaultFreezeDaysToSeven() {
+  void shouldStayFrozenWithNoConfiguredFreezeDays() {
     var result =
         CommissionSettlementRules.evaluate(
             inputs(
@@ -187,7 +187,7 @@ class CommissionSettlementRulesTest {
                 COMPLETED,
                 false,
                 null));
-    assertThat(result.releaseAt()).isEqualTo(COMPLETED.plusSeconds(7 * 86400L));
+    assertThat(result.releaseAt()).isNull();
   }
 
   @Test
@@ -241,7 +241,7 @@ class CommissionSettlementRulesTest {
 
   @Test
   void shouldPreferFreezeDaysOverSettlementConfirmation() {
-    // Owner 2026-11-03 (L-052): completed 11-01, freeze 7 days, confirmed 11-05 → release 11-08.
+    // Completion on 11-01 does not postpone confirmed settlement on 11-05.
     Instant completed = Instant.parse("2026-11-01T00:00:00Z");
     Instant confirmed = Instant.parse("2026-11-05T00:00:00Z");
     var result =
@@ -258,8 +258,8 @@ class CommissionSettlementRulesTest {
                 completed,
                 false,
                 7));
-    assertThat(result.releaseBasis()).isEqualTo(CommissionSettlementRules.RELEASE_FALLBACK);
-    assertThat(result.releaseAt()).isEqualTo(completed.plusSeconds(7 * 86400L));
+    assertThat(result.releaseBasis()).isEqualTo(CommissionSettlementRules.RELEASE_CONFIRMED);
+    assertThat(result.releaseAt()).isEqualTo(confirmed);
   }
 
   @Test
@@ -305,12 +305,11 @@ class CommissionSettlementRulesTest {
   }
 
   @Test
-  void shouldAccrueZeroForUnreleasedLineInAfterSales() {
-    // Task 113 (定稿 §2.1): pay 100, rate 10%, nothing released, refund open → accrual 0.
+  void shouldPreserveUnreleasedAccrualWhileBlockingRelease() {
+    // Task 113 (定稿 §2.1): pay 100, rate 10%, nothing released, refund open → accrual 10.00.
     var result = CommissionSettlementRules.evaluate(afterSalesInputs(null, true, null));
     assertThat(result.verified()).isTrue();
-    assertThat(result.accruedCny()).isEqualByComparingTo("0.00");
-    // The result keeps the real effective basis; only the display reads 0.00 (commissionable).
+    assertThat(result.accruedCny()).isEqualByComparingTo("10.00");
     assertThat(result.effectiveBasisCny()).isEqualByComparingTo("100.00");
     assertThat(result.releaseBasis()).isEqualTo(CommissionSettlementRules.RELEASE_AFTER_SALES);
     assertThat(result.releaseAt()).isNull();
@@ -362,14 +361,14 @@ class CommissionSettlementRulesTest {
   }
 
   @Test
-  void shouldShowCommissionableZeroOnlyForUnreleasedAfterSalesLines() {
+  void shouldShowCommissionableAmountDuringAfterSales() {
     BigDecimal basis = new BigDecimal("100.00");
     assertThat(CommissionSettlementRules.commissionable(basis, false, null, true, null))
-        .isEqualByComparingTo("0.00");
+        .isEqualByComparingTo("100.00");
     assertThat(
             CommissionSettlementRules.commissionable(
                 basis, false, null, true, new BigDecimal("0.00")))
-        .isEqualByComparingTo("0.00");
+        .isEqualByComparingTo("100.00");
     assertThat(
             CommissionSettlementRules.commissionable(
                 basis, false, null, true, new BigDecimal("10.00")))
@@ -381,19 +380,23 @@ class CommissionSettlementRulesTest {
     assertThat(CommissionSettlementRules.commissionable(null, false, null, true, null)).isNull();
   }
 
-  @ParameterizedTest(name = "accrued {0}, released {1} -> adjustment {2}")
+  @ParameterizedTest(name = "refund {0}, released {1} -> adjustment {2}")
   @CsvSource({
-    "15.00, 0.00, 0.00, CREDIT",
-    "15.00, 15.00, 0.00, CREDIT",
-    "12.00, 15.00, -3.00, DEBIT",
-    "0.00, 15.00, -15.00, DEBIT",
-    "15.00, , 0.00, CREDIT"
+    "0.00, 0.00, 0.00, CREDIT",
+    "30.00, 0.00, -3.00, DEBIT",
+    "30.00, 12.00, -3.00, DEBIT",
+    "150.00, 0.00, -15.00, DEBIT"
   })
-  void shouldCountOnlyAReductionAfterReleaseAsRefundAdjustment(
-      String accrued, String released, String adjustment, String direction) {
-    BigDecimal value =
-        CommissionSettlementRules.refundAdjustment(
-            new BigDecimal(accrued), released == null ? null : new BigDecimal(released));
+  void shouldCountConfirmedRefundBeforeAndAfterRelease(
+      String refund, String released, String adjustment, String direction) {
+    var row = new CommissionItemStateDO();
+    row.setVerified(true);
+    row.setReleasedCommissionCny(new BigDecimal(released));
+    row.setBasisCny(new BigDecimal("150.00"));
+    row.setBasisIncludesRefund(false);
+    row.setSuccessfulRefundCny(new BigDecimal(refund));
+    row.setAccruedCommissionCny(new BigDecimal("15.00").add(new BigDecimal(adjustment)));
+    BigDecimal value = CommissionSettlementRules.refundAdjustment(row, new BigDecimal("0.10"));
     assertThat(value.toPlainString()).isEqualTo(adjustment);
     assertThat(CommissionSettlementRules.adjustmentDirection(value)).isEqualTo(direction);
   }

@@ -6,6 +6,7 @@ import com.tcrm.admin.shared.AuditLog;
 import com.tcrm.admin.shared.R;
 import com.tcrm.admin.stats.service.AnalyticsRankingService;
 import com.tcrm.admin.stats.service.AnalyticsRankingService.Board;
+import com.tcrm.admin.stats.service.AnalyticsRankingService.CreatorStatus;
 import com.tcrm.admin.stats.service.AnalyticsRankingService.Options;
 import com.tcrm.admin.stats.service.AnalyticsRankingService.Result;
 import com.tcrm.admin.stats.service.ShopPerformanceExport;
@@ -59,6 +60,28 @@ public class AnalyticsRankController {
       @ModelAttribute RankingQuery rank,
       @RequestParam(required = false) @Size(max = 100) String keyword) {
     return R.ok(query(Board.CREATOR, filters, rank, keyword));
+  }
+
+  @GetMapping("/creator-income")
+  @SaCheckPermission("commission:view")
+  public R<Result> creatorIncome(
+      @Valid @ModelAttribute StatsOverviewQuery filters,
+      @ModelAttribute RankingQuery rank,
+      @RequestParam(required = false) CreatorStatus creatorStatus) {
+    return R.ok(
+        rankings.income(
+            filters.toFilter(),
+            creatorStatus,
+            rank.page(),
+            rank.size(),
+            rank.sortBy(),
+            rank.sortDirection()));
+  }
+
+  @GetMapping("/creator-income/options")
+  @SaCheckPermission("commission:view")
+  public R<Options> creatorIncomeOptions() {
+    return R.ok(rankings.incomeOptions());
   }
 
   @GetMapping("/kol-ranking/exports")

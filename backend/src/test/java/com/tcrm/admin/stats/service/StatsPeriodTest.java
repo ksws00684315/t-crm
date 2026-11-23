@@ -21,6 +21,15 @@ class StatsPeriodTest {
   }
 
   @Test
+  void cumulativePeriodHasNoComparisonWindow() {
+    var period = StatsPeriod.resolve(TODAY, TODAY, true);
+    assertThat(period.cumulative()).isTrue();
+    assertThat(period.startDate()).isEqualTo(LocalDate.of(1900, 1, 1));
+    assertThat(period.endDate()).isEqualTo(LocalDate.now(java.time.ZoneId.of("Asia/Shanghai")));
+    assertThat(period.previous()).isNull();
+  }
+
+  @Test
   void validatesInclusiveMaximumAndRejectsIncompleteOrReversedPeriods() {
     assertThat(StatsPeriod.resolve(TODAY.minusDays(89), TODAY, TODAY).endDate()).isEqualTo(TODAY);
     assertThatThrownBy(() -> StatsPeriod.resolve(TODAY.minusDays(90), TODAY, TODAY))

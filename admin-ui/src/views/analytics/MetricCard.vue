@@ -14,7 +14,10 @@ const props = defineProps<{
   hint?: string;
   labelTerms?: Term[];
   detailTerms?: Term[];
+  detailSeparator?: string;
   comparison?: string;
+  badge?: string;
+  emphasize?: boolean;
   unavailable?: boolean;
   icon?: Component;
   tone?: "neutral" | "blue" | "green" | "amber" | "red" | "purple";
@@ -26,7 +29,10 @@ const note = computed(() => [props.detail, props.comparison].filter(Boolean).joi
 <template>
   <article
     class="metric-card"
-    :class="[tone && `metric-card--${tone}`, { 'metric-card--with-terms': labelTerms && icon }]"
+    :class="[
+      tone && `metric-card--${tone}`,
+      { 'metric-card--with-terms': labelTerms && icon, 'metric-card--expense': emphasize }
+    ]"
     :aria-label="label"
   >
     <el-icon v-if="icon" class="metric-card__icon" aria-hidden="true">
@@ -55,6 +61,7 @@ const note = computed(() => [props.detail, props.comparison].filter(Boolean).joi
           <span tabindex="0" class="metric-card__text metric-card__term">{{ label }}</span>
         </el-tooltip>
         <span v-else class="metric-card__text" :title="label">{{ label }}</span>
+        <el-tag v-if="badge" size="small" type="warning">{{ badge }}</el-tag>
       </div>
       <div v-if="unavailable" class="metric-card__state">
         <el-tag type="info" effect="light">{{ value }}</el-tag>
@@ -64,7 +71,7 @@ const note = computed(() => [props.detail, props.comparison].filter(Boolean).joi
       >
       <small v-if="detailTerms" class="metric-card__note metric-card__terms">
         <template v-for="(term, index) in detailTerms" :key="term.label">
-          <span v-if="index" aria-hidden="true">·</span>
+          <span v-if="index" aria-hidden="true">{{ detailSeparator ?? "·" }}</span>
           <el-tooltip
             v-if="term.hint"
             :content="term.hint"
@@ -97,6 +104,20 @@ const note = computed(() => [props.detail, props.comparison].filter(Boolean).joi
 .metric-card__body {
   min-width: 0;
   display: grid;
+  gap: var(--tcrm-space-1);
+}
+.metric-card--expense {
+  background: color-mix(in srgb, var(--el-color-warning) 10%, var(--tcrm-color-card));
+  border-color: color-mix(in srgb, var(--el-color-warning) 42%, var(--tcrm-color-border));
+}
+.metric-card--expense .metric-card__body {
+  flex: 1;
+}
+.metric-card--expense .metric-card__label {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
   gap: var(--tcrm-space-1);
 }
 .metric-card__icon {

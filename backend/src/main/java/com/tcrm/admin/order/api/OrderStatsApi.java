@@ -1,5 +1,7 @@
 package com.tcrm.admin.order.api;
 
+import com.tcrm.admin.order.api.OrderEvidenceApi.DetailSort;
+import com.tcrm.admin.shared.PageResult;
 import java.math.BigDecimal;
 import java.time.Instant;
 import java.time.LocalDate;
@@ -34,6 +36,30 @@ public interface OrderStatsApi {
   record CommissionWindowDTO(BigDecimal totalAmount, BigDecimal todayAmount) {}
 
   TotalsDTO totals(ScopeDTO scope, Instant from, Instant until);
+
+  List<DailyNetSales> dailyNetSales(ScopeDTO scope, Instant from, Instant until);
+
+  record DailyNetSales(LocalDate day, BigDecimal netSales) {}
+
+  record CreatorIncomeOrder(
+      long id,
+      String orderNo,
+      long shopId,
+      String shopName,
+      Instant eventTime,
+      BigDecimal amount,
+      BigDecimal refundAmount,
+      BigDecimal netTransactionAmount,
+      BigDecimal estimatedCommission) {}
+
+  PageResult<CreatorIncomeOrder> creatorIncomeOrders(
+      ScopeDTO scope,
+      Instant from,
+      Instant until,
+      int page,
+      int size,
+      DetailSort sortBy,
+      boolean ascending);
 
   /** Null when a paid affiliate line has no reliable current commission snapshot. */
   BigDecimal unsettledCommission(ScopeDTO scope, Instant from, Instant until);

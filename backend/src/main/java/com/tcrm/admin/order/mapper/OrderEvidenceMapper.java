@@ -126,7 +126,7 @@ public interface OrderEvidenceMapper {
       """
       SELECT i.id, o.weidian_order_id AS order_no, NULL::text AS refund_no,
              i.item_name AS product, i.sku_name AS sku, i.quantity AS units,
-             i.pay_amount AS amount, o.pay_time AS event_time,
+             i.pay_amount AS amount, o.pay_time AS event_time, o.pay_time AS order_paid_at,
              o.shop_id,
              <choose>
                <when test="s.productCode != null">
@@ -145,7 +145,7 @@ public interface OrderEvidenceMapper {
       """
       SELECT r.id, o.weidian_order_id AS order_no, r.weidian_refund_no AS refund_no,
              i.item_name AS product, i.sku_name AS sku, NULL::integer AS units,
-             r.amount, r.finish_time AS event_time,
+             r.amount, r.finish_time AS event_time, o.pay_time AS order_paid_at,
              o.shop_id, COALESCE(i.kol_id, o.kol_id) AS creator_id, i.reporting_product_id, i.spu_id, i.weidian_item_id AS transaction_item_id,
              i.sku_id, i.quantity AS sold_units, i.pay_amount AS sales_amount,
              o.id AS order_id
@@ -228,13 +228,38 @@ public interface OrderEvidenceMapper {
           + """
       )
       </if>
-      , paged AS (
-        SELECT p.* FROM
-        <choose><when test="sortRefunds">ranked</when><otherwise>candidates</otherwise></choose> p
+      , candidates_for_page AS (
+        SELECT * FROM <choose><when test="sortRefunds">ranked</when><otherwise>candidates</otherwise></choose>
+      )
+      <if test="s.groupOrders">
+      , order_groups AS (
+        SELECT p.order_id, p.order_id AS id, MAX(p.event_time) AS event_time,
+               SUM(p.sold_units) AS sold_units, SUM(p.sales_amount) AS sales_amount, SUM(p.amount) AS amount
+        <if test="sortRefunds">, SUM(p.refund_amount) AS refund_amount, SUM(p.net_transaction_amount) AS net_transaction_amount</if>
+        FROM candidates_for_page p GROUP BY p.order_id
+      ), order_page AS (
+        SELECT p.order_id, ROW_NUMBER() OVER (
       """
           + EVIDENCE_ORDER
           + """
-        LIMIT #{size} OFFSET #{offset}
+        ) AS position
+        FROM order_groups p
+        ORDER BY position LIMIT #{size} OFFSET #{offset}
+      )
+      </if>
+      , paged AS (
+        <choose>
+        <when test="s.groupOrders">
+          SELECT p.*, g.position FROM candidates_for_page p JOIN order_page g ON g.order_id = p.order_id
+        </when>
+        <otherwise>
+          SELECT p.* FROM candidates_for_page p
+      """
+          + EVIDENCE_ORDER
+          + """
+          LIMIT #{size} OFFSET #{offset}
+        </otherwise>
+        </choose>
       )
       SELECT p.id, p.order_no, p.refund_no, p.product, p.sku, p.units, p.amount, p.event_time,
              p.shop_id, k.name AS creator_name, p.spu_id,
@@ -246,7 +271,7 @@ public interface OrderEvidenceMapper {
                </when>
                <otherwise>NULL::numeric AS refund_amount, NULL::numeric AS net_transaction_amount</otherwise>
              </choose>, p.transaction_item_id, shop.shop_name, p.sku_id, p.sold_units, p.sales_amount,
-             k.kol_code AS creator_code
+             k.kol_code AS creator_code, p.order_paid_at
       FROM paged p
       LEFT JOIN crm_product product ON product.id = p.reporting_product_id AND product.tenant_id = #{s.scope.tenantId}
       LEFT JOIN crm_kol k ON k.id = p.creator_id AND k.tenant_id = #{s.scope.tenantId}
@@ -256,9 +281,14 @@ public interface OrderEvidenceMapper {
           + ORDER_REFUNDS
           + """
       </if>
+      <choose>
+        <when test="s.groupOrders">ORDER BY p.position, p.id</when>
+        <otherwise>
       """
           + EVIDENCE_ORDER
           + """
+        </otherwise>
+      </choose>
       </script>
       """)
   List<EvidenceRow> pageWithSort(
@@ -270,7 +300,12 @@ public interface OrderEvidenceMapper {
       @Param("ascending") boolean ascending);
 
   @InterceptorIgnore(tenantLine = "true")
-  @Select(EVIDENCE + "SELECT COUNT(*) FROM evidence </script>")
+  @Select(
+      EVIDENCE
+          + """
+      SELECT COUNT(<choose><when test="s.groupOrders">DISTINCT order_id</when><otherwise>*</otherwise></choose>)
+      FROM evidence </script>
+      """)
   long count(@Param("s") Selection selection, @Param("kind") Kind kind);
 
   @InterceptorIgnore(tenantLine = "true")

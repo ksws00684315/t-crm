@@ -10,7 +10,7 @@ const props = defineProps<{
   board: Board;
   name: string;
   row: RankRow;
-  period: Pick<Filters, "startDate" | "endDate">;
+  period: Pick<Filters, "startDate" | "endDate" | "cumulative">;
 }>();
 const { t, locale } = useI18n();
 const product = computed(() => props.board === "best-sellers");
@@ -93,7 +93,9 @@ const commission = computed(() => {
         <strong>{{ invited }}</strong>
       </div>
       <time :datetime="period.endDate">
-        {{ period.startDate }} – {{ period.endDate }} · {{ t("analytics.drilldown.beijingTime") }}
+        <template v-if="period.cumulative">{{ t("analytics.periodMode.cumulative") }}</template>
+        <template v-else>{{ period.startDate }} – {{ period.endDate }}</template>
+        · {{ t("analytics.drilldown.beijingTime") }}
       </time>
     </div>
   </section>

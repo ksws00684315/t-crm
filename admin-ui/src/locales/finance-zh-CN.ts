@@ -87,7 +87,7 @@ export default {
   refresh: "刷新",
   unverified: "待核实",
   afterSalesShort: "售后处理中",
-  afterSalesHint: "售后处理中，暂不计佣；已释放部分冻结，退款成功后按退款金额扣减",
+  afterSalesHint: "售后处理中保留已计提佣金，整单暂停释放。成功退款后重算对应商品行佣金。",
   unverifiedNotice: "尚有 {count} 条待核实记录未计入金额，不能按零佣金理解。",
   balanceNote:
     "可提现＝累计佣金－冻结中－提现中－已提现－已抵扣。允许负余额；待抵扣预付不重复扣减。",
@@ -104,7 +104,7 @@ export default {
   rateVersion: "历史比例版本",
   ruleVersion: "规则版本",
   commission: "预估佣金",
-  adjustment: "退款调整",
+  adjustment: "佣金扣回",
   releaseBasis: "解冻依据",
   businessAt: "业务时间",
   CONFIRMED: "微店确认结算",

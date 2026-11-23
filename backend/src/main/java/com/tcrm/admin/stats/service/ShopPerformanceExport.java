@@ -26,7 +26,7 @@ public class ShopPerformanceExport {
     var filters = meta.filters();
     var metadata =
         List.of(
-            List.of(label("start"), meta.period().startDate().toString()),
+            List.of(label("start"), periodStart(meta.period())),
             List.of(label("end"), meta.period().endDate().toString()),
             List.of(label("zone"), meta.timezone()),
             List.of(
@@ -94,7 +94,7 @@ public class ShopPerformanceExport {
         List.of(
             List.of(
                 label("start"),
-                meta.period().startDate().toString(),
+                periodStart(meta.period()),
                 label("end"),
                 meta.period().endDate().toString(),
                 label("zone"),
@@ -188,9 +188,7 @@ public class ShopPerformanceExport {
             label("average"),
             label("amountRefundRate"),
             label("commissionRate"),
-            label("estimatedCommission"),
-            label("commissionExpense"),
-            label("cumulativeCommission"));
+            label("estimatedCommission"));
     var rows =
         result.ranking().items().stream()
             .map(
@@ -224,15 +222,7 @@ public class ShopPerformanceExport {
                       money(
                           row.creatorMoney() == null
                               ? null
-                              : row.creatorMoney().estimatedCommission()),
-                      money(
-                          row.creatorMoney() == null
-                              ? null
-                              : row.creatorMoney().commissionExpense()),
-                      money(
-                          row.creatorMoney() == null
-                              ? null
-                              : row.creatorMoney().cumulativeCommission()));
+                              : row.creatorMoney().estimatedCommission()));
                 })
             .toList();
     return excel.export(metadata, headers, rows);
@@ -297,6 +287,10 @@ public class ShopPerformanceExport {
 
   private static String text(Object value) {
     return Objects.toString(value, "");
+  }
+
+  private String periodStart(StatsPeriod period) {
+    return period.cumulative() ? label("cumulative") : period.startDate().toString();
   }
 
   private String label(String key) {

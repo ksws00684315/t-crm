@@ -463,22 +463,26 @@ class CommissionIncomeServiceTest {
     assertThat(detail.income().name()).isEqualTo("Kol A");
   }
 
-  @ParameterizedTest(name = "accrued {0}, released {1} -> adjustment {2}")
+  @ParameterizedTest(name = "refund {0}, released {1} -> adjustment {2}")
   @CsvSource({
-    "15.00, 0.00, 0.00, CREDIT",
-    "15.00, 15.00, 0.00, CREDIT",
-    "12.00, 15.00, -3.00, DEBIT",
-    "0.00, 15.00, -15.00, DEBIT"
+    "0.00, 0.00, 0.00, CREDIT",
+    "30.00, 0.00, -3.00, DEBIT",
+    "30.00, 12.00, -3.00, DEBIT",
+    "150.00, 0.00, -15.00, DEBIT"
   })
-  void shouldCountOnlyAReductionAfterReleaseAsAdjustment(
-      String accrued, String released, String adjustment, String direction) {
-    // Task 114: a frozen line (accrued, not yet released) is not a refund adjustment; the same
-    // inputs give the same result in CommissionSettlementDetailServiceTest.
+  void shouldCountConfirmedRefundBeforeAndAfterRelease(
+      String refund, String released, String adjustment, String direction) {
     CommissionItemStateDO row = stateRow();
-    row.setAccruedCommissionCny(new BigDecimal(accrued));
+    row.setBasisCny(new BigDecimal("150.00"));
+    row.setBasisIncludesRefund(false);
+    row.setSuccessfulRefundCny(new BigDecimal(refund));
+    row.setAccruedCommissionCny(new BigDecimal("15.00").add(new BigDecimal(adjustment)));
     row.setReleasedCommissionCny(new BigDecimal(released));
     when(states.listByKol(KOL)).thenReturn(List.of(row));
-    when(revisions.listLatestByItemStateIds(anyCollection())).thenReturn(List.of());
+    var revision = new CommissionItemRevisionDO();
+    revision.setItemStateId(row.getId());
+    revision.setRate(new BigDecimal("0.10"));
+    when(revisions.listLatestByItemStateIds(anyCollection())).thenReturn(List.of(revision));
 
     IncomeDetail detail =
         TenantScope.callCompany(

@@ -29,7 +29,23 @@ public interface OrderEvidenceApi {
       String productCode,
       String keyword,
       Instant from,
-      Instant until) {}
+      Instant until,
+      boolean groupOrders) {
+    public Selection(
+        ScopeDTO scope,
+        Long creator,
+        Long inviter,
+        String productCode,
+        String keyword,
+        Instant from,
+        Instant until) {
+      this(scope, creator, inviter, productCode, keyword, from, until, false);
+    }
+
+    public Selection groupedByOrder() {
+      return new Selection(scope, creator, inviter, productCode, keyword, from, until, true);
+    }
+  }
 
   record EvidenceRow(
       Long id,
@@ -51,7 +67,8 @@ public interface OrderEvidenceApi {
       String skuId,
       Integer soldUnits,
       BigDecimal salesAmount,
-      String creatorCode) {}
+      String creatorCode,
+      Instant orderPaidAt) {}
 
   record ShopCreatorCounts(long selling, long total) {}
 

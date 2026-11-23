@@ -65,7 +65,7 @@ class ShopPerformanceExportTest {
             3L,
             4L,
             new AnalyticsRankingService.CreatorMoney(
-                new BigDecimal("12.34"), new BigDecimal("5.00"), new BigDecimal("50.98")));
+                new BigDecimal("12.34"), new BigDecimal("5.00"), new BigDecimal("50.98"), null));
     var result =
         new AnalyticsRankingService.Result(
             meta,
@@ -129,17 +129,13 @@ class ShopPerformanceExportTest {
                     "Average order amount (CNY)",
                     "Amount refund rate",
                     "Creator commission rate",
-                    "Estimated commission (CNY)",
-                    "Commission paid out (CNY)",
-                    "Cumulative commission (CNY)");
+                    "Estimated commission (CNY)");
             assertThat(data.getCell(0).getStringCellValue())
                 .isEqualTo("'=item (TikTok) / handle / CODE");
             assertThat(data.getCell(1).getStringCellValue()).isEqualTo("Shop / Promoting");
             assertThat(data.getCell(4).getStringCellValue()).isEqualTo("2");
             assertThat(data.getCell(10).getStringCellValue()).isEqualTo("15%");
             assertThat(data.getCell(11).getStringCellValue()).isEqualTo("12.34");
-            assertThat(data.getCell(12).getStringCellValue()).isEqualTo("5.00");
-            assertThat(data.getCell(13).getStringCellValue()).isEqualTo("50.98");
           } else {
             assertThat(labels)
                 .containsExactly(

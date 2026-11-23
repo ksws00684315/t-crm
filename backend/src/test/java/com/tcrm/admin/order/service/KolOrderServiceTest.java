@@ -520,7 +520,14 @@ class KolOrderServiceTest {
   private static com.tcrm.admin.order.api.CommissionOrderStateApi.ItemCommissionStateDTO state(
       long orderId, long itemId, String status) {
     return new com.tcrm.admin.order.api.CommissionOrderStateApi.ItemCommissionStateDTO(
-        orderId, itemId, status, new BigDecimal("0.1000"), BigDecimal.ONE, BigDecimal.ZERO, false);
+        orderId,
+        itemId,
+        status,
+        new BigDecimal("0.1000"),
+        BigDecimal.ONE,
+        BigDecimal.ZERO,
+        false,
+        new BigDecimal("10.00"));
   }
 
   private static OrderDO paidOrder(long id, String pay) {
@@ -547,15 +554,20 @@ class KolOrderServiceTest {
   }
 
   private static com.tcrm.admin.order.api.CommissionOrderStateApi.ItemCommissionStateDTO commission(
-      long orderId, BigDecimal amount) {
+      long orderId, String amount, String base) {
     return new com.tcrm.admin.order.api.CommissionOrderStateApi.ItemCommissionStateDTO(
-        orderId, orderId, "WITHDRAWABLE", new BigDecimal("0.1000"), amount, BigDecimal.ZERO, false);
+        orderId,
+        orderId,
+        "WITHDRAWABLE",
+        new BigDecimal("0.1000"),
+        new BigDecimal(amount),
+        BigDecimal.ZERO,
+        orderId == 31L,
+        new BigDecimal(base));
   }
 
   @Test
   void shouldSummariseOrderSalesRefundsBaseAndCommission_overFourRefundStates() {
-    // Task 115 §2.4 (amount terms §5a): 计佣金额 = 订单销售额 − 预估退款金额, and it equals the
-    // sum of the per-order commission bases (amount terms §2.1) across the four refund states.
     OrderDO noRefund = paidOrder(21L, "100.00");
     OrderDO refunding = paidOrder(31L, "50.00");
     OrderDO partial = paidOrder(41L, "100.00");
@@ -564,7 +576,6 @@ class KolOrderServiceTest {
     when(refunds.selectList(any()))
         .thenReturn(
             List.of(
-                // 退款中：the whole order pay amount is held back, even with a finished refund.
                 refund(31L, "20.00", "PROCESSING"),
                 // 部分退款完成：the refunded 30 counts, the closed 5 does not.
                 refund(41L, "30.00", "SUCCESS"),
@@ -575,30 +586,17 @@ class KolOrderServiceTest {
     when(commissionStates.listByOrderItemIds(anyLong(), any()))
         .thenReturn(
             List.of(
-                commission(21L, new BigDecimal("10.00")),
-                // A refunding order's released commission stays frozen and still counts as
-                // estimated commission, while its commission base is zero.
-                commission(31L, new BigDecimal("2.00")),
-                commission(41L, new BigDecimal("7.00")),
-                commission(51L, BigDecimal.ZERO)));
+                commission(21L, "10.00", "100.00"),
+                commission(31L, "5.00", "50.00"),
+                commission(41L, "7.00", "70.00"),
+                commission(51L, "0.00", "0.00")));
 
     var summary = service.summary(new KolOrderFilterDTO(null, null, null, null, null, null, 1, 1));
 
-    // 订单销售额 = 100 + 50 + 100 + 100; 预估退款金额 = 0 + 50(整单) + 30(已退) + 100(全额).
     assertThat(summary.orderSalesCny()).isEqualByComparingTo("350.00");
-    assertThat(summary.estimatedRefundCny()).isEqualByComparingTo("180.00");
-    assertThat(summary.commissionBaseCny()).isEqualByComparingTo("170.00");
-    assertThat(summary.commissionBaseCny())
-        .isEqualByComparingTo(summary.orderSalesCny().subtract(summary.estimatedRefundCny()));
-    // Per-order commission bases: 100 + 0 + 70 + 0 = 170.
-    assertThat(summary.commissionBaseCny())
-        .isEqualByComparingTo(
-            new BigDecimal("100.00")
-                .add(BigDecimal.ZERO)
-                .add(new BigDecimal("70.00"))
-                .add(BigDecimal.ZERO));
-    // 预估总佣金 sums the rows' estimated commissions.
-    assertThat(summary.estimatedCommissionCny()).isEqualByComparingTo("19.00");
+    assertThat(summary.estimatedRefundCny()).isEqualByComparingTo("130.00");
+    assertThat(summary.commissionBaseCny()).isEqualByComparingTo("220.00");
+    assertThat(summary.estimatedCommissionCny()).isEqualByComparingTo("22.00");
     // Verify the order query is the list's base query restricted to paid orders.
     var query = ArgumentCaptor.forClass(Wrapper.class);
     verify(orders).selectList(query.capture());

@@ -9,6 +9,7 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
+import com.tcrm.admin.commission.api.CreatorFundFlowApi;
 import com.tcrm.admin.kol.api.KolApi;
 import com.tcrm.admin.kol.api.KolRateDTO;
 import com.tcrm.admin.kol.api.KolRefDTO;
@@ -25,6 +26,7 @@ import com.tcrm.admin.order.api.OrderStatsApi.RankFactsDTO;
 import com.tcrm.admin.order.api.OrderStatsApi.ScopeDTO;
 import com.tcrm.admin.product.api.ShopAccessApi;
 import com.tcrm.admin.product.api.ShopAccessDTO;
+import com.tcrm.admin.security.api.CurrentUserContext;
 import com.tcrm.admin.security.api.DataScope;
 import com.tcrm.admin.shared.BusinessException;
 import com.tcrm.admin.shared.ErrorCode;
@@ -48,7 +50,15 @@ class AnalyticsDetailServiceTest {
   private final OrderStatsApi orders = mock(OrderStatsApi.class);
   private final BdUserApi inviters = mock(BdUserApi.class);
   private final AnalyticsDetailService details =
-      new AnalyticsDetailService(overview, evidence, shops, creators, orders, inviters);
+      new AnalyticsDetailService(
+          overview,
+          evidence,
+          shops,
+          creators,
+          orders,
+          inviters,
+          mock(CreatorFundFlowApi.class),
+          mock(CurrentUserContext.class));
   private final LocalDate day = LocalDate.of(2026, 11, 3);
 
   @Test
@@ -73,6 +83,7 @@ class AnalyticsDetailServiceTest {
         .isEqualTo(new ScopeDTO(4, 9L, 1L, 11L, null, List.of(1L)));
     assertThat(selection.getValue().productCode()).isEqualTo("SPU");
     assertThat(selection.getValue().keyword()).isEqualTo("Sample");
+    assertThat(selection.getValue().groupOrders()).isTrue();
   }
 
   @Test
@@ -356,7 +367,8 @@ class AnalyticsDetailServiceTest {
     when(overview.canView("order:view")).thenReturn(true);
     useScope(filters, new ScopeDTO(4, null, 1L, null, null));
     var page = new PageResult<OrderEvidenceApi.EvidenceRow>(List.of(), 40, 2, 20);
-    when(evidence.sortedActivity(selection, Kind.ORDERS, 2, 20, DetailSort.REFUND_AMOUNT, true))
+    when(evidence.sortedActivity(
+            selection.groupedByOrder(), Kind.ORDERS, 2, 20, DetailSort.REFUND_AMOUNT, true))
         .thenReturn(page);
 
     var result =
@@ -381,6 +393,28 @@ class AnalyticsDetailServiceTest {
               BusinessException.class,
               e -> assertThat(e.getErrorCode()).isEqualTo(ErrorCode.COMMON_VALIDATION_FAILED));
     }
+  }
+
+  @Test
+  void creatorIncomeOrderPageRequiresBothPermissionsAndUsesTheScopedOrderQuery() {
+    var filters = filters(1L);
+    when(overview.canView("order:view")).thenReturn(true);
+    assertThatThrownBy(() -> details.creatorIncomeOrders(filters, 11L, 1, 20, null, null))
+        .isInstanceOfSatisfying(
+            BusinessException.class,
+            e -> assertThat(e.getErrorCode()).isEqualTo(ErrorCode.AUTH_FORBIDDEN));
+    verifyNoInteractions(orders);
+
+    when(overview.canViewCommission()).thenReturn(true);
+    useScope(filters, new ScopeDTO(4, 9L, 1L, null, null));
+    var scope = new ScopeDTO(4, 9L, 1L, 11L, null, List.of(1L));
+    var period = new StatsPeriod(day, day);
+    var page = new PageResult<OrderStatsApi.CreatorIncomeOrder>(List.of(), 40, 2, 20);
+    when(orders.creatorIncomeOrders(
+            scope, period.from(), period.until(), 2, 20, DetailSort.NET_SALES_AMOUNT, true))
+        .thenReturn(page);
+    assertThat(details.creatorIncomeOrders(filters, 11L, 2, 20, DetailSort.NET_SALES_AMOUNT, "asc"))
+        .isSameAs(page);
   }
 
   @Test

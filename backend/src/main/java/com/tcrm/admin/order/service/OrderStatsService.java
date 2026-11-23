@@ -1,9 +1,11 @@
 package com.tcrm.admin.order.service;
 
+import com.tcrm.admin.order.api.OrderEvidenceApi.DetailSort;
 import com.tcrm.admin.order.api.OrderStatsApi;
 import com.tcrm.admin.order.mapper.OrderDailyStatsMapper;
 import com.tcrm.admin.order.mapper.OrderSettlementFlowMapper;
 import com.tcrm.admin.order.mapper.OrderStatsMapper;
+import com.tcrm.admin.shared.PageResult;
 import java.math.BigDecimal;
 import java.time.Instant;
 import java.time.LocalDate;
@@ -55,6 +57,33 @@ public class OrderStatsService implements OrderStatsApi {
   @Override
   public TotalsDTO totals(ScopeDTO scope, Instant from, Instant until) {
     return mapper.totals(scope, from, until);
+  }
+
+  @Override
+  public List<OrderStatsApi.DailyNetSales> dailyNetSales(
+      ScopeDTO scope, Instant from, Instant until) {
+    return mapper.dailyNetSales(scope, from, until);
+  }
+
+  @Override
+  public PageResult<CreatorIncomeOrder> creatorIncomeOrders(
+      ScopeDTO scope,
+      Instant from,
+      Instant until,
+      int page,
+      int size,
+      DetailSort sortBy,
+      boolean ascending) {
+    if (scope.visibleShopIds().isEmpty()) {
+      return new PageResult<>(List.of(), 0, page, size);
+    }
+    long offset = (long) (page - 1) * size;
+    var rows = mapper.creatorIncomeOrders(scope, from, until, size, offset, sortBy, ascending);
+    long total =
+        rows.size() < size && (page == 1 || !rows.isEmpty())
+            ? offset + rows.size()
+            : mapper.countCreatorIncomeOrders(scope, from, until);
+    return new PageResult<>(rows, total, page, size);
   }
 
   @Override

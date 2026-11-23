@@ -30,6 +30,14 @@ describe("analytics date ranges", () => {
     expect(adjacentPeriod("live", seven, -1, today)).toBeUndefined();
   });
 
+  it("uses a cumulative flag and disables previous and next navigation", () => {
+    const today = "2026-11-01";
+    const range = periodRange("cumulative", new Date(`${today}T00:00:00Z`));
+    expect(range).toEqual({ startDate: today, endDate: today, cumulative: true });
+    expect(adjacentPeriod("cumulative", range, -1, today)).toBeUndefined();
+    expect(adjacentPeriod("cumulative", range, 1, today)).toBeUndefined();
+  });
+
   it("accepts 90 inclusive days and rejects inverted, missing and oversized ranges", () => {
     const instant = new Date("2026-11-01T00:00:00Z");
     expect(validDates(dates(90, instant))).toBe(true);

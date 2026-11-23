@@ -50,7 +50,7 @@ public class OrderEvidenceService implements OrderEvidenceApi {
     long offset = (long) (page - 1) * size;
     var rows = evidence.pageWithSort(selection, kind, size, offset, sortBy, ascending);
     long total =
-        rows.size() < size && (page == 1 || !rows.isEmpty())
+        !selection.groupOrders() && rows.size() < size && (page == 1 || !rows.isEmpty())
             ? offset + rows.size()
             : evidence.count(selection, kind);
     return new PageResult<>(rows, total, page, size);

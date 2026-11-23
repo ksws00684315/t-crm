@@ -7,6 +7,7 @@ import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
+import com.tcrm.admin.commission.api.CreatorPrepayApi;
 import com.tcrm.admin.kol.api.KolApi;
 import com.tcrm.admin.kol.api.KolOwnershipApi;
 import com.tcrm.admin.kol.api.KolOwnershipDTO;
@@ -25,6 +26,7 @@ import com.tcrm.admin.security.api.AccountDTO;
 import com.tcrm.admin.security.api.CurrentUserContext;
 import com.tcrm.admin.shared.BusinessException;
 import com.tcrm.admin.stats.service.AnalyticsRankingService.Board;
+import com.tcrm.admin.stats.service.AnalyticsRankingService.CreatorStatus;
 import com.tcrm.admin.stats.service.AnalyticsRankingService.Row;
 import com.tcrm.admin.stats.service.StatsOverviewService.FilterDTO;
 import com.tcrm.admin.system.api.BdUserApi;
@@ -45,6 +47,7 @@ class AnalyticsRankingServiceTest {
   private final OrderStatsApi orders = mock(OrderStatsApi.class);
   private final KolApi creators = mock(KolApi.class);
   private final KolOwnershipApi ownership = mock(KolOwnershipApi.class);
+  private final CreatorPrepayApi prepays = mock(CreatorPrepayApi.class);
   private final BdUserApi inviters = mock(BdUserApi.class);
   private final ShopAccessApi shops = mock(ShopAccessApi.class);
   private final ProductAccessApi catalog = mock(ProductAccessApi.class);
@@ -58,7 +61,8 @@ class AnalyticsRankingServiceTest {
           catalog,
           creators,
           inviters,
-          ownership);
+          ownership,
+          prepays);
 
   @BeforeEach
   void setup() {
@@ -273,7 +277,7 @@ class AnalyticsRankingServiceTest {
         .singleElement()
         .satisfies(
             row -> {
-              assertThat(row.creatorMoney().estimatedCommission()).isEqualByComparingTo("3");
+              assertThat(row.creatorMoney().estimatedCommission()).isEqualByComparingTo("8");
               assertThat(row.creatorMoney().commissionExpense()).isEqualByComparingTo("5");
               assertThat(row.creatorMoney().cumulativeCommission()).isEqualByComparingTo("18");
             });
@@ -305,6 +309,83 @@ class AnalyticsRankingServiceTest {
         .singleElement()
         .satisfies(
             row -> assertThat(row.creatorMoney().commissionExpense()).isEqualByComparingTo("5"));
+  }
+
+  @Test
+  void incomeFiltersByEmailAndStatusAndIncludesCreatorsWithOnlyPrepay() {
+    var until = new StatsPeriod(DAY, DAY).until();
+    when(current.effectivePermissions(account)).thenReturn(List.of("commission:view"));
+    when(creators.listAll())
+        .thenReturn(
+            List.of(
+                new KolRefDTO(11L, "K1", "Promoting", true, 9L),
+                new KolRefDTO(12L, "K2", "Invalid", false, 9L),
+                new KolRefDTO(13L, "K3", "Prepay only", true, 9L)));
+    when(creators.findIdsByKeyword("creator@example.test")).thenReturn(List.of(11L, 12L, 13L));
+    when(creators.analyticsProfiles(any(), any()))
+        .thenReturn(
+            Map.of(
+                11L, new KolApi.AnalyticsProfileDTO(List.of(), null, "PROMOTING"),
+                12L, new KolApi.AnalyticsProfileDTO(List.of(), null, "INVALID"),
+                13L, new KolApi.AnalyticsProfileDTO(List.of(), null, "PROMOTING")));
+    when(orders.rankFacts(any(), any(), any(), any()))
+        .thenReturn(List.of(person(11, 1), person(12, 1)));
+    when(prepays.paidByCreator(List.of(11L, 13L), FROM, until))
+        .thenReturn(Map.of(13L, new BigDecimal("200")));
+    when(orders.creatorCommission(any(), eq(FROM), eq(until)))
+        .thenReturn(
+            new OrderStatsApi.CreatorCommissionDTO(new BigDecimal("1200"), new BigDecimal("50")));
+    when(orders.creatorRankingCommissions(any(), eq(FROM), eq(until)))
+        .thenReturn(
+            List.of(
+                new OrderStatsApi.CreatorRankingCommission(
+                    11L, new BigDecimal("1000"), new BigDecimal("1200"))));
+    var filters = new FilterDTO(DAY, DAY, null, null, null, null, "creator@example.test");
+
+    var income = service.income(filters, CreatorStatus.PROMOTING, 1, 20, null, null);
+
+    var cards = income.summary().creatorCards();
+    assertThat(cards.totalCommission()).isEqualByComparingTo("1200");
+    assertThat(cards.commissionBeforeClawback()).isEqualByComparingTo("1250");
+    assertThat(cards.commissionClawback()).isEqualByComparingTo("50");
+    assertThat(income.ranking().items())
+        .filteredOn(row -> row.id().equals("11"))
+        .singleElement()
+        .satisfies(
+            row -> {
+              assertThat(row.creatorMoney().estimatedCommission()).isEqualByComparingTo("1200");
+              assertThat(row.creatorMoney().cumulativeCommission()).isNull();
+              assertThat(row.creatorMoney().commissionExpense()).isNull();
+            });
+    assertThat(income.summary().sellingCount()).isEqualTo(1L);
+    assertThat(income.ranking().items()).extracting(Row::id).containsExactlyInAnyOrder("11", "13");
+    assertThat(income.ranking().items())
+        .filteredOn(row -> row.id().equals("13"))
+        .singleElement()
+        .satisfies(row -> assertThat(row.creatorMoney().paidPrepay()).isEqualByComparingTo("200"));
+    org.mockito.Mockito.verify(orders)
+        .totals(
+            org.mockito.ArgumentMatchers.argThat(
+                scope ->
+                    scope.matchedKolIds().size() == 2
+                        && scope.matchedKolIds().containsAll(List.of(11L, 13L))),
+            eq(FROM),
+            eq(until));
+
+    var shop =
+        service.income(
+            new FilterDTO(DAY, DAY, 1L, null, null, null),
+            CreatorStatus.PROMOTING,
+            1,
+            20,
+            null,
+            null);
+    assertThat(shop.summary().creatorCards().totalCommission()).isEqualByComparingTo("1200");
+    assertThat(shop.ranking().items())
+        .singleElement()
+        .satisfies(
+            row ->
+                assertThat(row.creatorMoney().estimatedCommission()).isEqualByComparingTo("1200"));
   }
 
   @Test

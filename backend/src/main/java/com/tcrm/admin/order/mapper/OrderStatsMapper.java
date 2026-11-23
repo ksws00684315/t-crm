@@ -1,12 +1,15 @@
 package com.tcrm.admin.order.mapper;
 
 import com.baomidou.mybatisplus.annotation.InterceptorIgnore;
+import com.tcrm.admin.order.api.OrderEvidenceApi.DetailSort;
 import com.tcrm.admin.order.api.OrderStatsApi.BestCreatorDTO;
 import com.tcrm.admin.order.api.OrderStatsApi.CommissionWindowDTO;
 import com.tcrm.admin.order.api.OrderStatsApi.CreatorCommissionDTO;
 import com.tcrm.admin.order.api.OrderStatsApi.CreatorCommissionExpense;
 import com.tcrm.admin.order.api.OrderStatsApi.CreatorCommissionTotal;
+import com.tcrm.admin.order.api.OrderStatsApi.CreatorIncomeOrder;
 import com.tcrm.admin.order.api.OrderStatsApi.CreatorRankingCommission;
+import com.tcrm.admin.order.api.OrderStatsApi.DailyNetSales;
 import com.tcrm.admin.order.api.OrderStatsApi.InviterCommissionDTO;
 import com.tcrm.admin.order.api.OrderStatsApi.RankDimension;
 import com.tcrm.admin.order.api.OrderStatsApi.RankFactsDTO;
@@ -199,6 +202,9 @@ public interface OrderStatsMapper {
   BigDecimal scopedSettlement(
       @Param("scope") ScopeDTO scope, @Param("from") Instant from, @Param("until") Instant until);
 
+  String VERIFIED_COMMISSION_LINE =
+      "(s.verified IS TRUE AND s.kol_id = p.kol_id AND i.kol_id = p.kol_id) IS TRUE";
+
   /**
    * Current verified snapshots; released means posted to the wallet, independent of withdrawals.
    */
@@ -209,8 +215,10 @@ public interface OrderStatsMapper {
         SELECT p.bd_user_id AS inviter_id, p.kol_id AS creator_id,
                p.id AS order_id, s.id AS item_state_id, s.accrued_commission_cny AS accrued,
                COALESCE(s.released_commission_cny, 0) AS released,
-               (s.verified AND s.kol_id IS NOT DISTINCT FROM p.kol_id
-                 AND i.kol_id IS NOT DISTINCT FROM p.kol_id) AS verified,
+      """
+          + VERIFIED_COMMISSION_LINE
+          + """
+       AS verified,
         <choose>
           <when test="scope.productKeyword != null">
             EXISTS (SELECT 1 FROM product_items matched WHERE matched.id = i.id)
@@ -218,10 +226,10 @@ public interface OrderStatsMapper {
           <otherwise>TRUE</otherwise>
         </choose> AS included
         FROM scoped_orders p
-        JOIN crm_commission_item_state s ON s.order_id = p.id
-          AND s.tenant_id = #{scope.tenantId} AND NOT s.is_deleted
-        JOIN crm_order_item i ON i.id = s.order_item_id AND i.order_id = p.id
+        JOIN crm_order_item i ON i.order_id = p.id
           AND i.tenant_id = #{scope.tenantId} AND NOT i.is_deleted
+        LEFT JOIN crm_commission_item_state s ON s.order_item_id = i.id AND s.order_id = p.id
+          AND s.tenant_id = #{scope.tenantId} AND NOT s.is_deleted
         WHERE p.kol_id IS NOT NULL AND p.pay_time &lt; #{until}
         <if test="from != null">AND p.pay_time &gt;= #{from}</if>
       ), commission_orders AS (
@@ -239,7 +247,7 @@ public interface OrderStatsMapper {
           + """
       SELECT creator_id,
         SUM(CASE WHEN unsettled THEN accrued ELSE 0 END) AS estimated,
-        SUM(CASE WHEN unsettled THEN accrued ELSE released END) AS total
+        SUM(accrued) AS total
       FROM commission_orders GROUP BY creator_id
       </script>
       """)
@@ -268,48 +276,28 @@ public interface OrderStatsMapper {
   List<CreatorCommissionExpense> creatorCommissionExpenses(
       @Param("scope") ScopeDTO scope, @Param("from") Instant from, @Param("until") Instant until);
 
-  // This read model uses wallet postings, not mutable release balances, for confirmed deductions.
+  /** Refund reductions in the payment cohort, including reductions before wallet release. */
   @InterceptorIgnore(tenantLine = "true")
   @Select(
       COMMISSION_ORDERS
           + """
-      , verified AS MATERIALIZED (
-        SELECT s.item_state_id AS id, s.creator_id AS kol_id
-        FROM states s JOIN commission_orders o ON o.order_id = s.order_id
-        WHERE s.included
-      ), adjustments AS (
-        SELECT -l.amount_cny AS amount,
-          CASE
-            WHEN prior.id IS NULL THEN NULL
-            WHEN COALESCE(r.successful_refund_cny, 0) &lt;= COALESCE(prior.successful_refund_cny, 0) THEN FALSE
-            WHEN r.release_basis != 'AFTER_SALES'
-              AND r.rate IS NOT NULL AND r.rate = prior.rate
-              AND prior.basis_cny - r.basis_cny IN (
-                0, COALESCE(r.successful_refund_cny, 0) - COALESCE(prior.successful_refund_cny, 0))
-              THEN TRUE
-            ELSE NULL
-          END AS refund
-        FROM verified s
-        JOIN crm_commission_ledger l ON l.tenant_id = #{scope.tenantId} AND l.source_id = s.id
-          AND l.kol_id = s.kol_id AND l.source_type = 'COMMISSION'
-          AND l.entry_type = 'COMMISSION_ADJUSTMENT' AND l.amount_cny &lt; 0
-        LEFT JOIN crm_commission_item_revision r ON r.tenant_id = #{scope.tenantId}
-          AND r.item_state_id = s.id
-          AND l.source_key = 'COMMISSION_ITEM:' || s.id || ':' || r.source_version
-        LEFT JOIN LATERAL (
-          SELECT prev.id, prev.basis_cny, prev.successful_refund_cny, prev.rate
-          FROM crm_commission_item_revision prev
-          WHERE prev.tenant_id = #{scope.tenantId} AND prev.item_state_id = s.id
-            AND (prev.create_time, prev.id) &lt; (r.create_time, r.id)
-          ORDER BY prev.create_time DESC, prev.id DESC LIMIT 1
-        ) prior ON TRUE
-        WHERE l.source_key !~ ':K[0-9]+$'
+      , refund_deductions AS (
+        SELECT CASE
+          WHEN COALESCE(s.successful_refund_cny, 0) = 0 THEN 0
+          WHEN s.basis_includes_refund IS FALSE AND r.rate IS NOT NULL
+            AND ROUND(GREATEST(s.basis_cny - s.successful_refund_cny, 0) * r.rate, 2)
+              = s.accrued_commission_cny
+            THEN ROUND(GREATEST(s.basis_cny, 0) * r.rate, 2) - s.accrued_commission_cny
+        END AS amount
+        FROM states lines JOIN commission_orders o ON o.order_id = lines.order_id
+        JOIN crm_commission_item_state s ON s.id = lines.item_state_id AND s.tenant_id = #{scope.tenantId}
+        LEFT JOIN crm_commission_item_revision r ON r.tenant_id = s.tenant_id
+          AND r.item_state_id = s.id AND r.source_version = s.source_version
+        WHERE lines.included
       )
-      SELECT (SELECT SUM(CASE WHEN unsettled THEN accrued ELSE released END) FROM commission_orders) AS total,
-             CASE WHEN EXISTS (SELECT 1 FROM verified)
-               AND NOT EXISTS (SELECT 1 FROM adjustments WHERE refund IS NULL)
-               THEN (SELECT COALESCE(SUM(amount) FILTER (WHERE refund), 0) FROM adjustments)
-             END AS clawback
+      SELECT (SELECT SUM(accrued) FROM commission_orders) AS total,
+             CASE WHEN COUNT(*) = COUNT(amount) THEN SUM(amount) END AS clawback
+      FROM refund_deductions
       </script>
       """)
   CreatorCommissionDTO creatorCommission(
@@ -426,7 +414,7 @@ public interface OrderStatsMapper {
   @Select(
       COMMISSION_ORDERS
           + """
-      SELECT creator_id, SUM(CASE WHEN unsettled THEN accrued ELSE released END) AS total
+      SELECT creator_id, SUM(accrued) AS total
       FROM commission_orders WHERE inviter_id IS NOT NULL GROUP BY creator_id
       </script>
       """)
@@ -440,6 +428,109 @@ public interface OrderStatsMapper {
         AT TIME ZONE 'Asia/Shanghai'
       )
       """;
+
+  String INCOME_ORDER_SORT =
+      """
+      <if test="sortBy != null">
+        <choose>
+          <when test="sortBy.name() == 'SALES_AMOUNT'">pay_amount</when>
+          <when test="sortBy.name() == 'REFUND_AMOUNT'">refund_amount</when>
+          <otherwise>net_transaction_amount</otherwise>
+        </choose>
+        <choose><when test="ascending">ASC</when><otherwise>DESC</otherwise></choose>
+        NULLS LAST,
+      </if>
+      pay_time DESC, p.id DESC
+      """;
+
+  @InterceptorIgnore(tenantLine = "true")
+  @Select(
+      SCOPED_ORDERS
+          + """
+      , paged AS (
+        SELECT p.*, refunds.amount AS refund_amount, p.pay_amount - refunds.amount AS net_transaction_amount
+        FROM scoped_orders p
+        CROSS JOIN LATERAL (
+          SELECT COALESCE(SUM(r.amount), 0) AS amount
+          FROM crm_refund r
+          WHERE r.tenant_id = #{scope.tenantId} AND r.order_id = p.id
+            AND NOT r.is_deleted AND r.refund_status = 'SUCCESS'
+      """
+          + COHORT_REFUND_WINDOW
+          + MATCHED_REFUND
+          + """
+        ) refunds
+        WHERE p.pay_time &gt;= #{from} AND p.pay_time &lt; #{until}
+        ORDER BY
+      """
+          + INCOME_ORDER_SORT
+          + """
+        LIMIT #{size} OFFSET #{offset}
+      )
+      SELECT p.id, p.weidian_order_id AS order_no, p.shop_id, shop.shop_name, p.pay_time AS event_time,
+             p.pay_amount AS amount, p.refund_amount, p.net_transaction_amount,
+             commission.amount AS estimated_commission
+      FROM paged p
+      LEFT JOIN crm_shop shop ON shop.id = p.shop_id AND shop.tenant_id = #{scope.tenantId}
+      LEFT JOIN LATERAL (
+        SELECT SUM(s.accrued_commission_cny)
+        <if test="scope.productKeyword != null">
+          FILTER (WHERE EXISTS (SELECT 1 FROM product_items matched WHERE matched.id = i.id))
+        </if>
+        AS amount
+        FROM crm_order_item i
+        LEFT JOIN crm_commission_item_state s ON s.order_item_id = i.id AND s.order_id = p.id
+          AND s.tenant_id = #{scope.tenantId} AND NOT s.is_deleted
+        WHERE i.order_id = p.id AND i.tenant_id = #{scope.tenantId} AND NOT i.is_deleted
+        HAVING BOOL_AND(
+      """
+          + VERIFIED_COMMISSION_LINE
+          + """
+        )
+      ) commission ON TRUE
+      ORDER BY
+      """
+          + INCOME_ORDER_SORT
+          + """
+      </script>
+      """)
+  List<CreatorIncomeOrder> creatorIncomeOrders(
+      @Param("scope") ScopeDTO scope,
+      @Param("from") Instant from,
+      @Param("until") Instant until,
+      @Param("size") int size,
+      @Param("offset") long offset,
+      @Param("sortBy") DetailSort sortBy,
+      @Param("ascending") boolean ascending);
+
+  @InterceptorIgnore(tenantLine = "true")
+  @Select(
+      SCOPED_ORDERS
+          + "SELECT COUNT(*) FROM scoped_orders WHERE pay_time &gt;= #{from} AND pay_time &lt; #{until}"
+          + " </script>")
+  long countCreatorIncomeOrders(
+      @Param("scope") ScopeDTO scope, @Param("from") Instant from, @Param("until") Instant until);
+
+  @InterceptorIgnore(tenantLine = "true")
+  @Select(
+      SCOPED_PAID_ORDERS
+          + """
+      net_events AS (
+        SELECT pay_time, pay_amount AS amount FROM paid
+        UNION ALL
+        SELECT p.pay_time, -r.amount FROM crm_refund r JOIN paid p ON p.id = r.order_id
+        WHERE r.tenant_id = #{scope.tenantId} AND NOT r.is_deleted AND r.refund_status = 'SUCCESS'
+      """
+          + COHORT_REFUND_WINDOW
+          + MATCHED_REFUND
+          + """
+      )
+      SELECT (pay_time AT TIME ZONE 'Asia/Shanghai')::date AS day, SUM(amount) AS net_sales
+      FROM net_events GROUP BY 1 ORDER BY 1
+      </script>
+      """)
+  List<DailyNetSales> dailyNetSales(
+      @Param("scope") ScopeDTO scope, @Param("from") Instant from, @Param("until") Instant until);
 
   @InterceptorIgnore(tenantLine = "true")
   @Select(
