@@ -823,7 +823,7 @@ describe("order chain page (task 40)", () => {
         .get('[data-test="chain-stage-withdrawal"]')
         .get('[data-test="chain-after-sales"]')
         .text()
-    ).toBe("售后处理中，暂不计佣；已释放部分冻结，退款成功后按退款金额扣减");
+    ).toBe("售后处理中保留已计提佣金，整单暂停释放。成功退款后重算对应商品行佣金。");
     wrapper.unmount();
   });
 

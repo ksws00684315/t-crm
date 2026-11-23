@@ -801,6 +801,8 @@ class OrderStatsIT {
         VALUES (701, 4, 701, 'initial', 100, 0, .10, 10, 0, 'CONFIRMED', '2026-11-03T00:00:00Z'),
                (702, 4, 701, 'refund', 100, 20, .10, 8, 0, 'CONFIRMED', '2026-11-04T00:00:00Z')
         """);
+    // The cards sum a whole order only when every live line carries this creator's snapshot.
+    jdbc.update("UPDATE crm_order_item SET kol_id = 11 WHERE id = 2");
     try (var session = factory.openSession()) {
       var kols = session.getMapper(KolMapper.class);
       kols.recordReportingStatus(4L, 701L, false, UNTIL);
