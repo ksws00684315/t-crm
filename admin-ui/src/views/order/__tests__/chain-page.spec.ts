@@ -426,8 +426,8 @@ describe("order chain page (task 40)", () => {
     const cells = rows[0].findAll("td");
     expect(cells[2]?.get('[data-test="value"]').text()).toBe("7900222333");
     expect(cells[3]?.get('[data-test="value"]').text()).toBe("9001");
-    expect(cells[2]?.get('[data-test="copy"]').exists()).toBe(true);
-    expect(cells[3]?.get('[data-test="copy"]').exists()).toBe(true);
+    expect(cells[2]?.find('[data-test="copy"]').exists()).toBe(true);
+    expect(cells[3]?.find('[data-test="copy"]').exists()).toBe(true);
     const unlinked = rows[1].findAll("td");
     expect(unlinked[2]?.text()).toBe("—");
     expect(unlinked[3]?.get('[data-test="value"]').text()).toBe("9002");
