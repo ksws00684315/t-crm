@@ -15,6 +15,7 @@ import java.util.List;
  * @param discount 优惠 = orderAmount − payAmount; null when orderAmount or payAmount is null
  * @param refundAmount 退款金额: successful refunds deduplicated by refund id, same algorithm as the
  *     chain {@code refundTotal}; 0.00 without refunds
+ * @param pendingRefundAmount pending refund requests, separate from the successful refund total
  * @param netReceived 订单实收 = payAmount − refundAmount; null when payAmount is null
  * @param commission order-level commission block; null without {@code commission:view} or when the
  *     OWN scope does not cover the order (same rule as the chain funds)
@@ -47,6 +48,7 @@ public record OrderDetailDTO(
     BigDecimal orderAmount,
     BigDecimal discount,
     BigDecimal refundAmount,
+    BigDecimal pendingRefundAmount,
     BigDecimal netReceived,
     CommissionDTO commission,
     List<OrderDetailItemDTO> items) {
@@ -61,8 +63,7 @@ public record OrderDetailDTO(
    * @param estimatedCommission 预估佣金: the chain funds {@code kolCommission}; null while any line is
    *     unverified
    * @param afterSales the order is in after-sales (task 113, any line's snapshot flag, verified or
-   *     not): unreleased commission counts 0 and released commission is frozen until the refund
-   *     concludes; the UI shows the after-sales hint
+   *     not): retain earned commission and block release until all refunds conclude
    */
   record CommissionDTO(
       BigDecimal commissionableAmount,

@@ -10,7 +10,7 @@ import java.util.List;
  *
  * <ul>
  *   <li>{@link #NONE} 无退款 — the order has no refund rows;
- *   <li>{@link #PROCESSING} 退款中 — any refund row is PROCESSING;
+ *   <li>{@link #PROCESSING} 退款中 — any refund row is still open or its conclusion is unknown;
  *   <li>{@link #PARTIAL_SUCCESS} 部分退款成功 — no PROCESSING row, successful amounts below the paid
  *       amount;
  *   <li>{@link #FULL_SUCCESS} 全额退款成功 — no PROCESSING row, successful amounts equal the paid amount.
@@ -40,7 +40,7 @@ public final class OrderRefundStatuses {
     boolean processing = false;
     BigDecimal succeeded = BigDecimal.ZERO;
     for (var refund : refunds) {
-      if ("PROCESSING".equals(refund.getRefundStatus())) {
+      if (OrderCommissionSync.isUnconcludedRefund(refund)) {
         processing = true;
       } else if ("SUCCESS".equals(refund.getRefundStatus()) && refund.getAmount() != null) {
         succeeded = succeeded.add(refund.getAmount());

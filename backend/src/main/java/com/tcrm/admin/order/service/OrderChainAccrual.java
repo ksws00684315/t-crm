@@ -13,7 +13,6 @@ import java.util.Comparator;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
-import java.util.Objects;
 import java.util.stream.Collectors;
 
 /** Derived payment accrual and refund events for the chain. These do not post wallet entries. */
@@ -268,8 +267,7 @@ record OrderChainAccrual(String status, BigDecimal amount, List<OrderChainDTO.Fl
   }
 
   private static boolean pending(RefundDO refund) {
-    return OrderCommissionSync.UNCONCLUDED_REFUND_STATUSES.contains(
-        Objects.toString(refund.getRefundStatus(), ""));
+    return OrderCommissionSync.isUnconcludedRefund(refund);
   }
 
   private static Instant eventTime(RefundDO refund) {

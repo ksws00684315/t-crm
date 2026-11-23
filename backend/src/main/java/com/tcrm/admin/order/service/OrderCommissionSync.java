@@ -147,11 +147,12 @@ public class OrderCommissionSync {
 
   /** Shared unconcluded rule (task 115 review): also drives the creator order summary. */
   static boolean hasUnconcludedRefund(List<RefundDO> refundRows) {
-    return refundRows.stream()
-        .anyMatch(
-            refund ->
-                refund.getRefundStatus() != null
-                    && UNCONCLUDED_REFUND_STATUSES.contains(refund.getRefundStatus()));
+    return refundRows.stream().anyMatch(OrderCommissionSync::isUnconcludedRefund);
+  }
+
+  static boolean isUnconcludedRefund(RefundDO refund) {
+    return refund.getRefundStatus() != null
+        && UNCONCLUDED_REFUND_STATUSES.contains(refund.getRefundStatus());
   }
 
   /** Open refunds and successful refunds lacking a product line block the entire order. */

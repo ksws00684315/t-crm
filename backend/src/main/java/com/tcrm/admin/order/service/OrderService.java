@@ -165,9 +165,16 @@ public class OrderService {
     if (filter.refundState() != null) {
       // B03: EXISTS keeps one order with several refund rows counted once; the map onto the
       // persisted refund_status values lives in the §6.2 contract.
-      query.exists(
-          "SELECT 1 FROM crm_refund r WHERE r.order_id = crm_order.id AND r.refund_status = {0}",
-          "REFUNDING".equals(filter.refundState()) ? "PROCESSING" : "SUCCESS");
+      String refundExists =
+          "SELECT 1 FROM crm_refund r WHERE r.order_id = crm_order.id"
+              + " AND r.tenant_id = crm_order.tenant_id AND NOT r.is_deleted";
+      if ("REFUNDING".equals(filter.refundState())) {
+        query.exists(
+            refundExists + " AND r.refund_status IN ({0}, {1})",
+            OrderCommissionSync.UNCONCLUDED_REFUND_STATUSES.toArray());
+      } else {
+        query.exists(refundExists + " AND r.refund_status = {0}", "SUCCESS");
+      }
     }
     if (filter.abnormal()) {
       // B04: one union of the three abnormal markers, intersected with every other condition.
@@ -359,6 +366,7 @@ public class OrderService {
         orderAmount,
         orderAmount == null || payAmount == null ? null : orderAmount.subtract(payAmount),
         refundAmount,
+        pendingRefundAmount(refunds),
         payAmount == null ? null : payAmount.subtract(refundAmount),
         detailCommission(current.user(), order, lines),
         lines.stream()
@@ -723,6 +731,15 @@ public class OrderService {
       }
     }
     return anyOwn;
+  }
+
+  private static BigDecimal pendingRefundAmount(List<RefundDO> refunds) {
+    return refunds.stream()
+        .filter(OrderCommissionSync::isUnconcludedRefund)
+        .map(RefundDO::getAmount)
+        .filter(Objects::nonNull)
+        .reduce(BigDecimal::add)
+        .orElse(null);
   }
 
   /**

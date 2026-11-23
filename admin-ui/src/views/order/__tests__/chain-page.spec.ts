@@ -853,6 +853,45 @@ describe("order chain page (task 40)", () => {
     wrapper.unmount();
   });
 
+  it("shows an unconcluded refund without subtracting it from sales or commission", async () => {
+    signIn("SUPER_ADMIN", ["order:view", "commission:view"]);
+    vi.mocked(orderApi.getOrderChain).mockResolvedValue({
+      ...financedChain,
+      funds: { ...financedChain.funds!, kolCommission: "21.00", commissionStatus: "FROZEN" },
+      financeFlows: [],
+      lines: [
+        {
+          ...chain.lines[0]!,
+          refunds: [{ ...chain.lines[0]!.refunds[0]!, refundStatus: "UNKNOWN", amount: "105.00" }]
+        }
+      ]
+    });
+    vi.mocked(orderApi.getOrder).mockResolvedValue({
+      ...financedDetail,
+      refundStatus: "NONE",
+      payAmount: "105.00",
+      refundAmount: "0.00",
+      netReceived: "105.00",
+      items: [{ ...orderDetail.items[0]!, payAmount: "105.00", refundAmount: "0.00" }],
+      commission: {
+        commissionableAmount: "105.00",
+        rates: ["0.2000"],
+        estimatedCommission: "21.00",
+        afterSales: true
+      }
+    });
+    const { wrapper } = await mountPage();
+    const refundStage = wrapper.get('[data-test="chain-stage-refund"]');
+    expect(refundStage.text()).toContain("退款中");
+    expect(refundStage.text()).toContain("¥105.00");
+    expect(wrapper.get('[data-test="chain-stage-withdrawal"]').text()).toContain("¥21.00");
+    const item = wrapper.get('[data-test="chain-product-summary"]').get("tbody tr");
+    expect(item.text()).toContain("退款中");
+    expect(item.text()).toContain("¥105.00");
+    expect(item.text()).toContain("¥0.00");
+    wrapper.unmount();
+  });
+
   it("explains that after-sales freezes accrued commission", async () => {
     signIn("SUPER_ADMIN", ["order:view", "commission:view"]);
     vi.mocked(orderApi.getOrderChain).mockResolvedValue(financedChain);

@@ -459,13 +459,24 @@ const commissionState = computed(() => {
             ? financeStatusText("FROZEN")
             : financeStatusText(currentCommission);
 });
+function refundIsOpen(status: string): boolean {
+  return status === "PROCESSING" || status === "UNKNOWN";
+}
+
+const openRefunds = computed(() =>
+  refundRecords.value.filter(refund => refundIsOpen(refund.refundStatus))
+);
+const refundInProgress = computed(
+  () => detail.value?.refundStatus === "PROCESSING" || openRefunds.value.length > 0
+);
+const pendingRefundAmount = computed(
+  () =>
+    detail.value?.pendingRefundAmount ??
+    (openRefunds.value.length
+      ? sumKnownAmounts(openRefunds.value.map(refund => refund.amount))
+      : null)
+);
 const stages = computed(() => {
-  const openRefunds = refundRecords.value.filter(
-    refund => refund.refundStatus === "PROCESSING" || refund.refundStatus === "UNKNOWN"
-  );
-  const pendingAmount = openRefunds.length
-    ? sumKnownAmounts(openRefunds.map(refund => refund.amount))
-    : null;
   return [
     {
       key: "copy",
@@ -485,10 +496,14 @@ const stages = computed(() => {
       key: "refund",
       icon: Refresh,
       label: t("order.chain.refunds"),
-      state: detail.value
-        ? orderRefundStatusText(detail.value.refundStatus)
-        : countRecords(refundRecords.value.length),
-      amount: displayAmount(pendingAmount ?? refundTotalAmount.value)
+      state: refundInProgress.value
+        ? orderRefundStatusText("PROCESSING")
+        : detail.value
+          ? orderRefundStatusText(detail.value.refundStatus)
+          : countRecords(refundRecords.value.length),
+      amount: displayAmount(
+        refundInProgress.value ? pendingRefundAmount.value : refundTotalAmount.value
+      )
     },
     {
       key: "settlement",
@@ -543,6 +558,9 @@ function lineNetSales(line: ChainLineVO) {
 }
 
 function lineStatus(line: ChainLineVO): string {
+  if (line.refunds.some(refund => refundIsOpen(refund.refundStatus))) {
+    return orderRefundStatusText("PROCESSING");
+  }
   const status = lineItem(line)?.status;
   if (!status) return "-";
   const key = `order.line.status.${status}`;
@@ -618,6 +636,9 @@ onMounted(load);
         <div class="chain-header__title">
           <CopyText :value="chain.orderNo" />
           <el-tag v-if="detail" effect="light">{{ orderStatusText(detail.orderStatus) }}</el-tag>
+          <el-tag v-if="refundInProgress" type="warning" effect="light">
+            {{ orderRefundStatusText("PROCESSING") }}
+          </el-tag>
         </div>
         <dl class="chain-meta">
           <div>

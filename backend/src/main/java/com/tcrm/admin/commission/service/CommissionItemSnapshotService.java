@@ -111,7 +111,9 @@ public class CommissionItemSnapshotService implements CommissionItemApi {
       }
       ResolvedRate rate = resolveRate(tenantId, order, item, kolRates);
       String fingerprint = fingerprint(order, item, rate, rule);
-      if (exists && fingerprint.equals(fingerprintOf(row.getSourceVersion()))) {
+      if (exists
+          && fingerprint.equals(fingerprintOf(row.getSourceVersion()))
+          && !hasStaleRefundAccrual(row, item, rate)) {
         continue;
       }
       String version = fingerprint + REVISION_SEPARATOR + (revisionNo(row.getSourceVersion()) + 1);
@@ -122,6 +124,20 @@ public class CommissionItemSnapshotService implements CommissionItemApi {
     for (Long itemStateId : stale) {
       pauses.resumeForItem(itemStateId);
     }
+  }
+
+  /** Older snapshots zeroed unreleased accrual during an open refund without changing the facts. */
+  private static boolean hasStaleRefundAccrual(
+      CommissionItemStateDO row, ItemSourceDTO item, ResolvedRate rate) {
+    return item.afterSales()
+        && Boolean.TRUE.equals(row.getVerified())
+        && row.getAccruedCommissionCny().signum() == 0
+        && CommissionSettlementRules.accrue(
+                    CommissionSettlementRules.effectiveBasis(
+                        item.basisCny(), item.basisIncludesRefund(), item.successfulRefundCny()),
+                    rate.rate())
+                .signum()
+            > 0;
   }
 
   private static List<Long> itemIds(List<ItemSourceDTO> items) {

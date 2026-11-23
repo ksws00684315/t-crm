@@ -45,8 +45,11 @@ import org.mockito.ArgumentCaptor;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
+import org.springframework.core.io.ClassPathResource;
 import org.springframework.http.MediaType;
+import org.springframework.jdbc.core.ConnectionCallback;
 import org.springframework.jdbc.core.JdbcTemplate;
+import org.springframework.jdbc.datasource.init.ScriptUtils;
 import org.springframework.test.context.DynamicPropertyRegistry;
 import org.springframework.test.context.DynamicPropertySource;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
@@ -464,6 +467,37 @@ class OrderSettlementFlowIT {
     releaseJob.releaseDue();
     assertThat(walletBalance()).isEqualByComparingTo("0.60");
     assertThat(adjustmentCount()).isZero();
+  }
+
+  @Test
+  void shouldRecomputeLegacyFrozenAccrualThroughSettlementRetry() throws Exception {
+    stubIncomeDetail(incomeRow("600"));
+    long refundId = insertRefund(itemA, "UNKNOWN");
+    assertThat(pullSucceeds()).isTrue();
+    jdbc.update(
+        "UPDATE crm_commission_item_state SET accrued_commission_cny=0 WHERE order_id=?", orderId);
+    jdbc.execute(
+        (ConnectionCallback<Void>)
+            connection -> {
+              ScriptUtils.executeSqlScript(
+                  connection,
+                  new ClassPathResource(
+                      "db/migration/V202611240900__queue_legacy_refund_commission_recompute.sql"));
+              return null;
+            });
+
+    assertThat(orderField("settlement_recompute_failures")).isEqualTo(1);
+    assertThat(pullSucceeds()).isTrue();
+    assertThat(orderField("settlement_recompute_failures")).isEqualTo(0);
+    assertThat(itemField(itemA, "accrued_commission_cny")).isEqualTo(new BigDecimal("0.40"));
+    assertThat(itemField(itemB, "accrued_commission_cny")).isEqualTo(new BigDecimal("0.20"));
+    assertThat(walletBalanceOrZero()).isZero();
+
+    setRefundStatus(refundId, "SUCCESS");
+    setItemRefund(itemA, "2.00");
+    syncOrderFromDb();
+    assertThat(itemField(itemA, "accrued_commission_cny")).isEqualTo(new BigDecimal("0.20"));
+    assertThat(itemField(itemB, "accrued_commission_cny")).isEqualTo(new BigDecimal("0.20"));
   }
 
   @Test

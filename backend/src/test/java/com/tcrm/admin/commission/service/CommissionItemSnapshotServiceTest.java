@@ -218,6 +218,27 @@ class CommissionItemSnapshotServiceTest {
   }
 
   @Test
+  void shouldRepairLegacyZeroAccrualEvenWhenTheRefundFactsHaveNotChanged() {
+    whenRateAtPayTime(KOL_A, "0.2000", 3);
+    var row = firstRevision(new BigDecimal("105.00"));
+    var open = withAfterSales(item(9001L, KOL_A, 1, new BigDecimal("105.00"), null), true);
+    syncLine(open);
+    String previousVersion = row.getSourceVersion();
+    row.setAccruedCommissionCny(BigDecimal.ZERO);
+
+    syncLine(open);
+
+    assertThat(row.getAccruedCommissionCny()).isEqualByComparingTo("21.00");
+    assertThat(row.getReleaseBasis()).isEqualTo(CommissionSettlementRules.RELEASE_AFTER_SALES);
+    assertThat(row.getReleasedCommissionCny()).isZero();
+    assertThat(row.getSourceVersion()).isNotEqualTo(previousVersion);
+    String repairedVersion = row.getSourceVersion();
+    syncLine(open);
+    assertThat(row.getSourceVersion()).isEqualTo(repairedVersion);
+    verifyNoInteractions(wallet);
+  }
+
+  @Test
   void shouldKeepReleasedAccrualWithoutAnyLedgerEntryInAfterSales() {
     // Released 10.00, then a refund opens: the released money stays, frozen, no clawback.
     CommissionItemStateDO existing = verifiedRow(9001L, KOL_A, "100.00", "10.00");

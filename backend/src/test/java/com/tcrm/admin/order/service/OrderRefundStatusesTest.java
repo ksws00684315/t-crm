@@ -26,10 +26,7 @@ class OrderRefundStatusesTest {
 
   @Test
   void shouldReturnNone_whenNothingSucceededOrIsRunning() {
-    assertThat(
-            OrderRefundStatuses.of(
-                List.of(refund("CLOSED", "10.00"), refund("UNKNOWN", "1.00")),
-                new BigDecimal("10.00")))
+    assertThat(OrderRefundStatuses.of(List.of(refund("CLOSED", "10.00")), new BigDecimal("10.00")))
         .isEqualTo(OrderRefundStatuses.NONE);
   }
 
@@ -39,6 +36,13 @@ class OrderRefundStatusesTest {
             OrderRefundStatuses.of(
                 List.of(refund("SUCCESS", "4.00"), refund("PROCESSING", "1.00")),
                 new BigDecimal("10.00")))
+        .isEqualTo(OrderRefundStatuses.PROCESSING);
+  }
+
+  @Test
+  void shouldTreatUnmappedRefundAsUnconcludedAtOrderLevel() {
+    assertThat(
+            OrderRefundStatuses.of(List.of(refund("UNKNOWN", "105.00")), new BigDecimal("105.00")))
         .isEqualTo(OrderRefundStatuses.PROCESSING);
   }
 
