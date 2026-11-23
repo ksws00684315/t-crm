@@ -852,6 +852,8 @@ class OrderStatsIT {
       jdbc.update("UPDATE crm_order_item SET kol_id = 11 WHERE id = 2");
       session.clearCache();
       assertThat(orders.creatorCommission(scoped, FROM, UNTIL).total()).isEqualByComparingTo("8");
+      // Restore the workbench fixture: the second line has no creator attribution.
+      jdbc.update("UPDATE crm_order_item SET kol_id = NULL WHERE id = 2");
       jdbc.update(
           "UPDATE crm_commission_item_state SET released_commission_cny = 8 WHERE id = 701");
       session.clearCache();
