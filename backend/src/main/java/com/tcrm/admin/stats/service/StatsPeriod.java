@@ -56,7 +56,9 @@ public record StatsPeriod(LocalDate startDate, LocalDate endDate, boolean cumula
   }
 
   public StatsPeriod previous() {
-    if (cumulative) return null;
+    if (cumulative) {
+      return null;
+    }
     long days = ChronoUnit.DAYS.between(startDate, endDate) + 1;
     return new StatsPeriod(startDate.minusDays(days), startDate.minusDays(1));
   }
