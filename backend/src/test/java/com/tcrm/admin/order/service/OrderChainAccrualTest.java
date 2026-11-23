@@ -112,16 +112,14 @@ class OrderChainAccrualTest {
     refund.setRefundStatus("PROCESSING");
     var pending =
         OrderChainAccrual.of(
-            order, List.of(item), List.of(refund, refund), commission("0", true), "XD");
+            order, List.of(item), List.of(refund, refund), commission("30", true), "XD");
     assertThat(pending.status()).isEqualTo("REFUNDING");
-    assertThat(pending.amount()).isEqualByComparingTo("26");
-    assertThat(pending.flows()).hasSize(4);
-    assertThat(pending.flows().get(2).type()).isEqualTo("SHOP_RECEIVABLE");
-    assertThat(pending.flows().get(2).amount()).isEqualByComparingTo("20");
-    assertThat(pending.flows().getLast().amount()).isEqualByComparingTo("4");
-    assertThat(pending.flows().getLast().type()).isEqualTo("COMMISSION_REFUND_PENDING");
-    assertThat(pending.flows().getLast().commissionStatus()).isEqualTo("FROZEN");
-    assertThat(pending.commissionStatus(commission("0", true))).isEqualTo("FROZEN");
+    assertThat(pending.amount()).isEqualByComparingTo("30");
+    assertThat(pending.flows()).hasSize(3);
+    assertThat(pending.flows().getLast().type()).isEqualTo("REFUND_REQUEST");
+    assertThat(pending.flows().getLast().amount()).isEqualByComparingTo("20");
+    assertThat(pending.flows().getLast().direction()).isNull();
+    assertThat(pending.commissionStatus(commission("30", true))).isEqualTo("FROZEN");
 
     refund.setRefundStatus("SUCCESS");
     refund.setFinishTime(PAID.plusSeconds(120));
@@ -129,7 +127,7 @@ class OrderChainAccrualTest {
         OrderChainAccrual.of(order, List.of(item), List.of(refund), commission("26", false), "XD");
     assertThat(confirmed.status()).isEqualTo("REFUNDED");
     assertThat(confirmed.amount()).isEqualByComparingTo("26");
-    assertThat(confirmed.flows().getLast().flowNo()).isEqualTo(pending.flows().getLast().flowNo());
+    assertThat(confirmed.flows().getLast().flowNo()).isEqualTo("CR21");
     assertThat(confirmed.flows().getLast().type()).isEqualTo("COMMISSION_REFUND");
     assertThat(confirmed.flows().getLast().commissionStatus()).isEqualTo("INVALID");
     assertThat(confirmed.commissionStatus(commission("26", false))).isEqualTo("FROZEN");

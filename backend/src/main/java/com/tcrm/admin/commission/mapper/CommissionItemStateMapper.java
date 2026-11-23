@@ -56,7 +56,8 @@ public interface CommissionItemStateMapper extends BaseMapper<CommissionItemStat
   @Select(
       SELECT_FROM
           + """
-      WHERE verified AND is_deleted = FALSE AND release_at IS NOT NULL AND release_at <= #{now}
+      WHERE verified AND is_deleted = FALSE AND after_sales = FALSE
+        AND release_basis = 'CONFIRMED' AND release_at IS NOT NULL AND release_at <= #{now}
         AND accrued_commission_cny > released_commission_cny
       ORDER BY release_at, id
       LIMIT #{limit}
@@ -134,7 +135,7 @@ public interface CommissionItemStateMapper extends BaseMapper<CommissionItemStat
       SELECT_FROM
           + """
       WHERE is_deleted = FALSE AND kol_id = #{kolId} AND verified = TRUE
-        AND after_sales = FALSE AND release_basis IN ('CONFIRMED', 'FALLBACK')
+        AND after_sales = FALSE AND release_basis = 'CONFIRMED'
         AND release_at <= #{now} AND released_commission_cny > 0
       ORDER BY release_at, order_item_id
       """)
@@ -166,7 +167,7 @@ public interface CommissionItemStateMapper extends BaseMapper<CommissionItemStat
       WHERE s.is_deleted = FALSE AND s.kol_id IN
         <foreach collection='kolIds' item='id' open='(' separator=',' close=')'>#{id}</foreach>
         AND s.verified = TRUE AND s.after_sales = FALSE
-        AND s.release_basis IN ('CONFIRMED', 'FALLBACK')
+        AND s.release_basis = 'CONFIRMED'
         AND s.release_at &lt;= #{now} AND s.released_commission_cny &gt; 0
       GROUP BY s.kol_id
       </script>

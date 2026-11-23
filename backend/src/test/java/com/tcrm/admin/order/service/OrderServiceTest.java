@@ -797,8 +797,11 @@ class OrderServiceTest {
     when(products.listProducts(any()))
         .thenReturn(List.of(new ProductRefDTO(200L, "P200", "Original", "https://img/a.png", 1)));
 
+    when(bdUsers.getById(99L)).thenReturn(new BdUserDTO(99L, "bd-login", "BD Demo", true));
+
     var detail = service.detail(10L);
 
+    assertThat(detail.inviterName()).isEqualTo("BD Demo");
     assertThat(detail.orderNo()).isEqualTo("remote10");
     assertThat(detail.channel()).isEqualTo("WEIDIAN");
     assertThat(detail.shopCode()).isEqualTo("S005");
@@ -1215,7 +1218,9 @@ class OrderServiceTest {
     assertThat(block.withdrawals()).hasSize(2);
     assertThat(block.withdrawals().getFirst().applicationNo()).isEqualTo("W20261016000001");
     assertThat(block.withdrawals().getFirst().paidAt()).isEqualTo(PAID);
-    assertThat(chain.financeFlows()).hasSize(7);
+    assertThat(chain.financeFlows())
+        .extracting(OrderChainDTO.FlowDTO::flowNo)
+        .containsExactly("CL900", "WA901", "SRremote10", "SRF9", "CR9");
     assertThat(chain.funds().financeStatus()).isEqualTo("REFUNDING");
     assertThat(chain.funds().financeAmount()).isNull();
     assertThat(chain.funds().commissionStatus()).isEqualTo("WITHDRAWN");

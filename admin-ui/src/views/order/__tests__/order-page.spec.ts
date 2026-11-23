@@ -559,6 +559,65 @@ describe("order list page (task 40)", () => {
     wrapper.unmount();
   });
 
+  it("shows freight once per order and expands only the selected order's extra product rows", async () => {
+    signIn("SUPER_ADMIN", MANAGER);
+    const items = Array.from({ length: 5 }, (_, index) => ({
+      id: String(301 + index),
+      subOrderId: null,
+      weidianItemId: String(9001 + index),
+      skuId: null,
+      itemName: `Product ${index + 1}`,
+      skuName: null,
+      quantity: 1,
+      payAmount: "24.00",
+      refundAmount: null,
+      kolId: null,
+      kolCode: null,
+      kolName: null,
+      productId: null,
+      kolItemId: null,
+      attributionType: null,
+      manualReason: null,
+      imageUrl: null
+    }));
+    vi.mocked(orderApi.listOrders).mockResolvedValue({
+      items: [
+        { ...attributed, items },
+        { ...unattributed, freight: "0.00", items },
+        { ...attributed, id: "103", freight: null, items: items.slice(0, 3) }
+      ],
+      total: "3",
+      page: 1,
+      size: 20
+    });
+    const wrapper = await mountPage();
+    const productRows = () => wrapper.findAll(".order-group-item");
+    const [first, second] = wrapper.findAll("tr [data-test='order-products-toggle']");
+    expect(wrapper.findAll("tr [data-test='order-products-toggle']")).toHaveLength(2);
+    expect(productRows()).toHaveLength(9);
+    expect(wrapper.text()).not.toContain("Product 4");
+    expect(wrapper.findAll("tr [data-test='order-freight']").map(cell => cell.text())).toEqual([
+      "（含运费：¥5.00）",
+      "（含运费：¥0.00）",
+      "（含运费：-）"
+    ]);
+    expect(productRows()[0].get("td[rowspan='3'] .order-money").text()).toContain("¥120.00");
+    expect(first.attributes("aria-expanded")).toBe("false");
+
+    await first.trigger("click");
+    expect(first.attributes("aria-expanded")).toBe("true");
+    expect(second.attributes("aria-expanded")).toBe("false");
+    expect(productRows()).toHaveLength(11);
+    expect(productRows()[0].find("td[rowspan='5'] .order-money").exists()).toBe(true);
+    expect(productRows()[4].text()).toContain("Product 5");
+
+    await first.trigger("click");
+    expect(first.attributes("aria-expanded")).toBe("false");
+    expect(productRows()).toHaveLength(9);
+    expect(productRows()[0].find("td[rowspan='3'] .order-money").exists()).toBe(true);
+    wrapper.unmount();
+  });
+
   it("disables the chain action for unattributed orders and opens the chain tab otherwise (R-17)", async () => {
     signIn("SUPER_ADMIN", MANAGER);
     const open = vi.spyOn(window, "open").mockReturnValue(null);

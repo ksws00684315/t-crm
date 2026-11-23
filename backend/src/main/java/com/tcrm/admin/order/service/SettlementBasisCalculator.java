@@ -3,12 +3,10 @@ package com.tcrm.admin.order.service;
 import com.tcrm.admin.order.model.OrderDO;
 import com.tcrm.admin.order.model.OrderItemDO;
 import com.tcrm.admin.order.model.OrderSettlementFlowDO;
-import com.tcrm.admin.order.model.OrderStatus;
 import java.math.BigDecimal;
 import java.math.RoundingMode;
 import java.time.Instant;
 import java.util.ArrayList;
-import java.util.HashMap;
 import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -22,9 +20,8 @@ import java.util.Set;
  * so accrual starts when the order is paid. The Weidian settlement only confirms the basis: the
  * goods-income flow must equal the pay amount, or the pay amount minus the CRM successful refunds.
  *
- * <p>Refunds reduce the basis from both sources, counted once: the CRM successful refunds per line,
- * and the refund rows of the settlement flows when their total exceeds the CRM total (the gap is
- * allocated by pay ratio). An order closed after payment has a zero basis.
+ * <p>Settlement refunds are checked against verified item amounts. An unmatched gap only blocks
+ * release; the calculator never assigns it to an item without evidence.
  *
  * <p>Unverified orders carry a queryable reason code: unpaid, multiple KOLs, allocation failure.
  */
@@ -72,22 +69,11 @@ public final class SettlementBasisCalculator {
 
   private SettlementBasisCalculator() {}
 
-  /**
-   * Result of the basis check. {@code reason} null means the basis was computed. {@code
-   * lineExtraRefund} holds the settlement refund gap allocated per line (empty when there is none);
-   * {@code refundGap} flags that the settlement flows show refunds the CRM records lack; {@code
-   * refundGapUnallocated} is the part of the gap that no line had basis left to absorb (task 91,
-   * L-035; zero in every normal case).
-   */
+  /** Paid basis, settlement evidence and a flag for refunds missing item-level detail. */
   public record BasisOutcome(
-      String reason,
-      Instant settlementTime,
-      Map<Long, BigDecimal> lineBasis,
-      Map<Long, BigDecimal> lineExtraRefund,
-      boolean refundGap,
-      BigDecimal refundGapUnallocated) {
+      String reason, Instant settlementTime, Map<Long, BigDecimal> lineBasis, boolean refundGap) {
     static BasisOutcome unverified(String reason) {
-      return new BasisOutcome(reason, null, Map.of(), Map.of(), false, ZERO);
+      return new BasisOutcome(reason, null, Map.of(), false);
     }
   }
 
@@ -100,24 +86,13 @@ public final class SettlementBasisCalculator {
     if (distinctKols(items).size() > 1) {
       return BasisOutcome.unverified(REASON_MULTIPLE_KOLS);
     }
-    if (OrderStatus.CLOSED.name().equals(order.getOrderStatus())) {
-      // Closed after payment: the whole order is refunded, so no commission remains.
-      return zeroBasis(items);
-    }
     List<OrderSettlementFlowDO> incomeFlows = new ArrayList<>();
-    boolean preSettleListed = false;
     for (OrderSettlementFlowDO flow : flows) {
       if (QUERY_INCOME_DETAIL.equals(flow.getQueryType())) {
         incomeFlows.add(flow);
-      } else if (QUERY_PRE_SETTLE_REFUND.equals(flow.getQueryType())) {
-        preSettleListed = true;
       }
     }
     if (incomeFlows.isEmpty()) {
-      if (preSettleListed) {
-        // Pre-settle full refund: the basis is determined to be zero, so no commission can arise.
-        return zeroBasis(items);
-      }
       return basis(order, items, flows, REASON_NO_SETTLEMENT, null);
     }
     OrderSettlementFlowDO income = singleGoodsIncome(incomeFlows);
@@ -171,27 +146,8 @@ public final class SettlementBasisCalculator {
     if (lineBasis == null) {
       return BasisOutcome.unverified(REASON_ALLOCATION_FAILED);
     }
-    BigDecimal gap = refundGap(items, flows);
-    Map<Long, BigDecimal> extra = Map.of();
-    BigDecimal unallocated = ZERO;
-    if (gap.signum() > 0) {
-      GapAllocation allocation = allocateRefundGap(gap, items, lineBasis);
-      if (allocation == null) {
-        return BasisOutcome.unverified(REASON_ALLOCATION_FAILED);
-      }
-      extra = allocation.perLine();
-      unallocated = allocation.unallocated();
-    }
     return new BasisOutcome(
-        reason, settlementTime, lineBasis, extra, gap.signum() > 0, unallocated);
-  }
-
-  private static BasisOutcome zeroBasis(List<OrderItemDO> items) {
-    Map<Long, BigDecimal> zeros = new HashMap<>();
-    for (OrderItemDO item : items) {
-      zeros.put(item.getId(), ZERO);
-    }
-    return new BasisOutcome(null, null, zeros, Map.of(), false, ZERO);
+        reason, settlementTime, lineBasis, refundGap(items, flows).signum() > 0);
   }
 
   /**
@@ -200,8 +156,15 @@ public final class SettlementBasisCalculator {
    */
   static BigDecimal refundGap(List<OrderItemDO> items, List<OrderSettlementFlowDO> flows) {
     BigDecimal fromFlows = BigDecimal.ZERO;
+    boolean incomeRefundPresent =
+        flows.stream()
+            .anyMatch(
+                flow ->
+                    QUERY_INCOME_DETAIL.equals(flow.getQueryType())
+                        && TRADE_SUB_TYPE_REFUND.equals(flow.getTradeSubType()));
+    String queryType = incomeRefundPresent ? QUERY_INCOME_DETAIL : QUERY_PRE_SETTLE_REFUND;
     for (OrderSettlementFlowDO flow : flows) {
-      if (!QUERY_INCOME_DETAIL.equals(flow.getQueryType())
+      if (!queryType.equals(flow.getQueryType())
           || !TRADE_SUB_TYPE_REFUND.equals(flow.getTradeSubType())) {
         continue;
       }
@@ -255,63 +218,6 @@ public final class SettlementBasisCalculator {
       }
     }
     return kols;
-  }
-
-  /** The settlement refund gap split per line, and the part no line had basis left for. */
-  private record GapAllocation(Map<Long, BigDecimal> perLine, BigDecimal unallocated) {}
-
-  /**
-   * Splits the settlement refund gap F - C across the lines (task 91, L-035). The first pass is the
-   * pay-ratio split of {@link #allocate}; a line can only take what is left of its basis after the
-   * CRM refund, because the commission engine floors every line at zero and would silently drop the
-   * rest. What a line cannot take is split again, by the same pay ratio, over the lines that still
-   * have basis, until the gap is placed or no line has room. The total therefore equals the gap to
-   * the cent. If every line is used up, each is netted to exactly zero (never negative) and the
-   * remainder is reported as unallocated instead of being forced onto a line. Returns null only
-   * when the gap cannot be split at all (every line pay is zero), like the basis split.
-   */
-  private static GapAllocation allocateRefundGap(
-      BigDecimal gap, List<OrderItemDO> items, Map<Long, BigDecimal> lineBasis) {
-    Map<Long, BigDecimal> firstPass = allocate(gap, items);
-    if (firstPass == null) {
-      return null;
-    }
-    Map<Long, BigDecimal> room = new LinkedHashMap<>();
-    Map<Long, BigDecimal> taken = new LinkedHashMap<>();
-    BigDecimal placed = ZERO;
-    for (OrderItemDO item : items) {
-      BigDecimal crm = item.getRefundAmount() == null ? ZERO : item.getRefundAmount();
-      BigDecimal left = lineBasis.get(item.getId()).subtract(crm).max(ZERO);
-      BigDecimal take = firstPass.get(item.getId()).min(left);
-      room.put(item.getId(), left.subtract(take));
-      taken.put(item.getId(), take);
-      placed = placed.add(take);
-    }
-    BigDecimal remaining = gap.subtract(placed);
-    while (remaining.signum() > 0) {
-      List<OrderItemDO> open = new ArrayList<>();
-      for (OrderItemDO item : items) {
-        if (room.get(item.getId()).signum() > 0) {
-          open.add(item);
-        }
-      }
-      Map<Long, BigDecimal> share = open.isEmpty() ? null : allocate(remaining, open);
-      if (share == null) {
-        break;
-      }
-      BigDecimal moved = ZERO;
-      for (OrderItemDO item : open) {
-        BigDecimal take = share.get(item.getId()).min(room.get(item.getId()));
-        taken.put(item.getId(), taken.get(item.getId()).add(take));
-        room.put(item.getId(), room.get(item.getId()).subtract(take));
-        moved = moved.add(take);
-      }
-      if (moved.signum() == 0) {
-        break;
-      }
-      remaining = remaining.subtract(moved);
-    }
-    return new GapAllocation(taken, remaining);
   }
 
   /**

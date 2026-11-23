@@ -122,7 +122,7 @@ public interface WithdrawalMapper {
    * of a dropped line are real money.
    */
   String BLOCKED_LINE =
-      " ((s.is_deleted = FALSE AND s.after_sales = TRUE)"
+      " ((s.is_deleted = FALSE AND (s.after_sales = TRUE OR s.release_basis != 'CONFIRMED'))"
           + " OR COALESCE(o.occupied_cny, 0) > s.released_commission_cny) ";
 
   /** Occupations (funding statuses, including PAID) grouped per line, for {@link #BLOCKED_LINE}. */

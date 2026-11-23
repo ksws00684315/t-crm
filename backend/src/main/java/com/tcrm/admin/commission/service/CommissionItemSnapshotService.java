@@ -166,8 +166,6 @@ public class CommissionItemSnapshotService implements CommissionItemApi {
                 item.completedTime(),
                 item.afterSales(),
                 rule.freezeDays(),
-                // After-sales caps the accrual at what the owner already received, so nothing is
-                // clawed back while the refund is open (task 113); a new owner holds nothing yet.
                 ownershipChanged ? ZERO : previousReleased));
 
     BigDecimal released = previousReleased;
@@ -335,7 +333,7 @@ public class CommissionItemSnapshotService implements CommissionItemApi {
     String canonical =
         String.join(
             "|",
-            "v1",
+            "v2",
             text(order.payTime()),
             text(item.kolId()),
             String.valueOf(item.attributionType()),

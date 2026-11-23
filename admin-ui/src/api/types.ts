@@ -510,6 +510,7 @@ export interface OrderDetailVO {
   kolId: string | null;
   kolName: string | null;
   kolCode: string | null;
+  inviterName?: string | null;
   orderStatus: OrderStatus;
   refundStatus: OrderRefundStatus;
   attributionStatus: AttributionStatus;
@@ -672,6 +673,7 @@ export interface ChainFinanceFlowVO {
     | "KOL_COMMISSION"
     | "SHOP_RECEIVABLE"
     | "COMMISSION_ACCRUAL"
+    | "REFUND_REQUEST"
     | "COMMISSION_REFUND_PENDING"
     | "COMMISSION_REFUND"
     | "ORDER_SETTLEMENT";

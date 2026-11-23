@@ -270,32 +270,31 @@ class OrderSettlementFlowIT {
   }
 
   @Test
-  void shouldNetRefundGapOnceWhenIncomeDetailRefundAppearsAfterRelease() throws Exception {
+  void shouldKeepWalletWhenSettlementRefundHasNoItemEvidence() throws Exception {
     stubIncomeDetail(incomeRow("600"), row("支出", "交易手续费", "-4"));
     pull();
     releaseJob.releaseDue();
     assertThat(walletBalance()).isEqualByComparingTo("0.60");
 
-    // The backfill re-observes the window and now sees a partial refund of -60 fen with no CRM
-    // refund record (task 81 PR review, 2026-10-30). The gap 0.60 is netted by pay ratio 4 : 2:
-    // lines A and B drop by 0.40 and 0.20, so accrual falls to 0.36 and 0.18. The released surplus
-    // is taken back as COMMISSION_ADJUSTMENT -0.04 and -0.02 at the next release run.
+    // The backfill first sees a refund without a CRM product-line match.
     stubIncomeDetail(incomeRow("600"), row("支出", "交易手续费", "-4"), row("支出", "退款", "-60"));
     pull();
     releaseJob.releaseDue();
 
+    assertThat(itemField(itemA, "release_basis")).isEqualTo("AFTER_SALES");
+    assertThat(itemField(itemB, "release_basis")).isEqualTo("AFTER_SALES");
     assertThat(flowCount()).isEqualTo(3);
     assertThat(itemField(itemA, "basis_cny")).isEqualTo(new BigDecimal("4.00"));
-    assertThat(itemField(itemA, "accrued_commission_cny")).isEqualTo(new BigDecimal("0.36"));
-    assertThat(itemField(itemB, "accrued_commission_cny")).isEqualTo(new BigDecimal("0.18"));
-    assertThat(walletBalance()).isEqualByComparingTo("0.54");
+    assertThat(itemField(itemA, "accrued_commission_cny")).isEqualTo(new BigDecimal("0.40"));
+    assertThat(itemField(itemB, "accrued_commission_cny")).isEqualTo(new BigDecimal("0.20"));
+    assertThat(walletBalance()).isEqualByComparingTo("0.60");
     assertThat(
             jdbc.queryForObject(
                 "SELECT count(*) FROM crm_commission_ledger WHERE kol_id = ?"
                     + " AND entry_type = 'COMMISSION_ADJUSTMENT'",
                 Integer.class,
                 kolId))
-        .isEqualTo(2);
+        .isZero();
   }
 
   @Test
@@ -434,9 +433,9 @@ class OrderSettlementFlowIT {
   }
 
   @Test
-  void shouldZeroUnreleasedAccrualWhileRefundIsOpenAndRestoreWhenRejected() throws Exception {
+  void shouldPreserveUnreleasedAccrualWhileRefundIsOpen() throws Exception {
     // Task 113 (定稿 §2.1): confirmed but not released yet (accrual 0.40 / 0.20). An open refund on
-    // line A puts the whole order in after-sales: both lines accrue 0, nothing is posted.
+    // line A puts the whole order in after-sales: both accruals stay frozen and nothing is posted.
     stubIncomeDetail(incomeRow("600"));
     assertThat(pullSucceeds()).isTrue();
     assertThat(itemField(itemA, "accrued_commission_cny")).isEqualTo(new BigDecimal("0.40"));
@@ -447,7 +446,8 @@ class OrderSettlementFlowIT {
       assertThat(itemField(item, "after_sales")).isEqualTo(true);
       assertThat(itemField(item, "verified")).isEqualTo(true);
       assertThat(itemField(item, "release_basis")).isEqualTo("AFTER_SALES");
-      assertThat(itemField(item, "accrued_commission_cny")).isEqualTo(new BigDecimal("0.00"));
+      assertThat(itemField(item, "accrued_commission_cny"))
+          .isEqualTo(new BigDecimal(item == itemA ? "0.40" : "0.20"));
     }
     assertThat(orderField("commission_basis_reason")).isNull();
     // The release job leaves after-sales lines alone.
@@ -813,19 +813,14 @@ class OrderSettlementFlowIT {
     assertThat(orderField("commission_basis_reason")).isEqualTo("NO_SETTLEMENT");
   }
 
-  /**
-   * L-035: line A is fully refunded in the CRM (4.00), the flows show 5.00, so the gap is 1.00. The
-   * pay-ratio share of A (0.67) cannot be taken from it, so B (2.00 basis) takes all 1.00 and
-   * accrues 10% of 1.00. A repeat pull must not append a revision.
-   */
   @Test
-  void shouldMoveTruncatedRefundGapToTheOtherLineAndStayStable() throws Exception {
+  void shouldKeepUnmatchedRefundFromReducingAnotherLine() throws Exception {
     setItemRefund(itemA, "4.00");
     stubIncomeDetail(incomeRow("600"), row("支出", "退款", "-500"));
     assertThat(pullSucceeds()).isTrue();
 
     assertThat(itemField(itemA, "accrued_commission_cny")).isEqualTo(new BigDecimal("0.00"));
-    assertThat(itemField(itemB, "accrued_commission_cny")).isEqualTo(new BigDecimal("0.10"));
+    assertThat(itemField(itemB, "accrued_commission_cny")).isEqualTo(new BigDecimal("0.20"));
     long revisionsA = revisionCount(itemA);
     long revisionsB = revisionCount(itemB);
 
@@ -834,7 +829,7 @@ class OrderSettlementFlowIT {
 
     assertThat(revisionCount(itemA)).isEqualTo(revisionsA);
     assertThat(revisionCount(itemB)).isEqualTo(revisionsB);
-    assertThat(walletBalance()).isEqualByComparingTo("0.10");
+    assertThat(walletBalanceOrZero()).isEqualByComparingTo("0.00");
   }
 
   private void pull() {

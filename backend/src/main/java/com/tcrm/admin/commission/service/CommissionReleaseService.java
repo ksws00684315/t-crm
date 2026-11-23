@@ -92,6 +92,8 @@ public class CommissionReleaseService {
     CommissionItemStateDO row = states.lockById(candidate.getId());
     if (row == null
         || !Boolean.TRUE.equals(row.getVerified())
+        || Boolean.TRUE.equals(row.getAfterSales())
+        || !CommissionSettlementRules.RELEASE_CONFIRMED.equals(row.getReleaseBasis())
         || row.getReleaseAt() == null
         || row.getReleaseAt().isAfter(now)
         || row.getKolId() == null) {
