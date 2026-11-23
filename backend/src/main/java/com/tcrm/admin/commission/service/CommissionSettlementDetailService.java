@@ -241,8 +241,7 @@ public class CommissionSettlementDetailService {
       BigDecimal released =
           row.getReleasedCommissionCny() == null ? BigDecimal.ZERO : row.getReleasedCommissionCny();
       frozen = frozen || row.getAccruedCommissionCny().compareTo(released) > 0;
-      BigDecimal adjustment =
-          CommissionSettlementRules.refundAdjustment(row.getAccruedCommissionCny(), released);
+      BigDecimal adjustment = CommissionSettlementRules.refundAdjustment(row, rate);
       KolRefDTO kol = row.getKolId() == null ? null : kolsById.get(row.getKolId());
       ItemRefDTO item =
           items.stream().filter(i -> i.id() == row.getOrderItemId()).findFirst().orElse(null);
@@ -258,8 +257,10 @@ public class CommissionSettlementDetailService {
               rate == null ? null : rate.toPlainString(),
               row.getConfigVersion(),
               row.getRuleVersionId(),
-              row.getAccruedCommissionCny().toPlainString(),
-              adjustment.toPlainString(),
+              Boolean.TRUE.equals(row.getVerified())
+                  ? row.getAccruedCommissionCny().toPlainString()
+                  : null,
+              adjustment == null ? null : adjustment.toPlainString(),
               row.getReleaseBasis(),
               order.payTime(),
               CommissionSettlementRules.adjustmentDirection(adjustment),

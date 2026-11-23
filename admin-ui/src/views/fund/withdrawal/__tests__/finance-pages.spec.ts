@@ -5,6 +5,8 @@ import { createMemoryHistory, createRouter } from "vue-router";
 import ElementPlus, { ElMessage } from "element-plus";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import * as api from "@/api/commission/finance";
+import * as analytics from "@/api/analytics";
+import type { AnalyticsResult } from "@/api/analytics";
 import { createFinanceDemo } from "../../../../../preview/commission/finance-engine";
 import { i18n } from "@/locales";
 import { useUserStore } from "@/stores/user";
@@ -17,6 +19,10 @@ import ConfigPage from "@/views/fund/settlement-config/index.vue";
 import SettlementPage from "@/views/fund/settlement-details/index.vue";
 import TasksPage from "../index.vue";
 import { notifyError } from "@/utils/notify";
+vi.mock("@/api/analytics", () => ({
+  analyticsOptions: vi.fn().mockResolvedValue({ shops: [], creators: [], inviters: [] }),
+  queryAnalytics: vi.fn()
+}));
 vi.mock("@/api/commission/finance", () => ({
   exportWithdrawals: vi.fn(),
   listIncome: vi.fn(),
@@ -58,7 +64,71 @@ beforeEach(() => {
     createTime: "2026-10-23T00:00:00Z"
   };
   const demo = createFinanceDemo();
-  vi.mocked(api.listIncome).mockResolvedValue(demo.listIncome("SUPER_ADMIN", "data", {}));
+  const metrics = {
+    paidOrderCount: 1,
+    units: 2,
+    salesAmount: "120.00",
+    cohortRefundAmount: "20.00",
+    completedRefundAmount: "20.00",
+    netSalesAmount: "100.00",
+    refundedOrderCount: 1,
+    averageOrderAmount: "120.00",
+    amountRefundRate: "0.1667",
+    periodRefundedOrderRate: "1"
+  };
+  const period = { startDate: "2026-11-12", endDate: "2026-11-18" };
+  const data: AnalyticsResult = {
+    meta: {
+      period,
+      previousPeriod: period,
+      filters: {},
+      dataScope: "ALL",
+      timezone: "Asia/Shanghai",
+      updatedAt: null
+    },
+    summary: {
+      metrics,
+      sellingCount: 1,
+      creatorCards: {
+        periodEffectiveCount: 1,
+        relationshipCount: 1,
+        spuCount: 2,
+        totalCommission: "1200.00",
+        commissionBeforeClawback: "1250.00",
+        commissionClawback: "50.00",
+        expenseThrough: "2026-11-23",
+        paidCommission: "150.00",
+        paidPrepay: "200.00",
+        cumulativeExpense: "350.00"
+      }
+    },
+    change: metrics,
+    previous: metrics,
+    ranking: {
+      items: [
+        {
+          id: "42",
+          name: "Creator",
+          code: "t1023_K001",
+          social: ["creator_social"],
+          relationStatus: "PROMOTING",
+          metrics,
+          commissionRate: "0.15",
+          creatorMoney: {
+            estimatedCommission: "1200.00",
+            paidPrepay: "200.00"
+          }
+        }
+      ],
+      total: 1,
+      page: 1,
+      size: 20
+    },
+    unavailable: [],
+    sortBy: "netSalesAmount",
+    sortDirection: "desc"
+  };
+  vi.mocked(analytics.queryAnalytics).mockResolvedValue(data);
   vi.mocked(api.getConfig).mockResolvedValue(demo.getConfig("SUPER_ADMIN", "data"));
   vi.mocked(api.listSettlements).mockResolvedValue(demo.settlements("SUPER_ADMIN", "data", {}));
   vi.mocked(api.listFinanceTasks).mockResolvedValue(
@@ -80,59 +150,61 @@ const global = {
   stubs: { IncomeDrawer: true, WithdrawalDrawer: true, PaymentDialog: true }
 };
 describe("finance admin pages", () => {
-  it("renders exact income headers, copyable identity and independently paid subamounts", async () => {
+  it("renders the ranking metrics and payment breakdown on creator income", async () => {
     const wrapper = mount(IncomePage, { global });
     await flushPromises();
     expect(
       wrapper
         .getComponent(DataTable)
         .props("columns")
-        .map((column: { label: string }) => column.label)
+        .map(column => column.key)
     ).toEqual([
-      "达人",
-      "商务",
-      "销售额",
-      "佣金比例",
-      "订单数/销量",
-      "累计佣金",
-      "冻结中",
-      "可提现",
-      "总支出",
-      "最近打款时间",
-      "操作"
+      "identity",
+      "relationship",
+      "ordersAndUnits",
+      "salesAmount",
+      "cohortRefundAmount",
+      "netSalesAmount",
+      "commissionRate",
+      "estimatedCommission",
+      "paidPrepay",
+      "actions"
     ]);
-    expect(wrapper.get('[data-test="income-page"]').text()).toContain("t1023_K001");
-    expect(wrapper.get('[data-test="income-page"]').text()).toContain("¥1,320.00");
-    // Task 115 (1105 sheet B7): the sales amount and the creator's current rate columns.
-    expect(wrapper.get('[data-test="income-page"]').text()).toContain("¥1,288.50");
-    expect(wrapper.get('[data-test="income-page"]').text()).toContain("15%");
-    // A creator without a rate shows the em dash instead of a fabricated figure.
-    expect(wrapper.get('[data-test="income-page"]').text()).toContain("—");
-    expect(wrapper.findAll('[data-test="income-ledger"]')).toHaveLength(3);
-    i18n.global.locale.value = "en-US";
-    await flushPromises();
-    const paidColumn = wrapper
-      .getComponent(DataTable)
-      .props("columns")
-      .find((column: { key: string }) => column.key === "paid");
-    expect(paidColumn?.label).toBe("Total paid");
+    const income = wrapper.get('[data-test="income-page"]');
+    expect(income.text()).toContain("t1023_K001");
+    expect(income.text()).toContain("creator_social");
+    expect(income.text()).toContain("¥1,200.00");
+    const card = wrapper.findAll(".analytics-cards article")[2]!;
+    expect(card.text()).toContain("当期预估佣金");
+    expect(card.text()).toContain("佣金 ¥1,250.00");
+    expect(card.text()).toContain("−");
+    expect(card.text()).toContain("扣回 ¥50.00");
+    const expense = wrapper.findAll(".analytics-cards article")[3]!;
+    expect(expense.text()).toContain("截止到11/23");
+    expect(expense.text()).toContain("¥350.00");
+    expect(income.text()).toContain("¥200.00");
+    expect(income.text()).toContain("15%");
+    expect(wrapper.find('[data-test="income-ledger"]').exists()).toBe(true);
     wrapper.unmount();
   });
-  it("queries from the first page, resets filters and handles failures without stale income", async () => {
+
+  it("submits income filters from the first page and marks retained results as stale on error", async () => {
     const wrapper = mount(IncomePage, { global });
     await flushPromises();
-    await wrapper.get('[data-test="income-keyword"]').setValue("t1023_K001");
-    await wrapper.get('[data-test="search"]').trigger("click");
+    await wrapper.get('input[data-test="income-keyword"]').setValue("creator@example.test");
+    await wrapper.getComponent(ListSearch).vm.$emit("search");
     await flushPromises();
-    expect(api.listIncome).toHaveBeenLastCalledWith(
-      expect.objectContaining({ keyword: "t1023_K001", page: 1 })
+    expect(analytics.queryAnalytics).toHaveBeenLastCalledWith(
+      "kol-ranking",
+      expect.objectContaining({ creatorKeyword: "creator@example.test", page: 1 }),
+      true
     );
-    vi.mocked(api.listIncome).mockRejectedValueOnce(new Error("network"));
+    vi.mocked(analytics.queryAnalytics).mockRejectedValueOnce(new Error("network"));
     wrapper.getComponent(DataTable).vm.$emit("refresh");
     await flushPromises();
-    expect(notifyError).toHaveBeenCalled();
-    expect(wrapper.getComponent(DataTable).props("rows")).toEqual([]);
+    expect(wrapper.getComponent(DataTable).props("rows")).toHaveLength(1);
     expect(wrapper.getComponent(DataTable).props("loading")).toBe(false);
+    expect(wrapper.find(".el-alert--warning").exists()).toBe(true);
     wrapper.unmount();
   });
   it("shows a single state-specific action and blocks refund-paused payment", async () => {

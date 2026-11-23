@@ -6,6 +6,7 @@ import com.tcrm.admin.order.api.OrderEvidenceApi.Kind;
 import com.tcrm.admin.order.api.OrderEvidenceApi.ProductBreakdown;
 import com.tcrm.admin.order.api.OrderEvidenceApi.ProductGroup;
 import com.tcrm.admin.order.api.OrderEvidenceApi.SettlementFlowRow;
+import com.tcrm.admin.order.api.OrderStatsApi.CreatorIncomeOrder;
 import com.tcrm.admin.shared.PageResult;
 import com.tcrm.admin.shared.R;
 import com.tcrm.admin.stats.service.AnalyticsDetailService;
@@ -98,6 +99,31 @@ public class AnalyticsDetailController {
       @ModelAttribute ActivityQuery activity,
       @RequestParam @PositiveOrZero Long entityId) {
     return query(Board.CREATOR, filters, entityId, null, activity);
+  }
+
+  @GetMapping("/creator-income/details")
+  @SaCheckPermission("commission:view")
+  public R<Detail> creatorIncome(
+      @Valid @ModelAttribute StatsOverviewQuery filters,
+      @ModelAttribute ActivityQuery activity,
+      @RequestParam @Positive Long entityId) {
+    return activity.kind() == null
+        ? R.ok(details.creatorIncome(filters.toFilter(), entityId))
+        : query(Board.CREATOR, filters, entityId, null, activity);
+  }
+
+  @GetMapping("/creator-income/orders")
+  @SaCheckPermission({"commission:view", "order:view"})
+  public R<PageResult<CreatorIncomeOrder>> creatorIncomeOrders(
+      @Valid @ModelAttribute StatsOverviewQuery filters,
+      @RequestParam @Positive long entityId,
+      @RequestParam(required = false) Integer page,
+      @RequestParam(required = false) Integer size,
+      @RequestParam(required = false) DetailSort sortBy,
+      @RequestParam(required = false) String sortDirection) {
+    return R.ok(
+        details.creatorIncomeOrders(
+            filters.toFilter(), entityId, page, size, sortBy, sortDirection));
   }
 
   @GetMapping("/inviter-performance/details")

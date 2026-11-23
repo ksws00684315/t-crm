@@ -88,6 +88,47 @@ class OrderWriterTest {
     verify(events).publishEvent(new OrderStatsDateChangedEvent(8L, 10L, null));
   }
 
+  @Test
+  void shouldReconcilePreIncomeOnlyForChangedAmountsAndClearItAtPayment() {
+    Instant placedAt = Instant.parse("2026-11-22T01:00:00Z");
+    Instant paidAt = placedAt.plusSeconds(120);
+    var previous = order();
+    previous.setOrderStatus("UNPAID");
+    var unpaid = order();
+    unpaid.setOrderTime(placedAt);
+    unpaid.setOrderStatus("UNPAID");
+    unpaid.setTotalAmount(new BigDecimal("100.00"));
+    var repriced = order();
+    repriced.setOrderStatus("UNPAID");
+    repriced.setTotalAmount(new BigDecimal("80.00"));
+    repriced.setSourceUpdateTime(placedAt.plusSeconds(60));
+    var paid = order();
+    paid.setOrderStatus("PAID");
+    paid.setPayTime(paidAt);
+    when(orders.selectOne(any())).thenReturn(null, previous, previous, previous);
+    when(orders.recordedPreIncome(10L))
+        .thenReturn(
+            BigDecimal.ZERO,
+            new BigDecimal("100.00"),
+            new BigDecimal("80.00"),
+            new BigDecimal("80.00"));
+
+    TestTransactions.template()
+        .executeWithoutResult(
+            status -> {
+              writer.save(new OrderPayloadDTO(unpaid, List.of()));
+              writer.save(new OrderPayloadDTO(repriced, List.of()));
+              writer.save(new OrderPayloadDTO(repriced, List.of()));
+              writer.save(new OrderPayloadDTO(paid, List.of()));
+            });
+
+    verify(orders).appendReceivableEvent(10L, "PRE_INCOME", new BigDecimal("100.00"), placedAt);
+    verify(orders)
+        .appendReceivableEvent(
+            10L, "PRE_INCOME_CHANGE", new BigDecimal("-20.00"), repriced.getSourceUpdateTime());
+    verify(orders).appendReceivableEvent(10L, "PRE_INCOME_PAID", new BigDecimal("-80.00"), paidAt);
+  }
+
   @BeforeAll
   static void metadata() {
     for (var type : List.of(OrderDO.class, OrderItemDO.class, RefundDO.class)) {

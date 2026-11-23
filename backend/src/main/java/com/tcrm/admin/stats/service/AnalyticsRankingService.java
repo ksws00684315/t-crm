@@ -1,5 +1,6 @@
 package com.tcrm.admin.stats.service;
 
+import com.tcrm.admin.commission.api.CreatorPrepayApi;
 import com.tcrm.admin.kol.api.KolApi;
 import com.tcrm.admin.kol.api.KolOwnershipApi;
 import com.tcrm.admin.kol.api.KolOwnershipDTO;
@@ -27,6 +28,7 @@ import com.tcrm.admin.system.api.BdUserApi;
 import com.tcrm.admin.system.api.BdUserDTO;
 import java.math.BigDecimal;
 import java.time.Instant;
+import java.time.LocalDate;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.HashMap;
@@ -51,6 +53,7 @@ public class AnalyticsRankingService {
   private final KolApi creators;
   private final BdUserApi inviters;
   private final KolOwnershipApi ownership;
+  private final CreatorPrepayApi prepays;
 
   public AnalyticsRankingService(
       StatsOverviewService overview,
@@ -59,7 +62,8 @@ public class AnalyticsRankingService {
       ProductAccessApi catalog,
       KolApi creators,
       BdUserApi inviters,
-      KolOwnershipApi ownership) {
+      KolOwnershipApi ownership,
+      CreatorPrepayApi prepays) {
     this.overview = overview;
     this.orders = orders;
     this.shops = shops;
@@ -67,6 +71,7 @@ public class AnalyticsRankingService {
     this.creators = creators;
     this.inviters = inviters;
     this.ownership = ownership;
+    this.prepays = prepays;
   }
 
   public enum Board {
@@ -84,18 +89,49 @@ public class AnalyticsRankingService {
       Integer size,
       String sortBy,
       String direction) {
+    return query(board, filters, keyword, page, size, sortBy, direction, null);
+  }
+
+  public enum CreatorStatus {
+    PROMOTING,
+    INVALID
+  }
+
+  @Transactional(readOnly = true, isolation = Isolation.REPEATABLE_READ)
+  public Result income(
+      FilterDTO filters,
+      CreatorStatus status,
+      Integer page,
+      Integer size,
+      String sortBy,
+      String direction) {
+    return query(
+        Board.CREATOR, filters, null, page, size, sortBy, direction, new IncomeFilter(status));
+  }
+
+  private record IncomeFilter(CreatorStatus status) {}
+
+  private Result query(
+      Board board,
+      FilterDTO filters,
+      String keyword,
+      Integer page,
+      Integer size,
+      String sortBy,
+      String direction,
+      IncomeFilter income) {
     var sorting = StatsRanking.resolve(page, size, direction);
     String key = sortBy == null ? (board == Board.PRODUCT ? "salesAmount" : NET) : sortBy;
     var comparator = comparator(board, sorting, key);
-    var scope = overview.resolve(filters);
+    var scope = overview.resolve(filters, income != null);
     String productKeyword = scope.scope().productKeyword();
     var data =
         board == Board.PRODUCT
             ? products(scope, productKeyword == null ? keyword : productKeyword)
-            : people(board, scope, keyword);
+            : people(board, scope, keyword, income);
     var ranking = sorting.slice(data.rows(), comparator);
     if (board == Board.CREATOR && overview.canViewCommission() && !ranking.items().isEmpty()) {
-      ranking = withCreatorCommissions(ranking, scope);
+      ranking = withCreatorCommissions(ranking, scope, income != null);
     }
     return new Result(
         data.meta(),
@@ -110,7 +146,7 @@ public class AnalyticsRankingService {
   }
 
   private PageResult<Row> withCreatorCommissions(
-      PageResult<Row> page, StatsOverviewService.ResolvedFilter filter) {
+      PageResult<Row> page, StatsOverviewService.ResolvedFilter filter, boolean income) {
     var scope = filter.scope();
     var ids = page.items().stream().map(Row::entityId).toList();
     var periodScope =
@@ -126,24 +162,41 @@ public class AnalyticsRankingService {
             scope.productKeyword(),
             scope.affiliateOnly());
     var period = filter.period();
+    var prepayIds =
+        income && scope.shopId() == null
+            ? scope.ownerId() == null
+                ? ids
+                : creators.listByBdUserId(scope.ownerId()).stream()
+                    .map(KolRefDTO::id)
+                    .filter(ids::contains)
+                    .toList()
+            : List.<Long>of();
+    var paidPrepays =
+        prepayIds.isEmpty()
+            ? Map.<Long, BigDecimal>of()
+            : prepays.paidByCreator(prepayIds, period.from(), period.until());
     var estimated =
         orders.creatorRankingCommissions(periodScope, period.from(), period.until()).stream()
             .collect(
                 Collectors.toMap(
                     OrderStatsApi.CreatorRankingCommission::creatorId,
-                    OrderStatsApi.CreatorRankingCommission::estimated));
-    var cumulative =
-        orders.creatorRankingCommissions(periodScope, null, Instant.now()).stream()
-            .collect(
-                Collectors.toMap(
-                    OrderStatsApi.CreatorRankingCommission::creatorId,
                     OrderStatsApi.CreatorRankingCommission::total));
+    var cumulative =
+        income
+            ? Map.<Long, BigDecimal>of()
+            : orders.creatorRankingCommissions(periodScope, null, Instant.now()).stream()
+                .collect(
+                    Collectors.toMap(
+                        OrderStatsApi.CreatorRankingCommission::creatorId,
+                        OrderStatsApi.CreatorRankingCommission::total));
     var expenses =
-        orders.creatorCommissionExpenses(periodScope, period.from(), period.until()).stream()
-            .collect(
-                Collectors.toMap(
-                    OrderStatsApi.CreatorCommissionExpense::creatorId,
-                    OrderStatsApi.CreatorCommissionExpense::amount));
+        income
+            ? Map.<Long, BigDecimal>of()
+            : orders.creatorCommissionExpenses(periodScope, period.from(), period.until()).stream()
+                .collect(
+                    Collectors.toMap(
+                        OrderStatsApi.CreatorCommissionExpense::creatorId,
+                        OrderStatsApi.CreatorCommissionExpense::amount));
     var rows =
         page.items().stream()
             .map(
@@ -152,11 +205,23 @@ public class AnalyticsRankingService {
                   return row.withCreatorMoney(
                       new CreatorMoney(
                           estimated.get(id),
-                          expenses.getOrDefault(id, BigDecimal.ZERO),
-                          cumulative.get(id)));
+                          income ? null : expenses.getOrDefault(id, BigDecimal.ZERO),
+                          cumulative.get(id),
+                          prepayIds.contains(id)
+                              ? paidPrepays.getOrDefault(id, BigDecimal.ZERO.setScale(2))
+                              : null));
                 })
             .toList();
     return new PageResult<>(rows, page.total(), page.page(), page.size());
+  }
+
+  @Transactional(readOnly = true)
+  public Options incomeOptions() {
+    return new Options(shopOptions(), List.of(), List.of());
+  }
+
+  private List<Option> shopOptions() {
+    return shops.listShops().stream().map(s -> new Option(s.id(), s.name(), s.shopCode())).toList();
   }
 
   @Transactional(readOnly = true)
@@ -169,7 +234,7 @@ public class AnalyticsRankingService {
             ? inviters.listUsable()
             : inviters.listByIds(List.of(scope.ownerId()));
     return new Options(
-        shops.listShops().stream().map(s -> new Option(s.id(), s.name(), s.shopCode())).toList(),
+        shopOptions(),
         kol.stream().map(k -> new Option(k.id(), k.name(), k.kolCode())).toList(),
         bd.stream().map(b -> new Option(b.id(), display(b), null)).toList());
   }
@@ -191,9 +256,11 @@ public class AnalyticsRankingService {
             original.matchedKolIds(),
             original.matchedInviterIds());
     var current = orders.productFacts(scope, keyword, period.from(), period.until());
-    var previous = orders.productFacts(scope, keyword, prior.from(), prior.until());
+    var previous =
+        prior == null
+            ? List.<ProductFactsDTO>of()
+            : orders.productFacts(scope, keyword, prior.from(), prior.until());
     var totals = current.stream().filter(p -> p.spu() == null).findFirst().orElseThrow();
-    var previousTotals = previous.stream().filter(p -> p.spu() == null).findFirst().orElseThrow();
     var products =
         catalog
             .listProducts(
@@ -236,7 +303,14 @@ public class AnalyticsRankingService {
       rows.add(row.withProductCounts(businessRank, counts));
     }
     var metrics = StatsOverviewService.metrics(productTotals(totals));
-    var priorMetrics = StatsOverviewService.metrics(productTotals(previousTotals));
+    var priorMetrics =
+        prior == null
+            ? null
+            : previous.stream()
+                .filter(p -> p.spu() == null)
+                .findFirst()
+                .map(p -> StatsOverviewService.metrics(productTotals(p)))
+                .orElseThrow();
     var meta =
         new MetaDTO(
             period,
@@ -249,8 +323,10 @@ public class AnalyticsRankingService {
         meta,
         new Summary(
             metrics, sellingProducts(now), null, null, null, null, null, null, totalSpuCount),
-        new Summary(priorMetrics, sellingProducts(before), null, null, null, null),
-        StatsOverviewService.changes(metrics, priorMetrics),
+        prior == null
+            ? null
+            : new Summary(priorMetrics, sellingProducts(before), null, null, null, null),
+        prior == null ? null : StatsOverviewService.changes(metrics, priorMetrics),
         rows,
         List.of(
             new UnavailableDTO("refundUnits", "REFUND_QUANTITY_PENDING"),
@@ -303,13 +379,20 @@ public class AnalyticsRankingService {
         fact.updatedAt());
   }
 
-  private Data people(Board board, StatsOverviewService.ResolvedFilter filter, String keyword) {
+  private Data people(
+      Board board,
+      StatsOverviewService.ResolvedFilter filter,
+      String keyword,
+      IncomeFilter income) {
     var scope = filter.scope();
     var period = filter.period();
     var prior = period.previous();
     var dimension = board == Board.CREATOR ? RankDimension.KOL : RankDimension.INVITER;
     var now = orders.rankFacts(scope, dimension, period.from(), period.until());
-    var before = orders.rankFacts(scope, dimension, prior.from(), prior.until());
+    var before =
+        prior == null
+            ? List.<RankFactsDTO>of()
+            : orders.rankFacts(scope, dimension, prior.from(), prior.until());
     var ids = new java.util.HashSet<Long>();
     now.forEach(r -> ids.add(r.entityId()));
     before.forEach(r -> ids.add(r.entityId()));
@@ -417,9 +500,15 @@ public class AnalyticsRankingService {
                                 || invited.containsKey(e.getKey())
                                 || effective.containsKey(e.getKey())))
             .filter(e -> matches(e.getValue(), keyword))
+            .filter(
+                e ->
+                    income == null
+                        || income.status() == null
+                        || income.status().name().equals(e.getValue().relationStatus()))
             .map(Map.Entry::getKey)
             .toList();
-    boolean search = keyword != null && !keyword.isBlank();
+    boolean search =
+        (keyword != null && !keyword.isBlank()) || (income != null && income.status() != null);
     var scoped =
         search
             ? new ScopeDTO(
@@ -438,16 +527,21 @@ public class AnalyticsRankingService {
         overview.overview(
             new StatsOverviewService.ResolvedFilter(
                 scoped, period, filter.filters(), filter.dataScope()));
-    var rows =
-        peopleRows(
-            board == Board.INVITER && scope.productKeyword() == null
-                ? withInactivePeriods(now, matched)
-                : now,
-            identities,
-            matched,
-            search);
-    var previous = peopleRows(before, identities, matched, search);
     var matchedIds = new java.util.HashSet<>(matched);
+    var prepayEligibleCreators =
+        income != null && commissionVisible && scope.shopId() == null
+            ? directory.stream().map(KolRefDTO::id).filter(matchedIds::contains).toList()
+            : List.<Long>of();
+    var rankedFacts = now;
+    if (board == Board.INVITER && scope.productKeyword() == null) {
+      rankedFacts = withInactivePeriods(now, matched);
+    } else if (!prepayEligibleCreators.isEmpty()) {
+      var periodPrepays =
+          prepays.paidByCreator(prepayEligibleCreators, period.from(), period.until());
+      rankedFacts = withInactivePeriods(now, List.copyOf(periodPrepays.keySet()));
+    }
+    var rows = peopleRows(rankedFacts, identities, matched, search);
+    var previous = peopleRows(before, identities, matched, search);
     long active =
         board == Board.CREATOR
             ? directory.stream()
@@ -473,7 +567,7 @@ public class AnalyticsRankingService {
             : null;
     var creatorCards =
         board == Board.CREATOR
-            ? creatorCards(scoped, period, directory, matchedIds, commissionVisible)
+            ? creatorCards(scoped, period, directory, matchedIds, commissionVisible, income != null)
             : null;
     InviterCards inviterCards = null;
     boolean canSeeInviterCommission = board == Board.INVITER && overview.canViewCommission();
@@ -564,7 +658,9 @@ public class AnalyticsRankingService {
             creatorCards,
             inviterCards,
             null),
-        new Summary(total.previous(), selling(previous), null, null, null, null),
+        prior == null
+            ? null
+            : new Summary(total.previous(), selling(previous), null, null, null, null),
         total.change(),
         rows,
         board == Board.CREATOR
@@ -590,7 +686,8 @@ public class AnalyticsRankingService {
       StatsPeriod period,
       List<KolRefDTO> directory,
       Set<Long> matched,
-      boolean commissionVisible) {
+      boolean commissionVisible,
+      boolean income) {
     var shopCreators =
         scope.shopId() == null ? null : new java.util.HashSet<>(orders.paidCreatorIds(scope));
     var eligible =
@@ -616,6 +713,23 @@ public class AnalyticsRankingService {
             : null;
     var commission =
         commissionVisible ? orders.creatorCommission(scope, period.from(), period.until()) : null;
+    var cutoff = StatsPeriod.resolve(null, null, true);
+    var ids = eligible.stream().map(KolRefDTO::id).toList();
+    BigDecimal paid = null;
+    BigDecimal prepaid = null;
+    if (income && commissionVisible) {
+      paid =
+          ids.isEmpty()
+              ? BigDecimal.ZERO
+              : orders.creatorCommissionExpenses(scope, cutoff.from(), cutoff.until()).stream()
+                  .map(OrderStatsApi.CreatorCommissionExpense::amount)
+                  .reduce(BigDecimal.ZERO, BigDecimal::add);
+      if (scope.shopId() == null) {
+        prepaid =
+            prepays.paidByCreator(ids, cutoff.from(), cutoff.until()).values().stream()
+                .reduce(BigDecimal.ZERO, BigDecimal::add);
+      }
+    }
     return new CreatorCards(
         valid,
         eligible.stream().filter(k -> k.bdUserId() != null).count(),
@@ -624,7 +738,11 @@ public class AnalyticsRankingService {
         commission == null || commission.total() == null || commission.clawback() == null
             ? null
             : commission.total().add(commission.clawback()),
-        commission == null ? null : commission.clawback());
+        commission == null ? null : commission.clawback(),
+        income ? cutoff.endDate() : null,
+        paid,
+        prepaid,
+        paid == null ? null : paid.add(prepaid == null ? BigDecimal.ZERO : prepaid));
   }
 
   private static List<UnavailableDTO> creatorUnavailable(boolean authorized) {
@@ -873,12 +991,17 @@ public class AnalyticsRankingService {
       long spuCount,
       BigDecimal totalCommission,
       BigDecimal commissionBeforeClawback,
-      BigDecimal commissionClawback) {}
+      BigDecimal commissionClawback,
+      LocalDate expenseThrough,
+      BigDecimal paidCommission,
+      BigDecimal paidPrepay,
+      BigDecimal cumulativeExpense) {}
 
   public record CreatorMoney(
       BigDecimal estimatedCommission,
       BigDecimal commissionExpense,
-      BigDecimal cumulativeCommission) {}
+      BigDecimal cumulativeCommission,
+      BigDecimal paidPrepay) {}
 
   public record Row(
       String id,

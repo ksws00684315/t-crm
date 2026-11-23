@@ -47,6 +47,7 @@ import { relationStatusLabelKey, relationTagType } from "@/utils/promotion";
 import {
   boards,
   columnsByBoard,
+  creatorIncomeColumns,
   dates,
   coverageKeys,
   money,
@@ -61,11 +62,12 @@ import MetricCard from "./MetricCard.vue";
 
 defineOptions({ name: "AnalyticsPage" });
 
+const { income } = defineProps<{ income?: boolean }>();
 const { t, te, locale } = useI18n();
 const AnalyticsDetail = defineAsyncComponent(() => import("./AnalyticsDetail.vue"));
 const me = useUserStore();
 const route = useRoute();
-const board = boards[String(route.name)]!;
+const board = income ? "kol-ranking" : boards[String(route.name)]!;
 const shop = board === "shop-performance";
 const product = board === "best-sellers";
 const creator = board === "kol-ranking";
@@ -133,8 +135,6 @@ const columnWidths: Record<string, DataColumn["minWidth"]> = {
   commissionRate: { "zh-CN": 120, "en-US": 172 },
   settlementAmount: { "zh-CN": 108, "en-US": 176 },
   estimatedCommission: { "zh-CN": 108, "en-US": 202 },
-  commissionExpense: { "zh-CN": 108, "en-US": 192 },
-  cumulativeCommission: { "zh-CN": 108, "en-US": 210 },
   prepayExpense: { "zh-CN": 108, "en-US": 198 },
   totalEstimatedCommission: { "zh-CN": 126, "en-US": 240 },
   totalExpense: { "zh-CN": 108, "en-US": 140 },
@@ -153,8 +153,9 @@ const shopColumnWidths: Record<string, number> = {
   amountRefundRate: 108,
   averageOrderAmount: 108
 };
+const columnKeys = income ? creatorIncomeColumns : columnsByBoard[board];
 const columns = computed<DataColumn[]>(() =>
-  [...columnsByBoard[board], "actions"].map(key => ({
+  [...columnKeys, "actions"].map(key => ({
     key,
     label: label(key),
     amount: money.has(key),
@@ -177,11 +178,19 @@ const columns = computed<DataColumn[]>(() =>
   }))
 );
 const customHeaders = computed(() =>
-  columnsByBoard[board]
+  columnKeys
     .filter(key => !shop || !["identity", "channelStatus"].includes(key))
-    .map(key => ({ key, help: t(`analytics.${board}.definitions.${key}`) }))
+    .map(key => ({
+      key,
+      help:
+        income && key === "estimatedCommission"
+          ? t("analytics.income.estimatedHint")
+          : te(`analytics.${board}.definitions.${key}`)
+            ? t(`analytics.${board}.definitions.${key}`)
+            : undefined
+    }))
 );
-const cellKeys = columnsByBoard[board].filter(
+const cellKeys = columnKeys.filter(
   key =>
     key !== "rank" &&
     !(product && key === "kolCount") &&
@@ -190,7 +199,14 @@ const cellKeys = columnsByBoard[board].filter(
 const selectedDetail = ref<{ row: RankRow; filters: DetailQuery }>();
 
 function detailActions(row: RankRow) {
-  return [{ key: "detail", label: t("analytics.detail"), onClick: () => openDetail(row) }];
+  return [
+    {
+      key: "detail",
+      testId: income ? "income-ledger" : undefined,
+      label: t(income ? "analytics.income.ledger" : "analytics.detail"),
+      onClick: () => openDetail(row)
+    }
+  ];
 }
 
 function openDetail(row: RankRow): void {
@@ -204,6 +220,7 @@ function detailSelection(row: RankRow, displayed: AnalyticsResult) {
     filters: {
       ...meta.period,
       ...meta.filters,
+      creatorKeyword: income ? undefined : meta.filters.creatorKeyword,
       shopId: shop ? row.shopId : meta.filters.shopId,
       productCode: product ? row.code : undefined,
       keyword: product && !meta.filters.productKeyword ? displayed.keyword : undefined,
@@ -249,6 +266,12 @@ const settlementTerms = computed(() => {
 });
 
 function label(key: string): string {
+  if (
+    income &&
+    ["identity", "relationship", "ordersAndUnits", "paidPrepay", "cohortRefundAmount"].includes(key)
+  ) {
+    return t(`analytics.income.${key}`);
+  }
   if (shop && ["coverage", "kolCount"].includes(key)) return shopTerm(key).label;
   if (key === "identity" || key === "netCommission") {
     return t(`analytics.${board}.${key}`);
@@ -275,9 +298,7 @@ function label(key: string): string {
       "paidOrderCount",
       "linkCount",
       "commissionRate",
-      "estimatedCommission",
-      "commissionExpense",
-      "cumulativeCommission"
+      "estimatedCommission"
     ].includes(key)
   ) {
     return t(`analytics.kol-ranking.${key}`);
@@ -369,12 +390,14 @@ const cards = computed(() => {
     const orderCount = term("orders");
     const units = term("units");
     const net = term("net");
-    const commission = term(
-      "totalCommission",
-      undefined,
-      forbidden ? "commissionForbiddenHint" : "totalCommissionHint"
-    );
-    return [
+    const commission = income
+      ? { label: t("analytics.income.periodCommission"), hint: t("analytics.income.estimatedHint") }
+      : term(
+          "totalCommission",
+          undefined,
+          forbidden ? "commissionForbiddenHint" : "totalCommissionHint"
+        );
+    const creatorMetrics = [
       {
         tone: "purple" as const,
         icon: User,
@@ -382,14 +405,17 @@ const cards = computed(() => {
         value: pair(summary?.sellingCount, extras?.periodEffectiveCount),
         labelTerms: [selling, effective],
         detailTerms: [
-          term(
-            "relationship",
-            extras?.relationshipCount == null
-              ? "—"
-              : t("analytics.creatorCards.peopleCount", {
-                  value: display("", extras.relationshipCount)
-                })
-          )
+          {
+            ...term(
+              "relationship",
+              extras?.relationshipCount == null
+                ? "—"
+                : t("analytics.creatorCards.peopleCount", {
+                    value: display("", extras.relationshipCount)
+                  })
+            ),
+            label: translate(income ? "totalInvited" : "relationship")
+          }
         ]
       },
       {
@@ -409,19 +435,21 @@ const cards = computed(() => {
         label: net.label,
         value: formatMoney(data?.netSalesAmount),
         labelTerms: [net],
+        detailSeparator: income ? "−" : undefined,
         detailTerms: [
           { label: t("analytics.salesAmount"), value: formatMoney(data?.salesAmount) },
           { label: translate("cohortRefund"), value: formatMoney(data?.cohortRefundAmount) }
         ]
       },
       {
-        tone: "amber" as const,
+        tone: income ? ("blue" as const) : ("amber" as const),
         icon: Wallet,
         label: commission.label,
         value: forbidden
           ? t("analytics.commissionForbidden")
           : formatMoney(extras?.totalCommission),
         labelTerms: [commission],
+        detailSeparator: income ? "−" : undefined,
         unavailable: forbidden || extras?.totalCommission == null,
         detailTerms: forbidden
           ? undefined
@@ -432,6 +460,35 @@ const cards = computed(() => {
               },
               term("clawback", formatMoney(extras?.commissionClawback))
             ]
+      }
+    ];
+    if (!income) return creatorMetrics;
+    return [
+      creatorMetrics[0]!,
+      creatorMetrics[2]!,
+      creatorMetrics[3]!,
+      {
+        tone: "amber" as const,
+        icon: Wallet,
+        emphasize: true,
+        label: t("analytics.income.cumulativeExpense"),
+        badge: extras?.expenseThrough
+          ? t("analytics.income.expenseThrough", {
+              date: extras.expenseThrough.slice(5).replace("-", "/")
+            })
+          : undefined,
+        value: formatMoney(extras?.cumulativeExpense),
+        detailSeparator: "+",
+        detailTerms:
+          extras?.cumulativeExpense == null
+            ? undefined
+            : [
+                {
+                  label: t("analytics.income.paidCommission"),
+                  value: formatMoney(extras.paidCommission)
+                },
+                { label: t("analytics.income.paidPrepay"), value: formatMoney(extras.paidPrepay) }
+              ]
       }
     ];
   }
@@ -634,7 +691,7 @@ async function load(): Promise<void> {
   loading.value = true;
   failed.value = false;
   try {
-    const next = await queryAnalytics(board, requested);
+    const next = await queryAnalytics(board, requested, income);
     if (id === request) {
       result.value = next;
       displayedQuery.value = requested;
@@ -642,7 +699,8 @@ async function load(): Promise<void> {
       if (
         detail &&
         (detail.filters.startDate !== next.meta.period.startDate ||
-          detail.filters.endDate !== next.meta.period.endDate)
+          detail.filters.endDate !== next.meta.period.endDate ||
+          Boolean(detail.filters.cumulative) !== Boolean(next.meta.period.cumulative))
       ) {
         const previous = detail.row;
         const row = next.ranking.items.find(item =>
@@ -667,7 +725,7 @@ async function load(): Promise<void> {
 
 async function loadOptions(): Promise<void> {
   try {
-    options.value = await analyticsOptions();
+    options.value = await analyticsOptions(income);
     optionsFailed.value = false;
   } catch {
     optionsFailed.value = true;
@@ -679,17 +737,20 @@ function refresh(): void {
   void load();
 }
 
-function applyPeriod({ startDate, endDate }: DateRange, useLive: boolean): void {
-  const range = { startDate, endDate };
+function applyPeriod(range: DateRange, useLive: boolean): void {
+  const { startDate, endDate, cumulative } = range;
   if (!validDates(range)) {
     ElMessage.warning(t("analytics.invalidDates"));
     return;
   }
-  const changed = startDate !== applied.value.startDate || endDate !== applied.value.endDate;
+  const changed =
+    startDate !== applied.value.startDate ||
+    endDate !== applied.value.endDate ||
+    Boolean(cumulative) !== Boolean(applied.value.cumulative);
   const startedLive = useLive && !live;
   live = useLive;
   if (!changed && !startedLive) return;
-  applied.value = { ...applied.value, ...range };
+  applied.value = { ...applied.value, ...range, cumulative };
   page.value = 1;
   void load();
 }
@@ -700,16 +761,26 @@ function search(useLive = false): void {
     return;
   }
   live = useLive;
-  const { shopId, channel, creatorKeyword, inviterKeyword, productKeyword, startDate, endDate } =
-    draft.value;
+  const {
+    shopId,
+    channel,
+    creatorKeyword,
+    inviterKeyword,
+    productKeyword,
+    startDate,
+    endDate,
+    cumulative
+  } = draft.value;
   applied.value = {
     startDate,
     endDate,
+    cumulative,
     shopId: shopId || undefined,
     channel: channel || undefined,
     creatorKeyword: creatorKeyword?.trim() || undefined,
     productKeyword: product || inviter ? productKeyword?.trim() || undefined : undefined,
-    inviterKeyword: creator ? inviterKeyword?.trim() || undefined : undefined
+    inviterKeyword: creator && !income ? inviterKeyword?.trim() || undefined : undefined,
+    creatorStatus: income ? draft.value.creatorStatus || undefined : undefined
   };
   page.value = 1;
   void load();
@@ -760,7 +831,8 @@ function applyShopShortcut(): boolean {
     lastShopShortcut = undefined;
     return false;
   }
-  const { shopId, startDate, endDate } = route.query;
+  const { shopId, startDate, endDate, cumulative } = route.query;
+  const useCumulative = !workbenchRanking && cumulative === "true";
   if (
     route.fullPath === lastShopShortcut ||
     (!workbenchRanking && (typeof shopId !== "string" || !/^[1-9][0-9]{0,18}$/.test(shopId)))
@@ -780,16 +852,21 @@ function applyShopShortcut(): boolean {
     sortBy.value = "salesAmount";
     sortDirection.value = "desc";
   } else if (!workbenchRanking) {
-    draft.value = { ...(range ?? dates()), shopId: shopId as string };
+    draft.value = {
+      ...(useCumulative ? { ...dates(1), cumulative: true } : (range ?? dates())),
+      shopId: shopId as string
+    };
   } else {
     return false;
   }
   applied.value = { ...draft.value };
-  initialPeriodMode.value = range
-    ? range.startDate === range.endDate
-      ? "day"
-      : "custom"
-    : "sevenDays";
+  initialPeriodMode.value = useCumulative
+    ? "cumulative"
+    : range
+      ? range.startDate === range.endDate
+        ? "day"
+        : "custom"
+      : "sevenDays";
   filterVersion.value++;
   page.value = 1;
   live = false;
@@ -831,7 +908,8 @@ onUnmounted(stop);
       :key="filterVersion"
       v-model="draft"
       :initial-mode="initialPeriodMode"
-      :show-inviter="creator"
+      :show-inviter="creator && !income"
+      :income="income"
       :show-product="product || inviter"
       :loading="loading"
       :options="options"
@@ -994,7 +1072,7 @@ onUnmounted(stop);
     <DataTable
       class="analytics-ranking"
       scroll-with-page
-      :table-id="`analytics-${board}${shop ? '' : '-v2'}`"
+      :table-id="income ? 'creator-income-v2' : `analytics-${board}${shop ? '' : '-v2'}`"
       :columns="columns"
       :rows="rows"
       :row-key="shop ? 'shopId' : 'id'"
@@ -1004,7 +1082,7 @@ onUnmounted(stop);
       :size="displayedQuery?.size ?? size"
       :page-sizes="[20, 50, 100]"
       :total="Number(result?.ranking.total ?? 0)"
-      :exportable="canExport(me.user)"
+      :exportable="!income && canExport(me.user)"
       :export-disabled="!exportQuery"
       :exporting="exporting"
       @export="download"
@@ -1014,7 +1092,9 @@ onUnmounted(stop);
       @update:size="changeSize"
     >
       <template #title>
-        <h2 class="analytics-ranking__title">{{ t(`analytics.${board}.ranking`) }}</h2>
+        <h2 class="analytics-ranking__title">
+          {{ t(income ? "analytics.income.ranking" : `analytics.${board}.ranking`) }}
+        </h2>
       </template>
       <template #toolbar>
         <el-tag v-if="result" effect="light" type="primary">
@@ -1123,10 +1203,11 @@ onUnmounted(stop);
         pair(valueOf(row, "kolCount"), row.linkedCreatorCount)
       }}</template>
       <template #cell-relationship="{ row }">
-        <div>{{ row.related || t("analytics.unassigned") }}</div>
+        <div v-if="!income">{{ row.related || t("analytics.unassigned") }}</div>
         <el-tag v-if="row.relationStatus" size="small" :type="relationTagType(row.relationStatus)">
           {{ t(relationStatusLabelKey(row.relationStatus)) }}
         </el-tag>
+        <span v-else-if="income">—</span>
       </template>
       <template #cell-status="{ row }">
         <el-tag v-if="row.enabled != null" size="small" :type="row.enabled ? 'success' : 'info'">
@@ -1141,6 +1222,10 @@ onUnmounted(stop);
             <span>{{ display(key, valueOf(row, key)) }}</span>
           </template>
         </div>
+      </template>
+      <template #cell-ordersAndUnits="{ row }">
+        {{ display("paidOrderCount", valueOf(row, "paidOrderCount")) }} /
+        {{ display("units", valueOf(row, "units")) }}
       </template>
       <template v-for="key in cellKeys" :key="key" #[`cell-${key}`]="{ row }">
         <div class="analytics-cell">
@@ -1188,6 +1273,7 @@ onUnmounted(stop);
     <AnalyticsDetail
       v-if="selectedDetail"
       :board="board"
+      :income="income"
       :data-scope="result?.meta.dataScope"
       :row="selectedDetail.row"
       :name="identity(selectedDetail.row)"

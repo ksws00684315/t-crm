@@ -1,5 +1,6 @@
 package com.tcrm.admin.stats.service;
 
+import com.tcrm.admin.commission.api.CreatorFundFlowApi;
 import com.tcrm.admin.kol.api.KolApi;
 import com.tcrm.admin.kol.api.KolRefDTO;
 import com.tcrm.admin.order.api.OrderEvidenceApi;
@@ -19,6 +20,7 @@ import com.tcrm.admin.order.api.OrderStatsApi.RankFactsDTO;
 import com.tcrm.admin.order.api.OrderStatsApi.ScopeDTO;
 import com.tcrm.admin.product.api.ShopAccessApi;
 import com.tcrm.admin.product.api.ShopAccessDTO;
+import com.tcrm.admin.security.api.CurrentUserContext;
 import com.tcrm.admin.security.api.DataScope;
 import com.tcrm.admin.shared.BusinessException;
 import com.tcrm.admin.shared.ErrorCode;
@@ -28,6 +30,7 @@ import com.tcrm.admin.stats.service.StatsOverviewService.MetricsDTO;
 import com.tcrm.admin.system.api.BdUserApi;
 import com.tcrm.admin.system.api.BdUserDTO;
 import java.math.BigDecimal;
+import java.time.LocalDate;
 import java.util.Comparator;
 import java.util.List;
 import java.util.Map;
@@ -54,6 +57,8 @@ public class AnalyticsDetailService {
   private final KolApi creators;
   private final OrderStatsApi orders;
   private final BdUserApi inviters;
+  private final CreatorFundFlowApi funds;
+  private final CurrentUserContext current;
 
   public AnalyticsDetailService(
       StatsOverviewService overview,
@@ -61,13 +66,105 @@ public class AnalyticsDetailService {
       ShopAccessApi shops,
       KolApi creators,
       OrderStatsApi orders,
-      BdUserApi inviters) {
+      BdUserApi inviters,
+      CreatorFundFlowApi funds,
+      CurrentUserContext current) {
     this.overview = overview;
     this.evidence = evidence;
     this.shops = shops;
     this.creators = creators;
     this.orders = orders;
     this.inviters = inviters;
+    this.funds = funds;
+    this.current = current;
+  }
+
+  @Transactional(readOnly = true, isolation = Isolation.REPEATABLE_READ)
+  public Detail creatorIncome(FilterDTO filters, long creatorId) {
+    var resolved = overview.resolve(filters);
+    var selection = select(resolved, Board.CREATOR, creatorId, null, null);
+    var scope = creatorIncomeScope(selection);
+    var cutoff = StatsPeriod.resolve(null, null, true);
+    var history = orders.totals(scope, cutoff.from(), cutoff.until());
+    var period = orders.totals(scope, selection.from(), selection.until());
+    var commission =
+        overview.canViewCommission()
+            ? orders.creatorCommission(scope, selection.from(), selection.until())
+            : null;
+    var canViewFunds =
+        overview.canViewCommission()
+            && (scope.ownerId() == null
+                || creators.listByIds(List.of(creatorId)).stream()
+                    .anyMatch(creator -> scope.ownerId().equals(creator.bdUserId())));
+    var totals =
+        canViewFunds
+            ? funds.totals(
+                current.user(),
+                new CreatorFundFlowApi.Query(
+                    creatorId, scope.shopId(), cutoff.from(), cutoff.until(), 1, 1))
+            : null;
+    var counts = overview.canView("order:view") ? evidence.productOrderCounts(selection) : null;
+    return new Detail(
+        resolved.period(),
+        null,
+        null,
+        null,
+        null,
+        new CreatorOverview(null, commission == null ? null : commission.total(), counts),
+        null,
+        new IncomeOverview(
+            StatsOverviewService.metrics(period),
+            orders.dailyNetSales(scope, selection.from(), selection.until()),
+            cutoff.endDate(),
+            history.sales(),
+            history.cohortRefunds(),
+            history.sales().subtract(history.cohortRefunds()),
+            totals == null ? null : totals.commission(),
+            totals));
+  }
+
+  @Transactional(readOnly = true, isolation = Isolation.REPEATABLE_READ)
+  public PageResult<OrderStatsApi.CreatorIncomeOrder> creatorIncomeOrders(
+      FilterDTO filters,
+      long creatorId,
+      Integer page,
+      Integer size,
+      DetailSort sortBy,
+      String sortDirection) {
+    if (!overview.canView("order:view") || !overview.canViewCommission()) {
+      throw new BusinessException(ErrorCode.AUTH_FORBIDDEN);
+    }
+    if (sortBy == DetailSort.PAID_ORDER_COUNT || sortBy == DetailSort.UNITS) {
+      throw new BusinessException(ErrorCode.COMMON_VALIDATION_FAILED);
+    }
+    var ranking = StatsRanking.resolve(page, size, sortDirection);
+    var selection = select(overview.resolve(filters), Board.CREATOR, creatorId, null, null);
+    return orders.creatorIncomeOrders(
+        creatorIncomeScope(selection),
+        selection.from(),
+        selection.until(),
+        ranking.page(),
+        ranking.size(),
+        sortBy,
+        !ranking.descending());
+  }
+
+  private static ScopeDTO creatorIncomeScope(Selection selection) {
+    var scope = selection.scope();
+    if (scope.kolId() != null && !scope.kolId().equals(selection.creator())) {
+      throw new BusinessException(ErrorCode.COMMON_NOT_FOUND);
+    }
+    return new ScopeDTO(
+        scope.tenantId(),
+        scope.ownerId(),
+        scope.shopId(),
+        selection.creator(),
+        scope.inviterId(),
+        scope.visibleShopIds(),
+        scope.matchedKolIds(),
+        scope.matchedInviterIds(),
+        scope.productKeyword(),
+        scope.affiliateOnly());
   }
 
   @Transactional(readOnly = true, isolation = Isolation.REPEATABLE_READ)
@@ -115,19 +212,22 @@ public class AnalyticsDetailService {
                 ? evidence.productOrderCounts(selection)
                 : null,
             board == Board.CREATOR ? creatorOverview(selection) : null,
-            board == Board.INVITER ? inviterOverview(selection) : null)
+            board == Board.INVITER ? inviterOverview(selection) : null,
+            null)
         : new Detail(
             resolved.period(),
             null,
             sortBy != null
                 ? evidence.sortedActivity(
-                    selection,
+                    selection.groupedByOrder(),
                     activity,
                     ranking.page(),
                     ranking.size(),
                     sortBy,
                     !ranking.descending())
-                : evidence.page(selection, activity, ranking.page(), ranking.size()),
+                : evidence.page(
+                    selection.groupedByOrder(), activity, ranking.page(), ranking.size()),
+            null,
             null,
             null,
             null,
@@ -515,6 +615,16 @@ public class AnalyticsDetailService {
 
   public record InviterOverview(BigDecimal settlementAmount, ProductOrderCounts orderCounts) {}
 
+  public record IncomeOverview(
+      MetricsDTO metrics,
+      List<OrderStatsApi.DailyNetSales> dailyNetSales,
+      LocalDate through,
+      BigDecimal cumulativeSales,
+      BigDecimal cumulativeRefunds,
+      BigDecimal cumulativeNetSales,
+      BigDecimal totalCommission,
+      CreatorFundFlowApi.Totals funds) {}
+
   public record Detail(
       StatsPeriod period,
       List<DailyAmount> daily,
@@ -522,5 +632,6 @@ public class AnalyticsDetailService {
       ShopOverview shopOverview,
       ProductOrderCounts productOrderCounts,
       CreatorOverview creatorOverview,
-      InviterOverview inviterOverview) {}
+      InviterOverview inviterOverview,
+      IncomeOverview incomeOverview) {}
 }

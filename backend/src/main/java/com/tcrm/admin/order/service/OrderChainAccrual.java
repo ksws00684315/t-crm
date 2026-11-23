@@ -11,7 +11,6 @@ import java.time.Instant;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.HashSet;
-import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
@@ -29,20 +28,38 @@ record OrderChainAccrual(String status, BigDecimal amount, List<OrderChainDTO.Fl
       List<RefundDO> refunds,
       OrderCommissionChainDTO commission,
       String shopName) {
-    if (order.getPayTime() == null || items.isEmpty()) {
+    if (order.getPayTime() == null) {
+      if (!"UNPAID".equals(order.getOrderStatus())
+          || "part_pay".equals(order.getRawStatus())
+          || order.getTotalAmount() == null) {
+        return new OrderChainAccrual(null, null, List.of());
+      }
+      return new OrderChainAccrual(
+          null,
+          null,
+          List.of(
+              shopFlow(
+                  "SP" + order.getWeidianOrderId(),
+                  null,
+                  shopName,
+                  OrderChainCommissionApi.DIRECTION_INCREASE,
+                  order.getTotalAmount(),
+                  order.getOrderTime(),
+                  "PRE_INCOME")));
+    }
+    if (items.isEmpty()) {
       return new OrderChainAccrual(null, null, List.of());
     }
 
     var effectiveRefunds =
         refunds.stream()
-            .filter(r -> "SUCCESS".equals(r.getRefundStatus()) || pending(r))
+            .filter(r -> "SUCCESS".equals(r.getRefundStatus()))
             .filter(r -> r.getId() != null)
             .sorted(
-                Comparator.comparing(OrderChainAccrual::pending)
-                    .thenComparing(OrderChainAccrual::eventTime, EVENT_TIME)
+                Comparator.comparing(OrderChainAccrual::eventTime, EVENT_TIME)
                     .thenComparing(RefundDO::getId))
             .toList();
-    boolean hasPending = effectiveRefunds.stream().anyMatch(OrderChainAccrual::pending);
+    boolean hasPending = refunds.stream().anyMatch(OrderChainAccrual::pending);
 
     var rates =
         commission.lines().stream()
@@ -68,9 +85,6 @@ record OrderChainAccrual(String status, BigDecimal amount, List<OrderChainDTO.Fl
               order.getPayTime(),
               "PENDING_SETTLEMENT"));
     }
-    if (commission.afterSales() && effectiveRefunds.isEmpty()) {
-      return new OrderChainAccrual("UNVERIFIED", null, List.copyOf(flows));
-    }
     if (gross != null) {
       flows.add(
           new OrderChainDTO.FlowDTO(
@@ -89,6 +103,29 @@ record OrderChainAccrual(String status, BigDecimal amount, List<OrderChainDTO.Fl
               null));
     }
 
+    // The application records an expected refund without moving cash or changing accrual.
+    refunds.stream()
+        .filter(refund -> refund.getId() != null && refund.getRefundTime() != null)
+        .filter(refund -> refund.getAmount() != null && refund.getAmount().signum() > 0)
+        .sorted(Comparator.comparing(RefundDO::getId))
+        .map(
+            refund ->
+                new OrderChainDTO.FlowDTO(
+                    "SRA" + refund.getId(),
+                    refund.getOrderItemId(),
+                    shopName,
+                    "REFUND_REQUEST",
+                    null,
+                    refund.getAmount(),
+                    refund.getRefundTime(),
+                    null,
+                    null,
+                    pending(refund) ? "REFUNDING" : "REFUND_REQUESTED",
+                    null,
+                    null,
+                    null))
+        .distinct()
+        .forEach(flows::add);
     BigDecimal remaining = gross;
     var seen = new HashSet<Long>();
     for (RefundDO refund : effectiveRefunds) {
@@ -105,7 +142,7 @@ record OrderChainAccrual(String status, BigDecimal amount, List<OrderChainDTO.Fl
               eventTime(refund),
               "DEDUCTION"));
       BigDecimal expense = null;
-      if (remaining != null && basis != null && applyRefund(basis, rates, refund)) {
+      if (remaining != null && basis != null && applyRefund(basis, refund)) {
         BigDecimal next = amount(basis, rates);
         expense = remaining.subtract(next);
         remaining = next;
@@ -117,21 +154,23 @@ record OrderChainAccrual(String status, BigDecimal amount, List<OrderChainDTO.Fl
               "CR" + refund.getId(),
               refund.getOrderItemId(),
               shopName,
-              pending(refund) ? "COMMISSION_REFUND_PENDING" : "COMMISSION_REFUND",
+              "COMMISSION_REFUND",
               OrderChainCommissionApi.DIRECTION_DECREASE,
               expense,
               eventTime(refund),
               null,
               null,
               "DEDUCTION",
-              pending(refund) ? "FROZEN" : "INVALID",
+              "INVALID",
               null,
               null));
     }
     flows.sort(Comparator.comparing(OrderChainDTO.FlowDTO::businessAt, EVENT_TIME));
-    if (!effectiveRefunds.isEmpty()) {
+    if (hasPending || commission.afterSales() || !effectiveRefunds.isEmpty()) {
       return new OrderChainAccrual(
-          hasPending ? "REFUNDING" : "REFUNDED", remaining, List.copyOf(flows));
+          hasPending || commission.afterSales() ? "REFUNDING" : "REFUNDED",
+          remaining,
+          List.copyOf(flows));
     }
     if (gross == null) {
       return new OrderChainAccrual("UNVERIFIED", null, List.copyOf(flows));
@@ -201,8 +240,7 @@ record OrderChainAccrual(String status, BigDecimal amount, List<OrderChainDTO.Fl
         null);
   }
 
-  private static boolean applyRefund(
-      Map<Long, BigDecimal> basis, Map<Long, BigDecimal> rates, RefundDO refund) {
+  private static boolean applyRefund(Map<Long, BigDecimal> basis, RefundDO refund) {
     BigDecimal refundAmount = refund.getAmount();
     if (refundAmount == null || refundAmount.signum() < 0) {
       return false;
@@ -216,33 +254,7 @@ record OrderChainAccrual(String status, BigDecimal amount, List<OrderChainDTO.Fl
       basis.put(itemId, current.subtract(refundAmount).max(ZERO));
       return true;
     }
-    BigDecimal total = basis.values().stream().reduce(ZERO, BigDecimal::add);
-    if (refundAmount.compareTo(total) >= 0) {
-      basis.replaceAll((id, value) -> ZERO);
-      return true;
-    }
-    // A partial order-wide refund cannot be attributed to lines with different pay-time rates.
-    var rateCount = rates.values().stream().map(BigDecimal::stripTrailingZeros).distinct().count();
-    if (rateCount > 1) {
-      return false;
-    }
-    // An order-wide adjustment with a single rate spreads by the remaining line basis.
-    BigDecimal unassigned = refundAmount;
-    var remaining = new LinkedHashMap<>(basis);
-    for (Map.Entry<Long, BigDecimal> line : remaining.entrySet()) {
-      BigDecimal part = refundAmount.multiply(line.getValue()).divide(total, 2, RoundingMode.DOWN);
-      basis.put(line.getKey(), line.getValue().subtract(part));
-      unassigned = unassigned.subtract(part);
-    }
-    for (Map.Entry<Long, BigDecimal> line : basis.entrySet()) {
-      BigDecimal take = line.getValue().min(unassigned);
-      line.setValue(line.getValue().subtract(take));
-      unassigned = unassigned.subtract(take);
-      if (unassigned.signum() == 0) {
-        break;
-      }
-    }
-    return true;
+    return false;
   }
 
   private static BigDecimal amount(Map<Long, BigDecimal> basis, Map<Long, BigDecimal> rates) {
@@ -261,8 +273,6 @@ record OrderChainAccrual(String status, BigDecimal amount, List<OrderChainDTO.Fl
   }
 
   private static Instant eventTime(RefundDO refund) {
-    return !pending(refund) && refund.getFinishTime() != null
-        ? refund.getFinishTime()
-        : refund.getRefundTime();
+    return refund.getFinishTime();
   }
 }

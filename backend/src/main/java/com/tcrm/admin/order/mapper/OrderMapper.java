@@ -6,6 +6,7 @@ import java.math.BigDecimal;
 import java.time.Instant;
 import java.util.Collection;
 import java.util.List;
+import org.apache.ibatis.annotations.Insert;
 import org.apache.ibatis.annotations.Mapper;
 import org.apache.ibatis.annotations.Param;
 import org.apache.ibatis.annotations.Select;
@@ -13,6 +14,39 @@ import org.apache.ibatis.annotations.Update;
 
 @Mapper
 public interface OrderMapper extends BaseMapper<OrderDO> {
+  @Select(
+      """
+      SELECT COALESCE(SUM(amount_cny), 0)
+        FROM crm_order_receivable_event
+       WHERE order_id = #{orderId}
+      """)
+  BigDecimal recordedPreIncome(@Param("orderId") long orderId);
+
+  @Insert(
+      """
+      INSERT INTO crm_order_receivable_event
+        (tenant_id, order_id, event_type, amount_cny, business_at)
+      SELECT tenant_id, id, #{eventType}, #{amount}, #{businessAt}
+        FROM crm_order
+       WHERE id = #{orderId} AND is_deleted = FALSE
+      """)
+  int appendReceivableEvent(
+      @Param("orderId") long orderId,
+      @Param("eventType") String eventType,
+      @Param("amount") BigDecimal amount,
+      @Param("businessAt") Instant businessAt);
+
+  @Select(
+      """
+      SELECT id, event_type, amount_cny, business_at
+        FROM crm_order_receivable_event
+       WHERE order_id = #{orderId}
+       ORDER BY id
+      """)
+  List<ReceivableEventRow> listReceivableEvents(@Param("orderId") long orderId);
+
+  record ReceivableEventRow(long id, String eventType, BigDecimal amountCny, Instant businessAt) {}
+
   /**
    * Cumulative sales of one creator (workbench total, task 112): Σ order pay amount — freight
    * included, refunds not deducted — over the creator's attributed, paid orders. One SQL aggregate;

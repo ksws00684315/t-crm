@@ -4,6 +4,7 @@ import { createMemoryHistory, createRouter } from "vue-router";
 import ElementPlus from "element-plus";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import * as api from "@/api/commission/finance";
+import * as analytics from "@/api/analytics";
 import { createFinanceDemo } from "../../../../../preview/commission/finance-engine";
 import type * as FinanceUtils from "@/utils/finance";
 import { i18n } from "@/locales";
@@ -15,6 +16,10 @@ import ConfigPage from "@/views/fund/settlement-config/index.vue";
 import SettlementPage from "@/views/fund/settlement-details/index.vue";
 import TasksPage from "../index.vue";
 
+vi.mock("@/api/analytics", () => ({
+  analyticsOptions: vi.fn().mockResolvedValue({ shops: [], creators: [], inviters: [] }),
+  queryAnalytics: vi.fn().mockRejectedValue(new Error("No analytics fixture"))
+}));
 vi.mock("@/api/commission/finance", () => ({
   listIncome: vi.fn(),
   getIncome: vi.fn(),
@@ -56,7 +61,6 @@ beforeEach(() => {
     createTime: "2026-10-23T00:00:00Z"
   };
   const demo = createFinanceDemo();
-  vi.mocked(api.listIncome).mockResolvedValue(demo.listIncome("SUPER_ADMIN", "data", {}));
   vi.mocked(api.getConfig).mockResolvedValue(demo.getConfig("SUPER_ADMIN", "data"));
   vi.mocked(api.listSettlements).mockResolvedValue(demo.settlements("SUPER_ADMIN", "data", {}));
   vi.mocked(api.listFinanceTasks).mockResolvedValue(
@@ -83,8 +87,13 @@ describe("commission pages inside the existing application", () => {
   it("loads income and its confirmed columns outside the standalone preview mode", async () => {
     const wrapper = mount(IncomePage, { global });
     await flushPromises();
-    expect(api.listIncome).toHaveBeenCalled();
-    expect(wrapper.getComponent(DataTable).props("rows")).toHaveLength(3);
+    expect(analytics.queryAnalytics).toHaveBeenCalledWith("kol-ranking", expect.anything(), true);
+    expect(
+      wrapper
+        .getComponent(DataTable)
+        .props("columns")
+        .map(column => column.key)
+    ).toContain("estimatedCommission");
     expect(wrapper.find('[data-test="income-keyword"]').exists()).toBe(true);
     expect(wrapper.find('[data-test="finance-preview-notice"]').exists()).toBe(false);
     wrapper.unmount();

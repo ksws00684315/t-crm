@@ -138,7 +138,7 @@ class CommissionSettlementDetailServiceTest {
     when(kols.listByIds(anyCollection()))
         .thenReturn(List.of(new KolRefDTO(77L, "KOL001", "Kol A", true, 9L)));
     CommissionItemStateDO row = stateRow(5001L, 9001L, 77L, "18.00", "18.00", true, "CONFIRMED");
-    // Source basis 180 not yet net of the confirmed 20 refund: 计佣金额 shows 160 (task 112).
+    row.setBasisCny(new BigDecimal("200.00"));
     row.setBasisIncludesRefund(false);
     row.setSuccessfulRefundCny(new BigDecimal("20.00"));
     when(states.listByOrderIds(List.of(5001L))).thenReturn(List.of(row));
@@ -163,8 +163,9 @@ class CommissionSettlementDetailServiceTest {
     assertThat(settlement.lines().getFirst().product()).isEqualTo("item");
     assertThat(settlement.lines().getFirst().sku()).isEqualTo("sku");
     assertThat(settlement.lines().getFirst().rate()).isEqualTo("0.1000");
-    assertThat(settlement.lines().getFirst().base()).isEqualTo("160.00");
-    assertThat(settlement.lines().getFirst().direction()).isEqualTo("CREDIT");
+    assertThat(settlement.lines().getFirst().base()).isEqualTo("180.00");
+    assertThat(settlement.lines().getFirst().adjustment()).isEqualTo("-2.00");
+    assertThat(settlement.lines().getFirst().direction()).isEqualTo("DEBIT");
     assertThat(settlement.lines().getFirst().subject()).isEqualTo("KOL");
   }
 
@@ -240,16 +241,15 @@ class CommissionSettlementDetailServiceTest {
     assertThat(settlement.lines().getFirst().direction()).isEqualTo("CREDIT");
   }
 
-  @ParameterizedTest(name = "accrued {0}, released {1} -> adjustment {2}")
+  @ParameterizedTest(name = "refund {0}, released {1} -> adjustment {2}")
   @CsvSource({
-    "15.00, 0.00, 0.00, CREDIT",
-    "15.00, 15.00, 0.00, CREDIT",
-    "12.00, 15.00, -3.00, DEBIT",
-    "0.00, 15.00, -15.00, DEBIT"
+    "0.00, 0.00, 0.00, CREDIT",
+    "30.00, 0.00, -3.00, DEBIT",
+    "30.00, 12.00, -3.00, DEBIT",
+    "150.00, 0.00, -15.00, DEBIT"
   })
-  void shouldCountOnlyAReductionAfterReleaseAsAdjustment(
-      String accrued, String released, String adjustment, String direction) {
-    // Task 114: same inputs and results as CommissionIncomeServiceTest.
+  void shouldCountConfirmedRefundBeforeAndAfterRelease(
+      String refund, String released, String adjustment, String direction) {
     when(orderSettlement.pageOrderIds(any(), any(), any(), anyInt(), anyInt()))
         .thenReturn(new PageResult<>(List.of(5004L), 1, 1, 20));
     when(orderSettlement.listOrdersByIds(List.of(5004L)))
@@ -268,8 +268,16 @@ class CommissionSettlementDetailServiceTest {
                     BigDecimal.ZERO,
                     77L,
                     51L)));
-    when(states.listByOrderIds(List.of(5004L)))
-        .thenReturn(List.of(stateRow(5004L, 9004L, 77L, accrued, released, true, "CONFIRMED")));
+    var row = stateRow(5004L, 9004L, 77L, "0", released, true, "CONFIRMED");
+    row.setBasisCny(new BigDecimal("150.00"));
+    row.setBasisIncludesRefund(false);
+    row.setSuccessfulRefundCny(new BigDecimal(refund));
+    row.setAccruedCommissionCny(new BigDecimal("15.00").add(new BigDecimal(adjustment)));
+    var revision = new CommissionItemRevisionDO();
+    revision.setItemStateId(row.getId());
+    revision.setRate(new BigDecimal("0.10"));
+    when(revisions.listLatestByItemStateIds(anyCollection())).thenReturn(List.of(revision));
+    when(states.listByOrderIds(List.of(5004L))).thenReturn(List.of(row));
     PageResult<SettlementRow> page =
         TenantScope.callCompany(
             TENANT, () -> service.page(superAdmin(), new DetailFilter(null, null, null, 1, 20)));

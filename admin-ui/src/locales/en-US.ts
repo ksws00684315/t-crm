@@ -69,12 +69,56 @@ const enUS: MessageSchema = {
     remaining: "{number} item slots left"
   },
   analytics: {
+    fundFlows: {
+      title: "Fund activity",
+      fundType: "Fund type",
+      direction: "Direction",
+      orderNo: "Order no.",
+      amount: "Amount",
+      status: "Status",
+      settlementNo: "Settlement no.",
+      types: { COMMISSION: "Commission", PREPAY: "Prepayment" },
+      directions: { INCREASE: "Increase", DECREASE: "Decrease" },
+      statuses: {
+        FROZEN: "Frozen",
+        AVAILABLE: "Available to withdraw",
+        WITHDRAWN: "Withdrawn",
+        CLAWBACK: "Clawback",
+        PREPAID: "Prepaid"
+      }
+    },
+    income: {
+      ranking: "Creator details",
+      identity: "Creator / Social / ID",
+      relationship: "Creator status",
+      ledger: "Details",
+      ordersAndUnits: "Orders / Units",
+      cohortRefundAmount: "Refund amount",
+      paidPrepay: "Paid advances",
+      paidCommission: "Paid commission",
+      periodCommission: "Period estimated commission",
+      cumulativeExpense: "Cumulative spend",
+      expenseThrough: "Through {date}",
+      history: "Lifetime totals",
+      historyThrough: "Through {date}",
+      cumulativeNetSales: "Cumulative net sales",
+      cumulativeCommission: "Total estimated commission",
+      cumulativePrepay: "Cumulative advances",
+      prepayDateHint: "By payment date",
+      netSalesTrend: "Net sales trend",
+      orderPaidDate: "By order payment date",
+      detailTitle: "Creator income details",
+      search: "Creator name / ID / email",
+      estimatedHint:
+        "Net commission on verified orders paid in the selected period. Each item uses its locked payment-time rate and its paid amount including allocated shipping, less confirmed refunds."
+    },
     detailHeader: {
       totalInvited: "Total invited creators",
       totalInvitedHint:
         "Distinct creators first assigned to this inviter, including creators later transferred or disabled."
     },
     creatorCards: {
+      totalInvited: "Total invited creators",
       selling: "Creators with sales",
       sellingHint: "Distinct creators with paid orders during the selected period.",
       effective: "Creators active in period",
@@ -92,7 +136,7 @@ const enUS: MessageSchema = {
         "Sales paid during the selected period less successful refunds completed within 30 Beijing calendar days of payment, counting the payment day as day one.",
       totalCommission: "Total creator commission",
       totalCommissionHint:
-        "Commission on verified orders paid during the selected period. Estimated amounts apply to unsettled orders and actual amounts to settled orders. Withdrawals do not add commission again.",
+        "Net commission on verified orders paid during the selected period. Release and withdrawal use the commission already attributed to the order.",
       commissionForbiddenHint:
         "Total creator commission is based on the payment period. Viewing amounts requires commission access.",
       relationship: "Assigned creators",
@@ -107,7 +151,7 @@ const enUS: MessageSchema = {
       commissionBeforeClawback: "Commission",
       clawback: "Clawback",
       clawbackHint:
-        "Confirmed deductions after commission release due to successful refunds on the same cohort of verified orders. Shown as a positive amount. A dash indicates unverified attribution."
+        "Commission reductions from successful refunds on the same verified orders, before or after release. Shown as a positive amount. A dash indicates missing evidence."
     },
     productCreatorCount: "Creators",
     product: "Product",
@@ -117,6 +161,7 @@ const enUS: MessageSchema = {
     creatorSearch: "Enter creator ID or name",
     inviterSearch: "Enter ID or username",
     periodMode: {
+      cumulative: "Cumulative",
       live: "Live",
       sevenDays: "7 days",
       thirtyDays: "30 days",
@@ -465,7 +510,7 @@ const enUS: MessageSchema = {
         commissionRate:
           "The creator’s current default commission rate. Historical orders use the rate effective at payment.",
         estimatedCommission:
-          "Estimated commission on unsettled orders paid in the selected period, using each order’s commissionable amount and applicable rate.",
+          "Net commission on verified orders paid in the selected period, calculated by item at the payment-time rate after successful refunds.",
         commissionExpense:
           "Paid commission allocated to orders matching the current filters, based on the payout date in the selected period.",
         cumulativeCommission:
@@ -2187,6 +2232,9 @@ const enUS: MessageSchema = {
     itemImageDeveloping: "Order item image data awaits API support",
     productInfo: "Product information",
     actualPaidAmount: "Paid Amount",
+    includedFreight: "(Includes shipping: {amount})",
+    expandProducts: "Expand products",
+    collapseProducts: "Collapse products",
     itemImageMissing: "No image",
     listStatus: {
       UNPAID: "Awaiting payment",
@@ -2326,6 +2374,21 @@ const enUS: MessageSchema = {
       newItemId: "New Product ID",
       orderAmounts: "Order Amounts",
       successfulRefunds: "Completed Refunds",
+      creatorName: "Creator name",
+      creatorId: "Creator ID",
+      inviterLabel: "Inviter",
+      itemTotalPrice: "Total price",
+      refundAmountLabel: "Refund amount",
+      netSalesLabel: "Net sales",
+      salesAmountLabel: "Sales",
+      creatorCommissionAmount: "Creator commission",
+      movementTime: "Movement time",
+      orderAfterSalesHint:
+        "Commission stays frozen during after-sales and is reduced when the item refund succeeds.",
+      frozenState: "Frozen",
+      platformExpense: "Platform expense",
+      currentFrozenCommission: "Frozen commission balance",
+      currentAvailableCommission: "Available commission balance",
       fundSummary: "Funds Summary",
       weidianSettlementAmount: "Weidian Settlement Amount",
       paidWithdrawal: "Paid Creator Withdrawals",
@@ -2379,6 +2442,22 @@ const enUS: MessageSchema = {
       commissionStatus: "Commission status",
       settlementTime: "Settlement time",
       settlementNo: "Settlement number",
+      preIncome: "Expected income",
+      preIncomeChange: "Expected income adjustment",
+      preIncomeClosed: "Expected income reversed",
+      preIncomePaid: "Expected income cleared on payment",
+      commissionPayableIncrease: "Payable increase",
+      commissionPayableDecrease: "Payable decrease",
+      refundRequested: "Refund due",
+      refundInProgress: "Refund in progress",
+      refundApplication: "Refund requested",
+      goodsRefunded: "Refunded",
+      goodsSettleable: "Available for settlement",
+      partiallyWithdrawn: "Partially withdrawn",
+      releasedCommission: "Available for withdrawal",
+      frozenReceivable: "Frozen income",
+      accruedCommission: "Accrued commission expense",
+      commissionClawback: "Commission clawback",
       orderMoneyStatus: {
         PENDING_SETTLEMENT: "Pending settlement",
         DEDUCTION: "Deduction",

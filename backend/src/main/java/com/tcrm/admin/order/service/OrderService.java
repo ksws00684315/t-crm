@@ -325,6 +325,14 @@ public class OrderService {
             ? null
             : itemAmount.add(order.getFreight() == null ? BigDecimal.ZERO : order.getFreight());
     BigDecimal refundAmount = successfulRefundTotal(refunds);
+    Long inviterId = orderKol == null ? null : orderKol.bdUserId();
+    var inviter = inviterId == null ? null : bdUsers.getById(inviterId);
+    String inviterName =
+        inviter == null
+            ? null
+            : inviter.nickname() == null || inviter.nickname().isBlank()
+                ? inviter.username()
+                : inviter.nickname();
     return new OrderDetailDTO(
         order.getId(),
         order.getWeidianOrderId(),
@@ -336,6 +344,7 @@ public class OrderService {
         order.getKolId(),
         orderKol == null ? null : orderKol.kolCode(),
         orderKol == null ? null : orderKol.name(),
+        inviterName,
         order.getOrderStatus(),
         OrderRefundStatuses.of(refunds, order.getPayAmount()),
         order.getAttributionStatus(),
@@ -594,7 +603,31 @@ public class OrderService {
             .toList();
     var accrual = OrderChainAccrual.of(order, lines, refunds, commission, shopName);
     var chainFlows = new ArrayList<>(flows);
-    chainFlows.addAll(accrual.flows());
+    var receivables = orders.listReceivableEvents(order.getId());
+    for (var flow : accrual.flows()) {
+      if (!"PRE_INCOME".equals(flow.orderStatus()) || receivables.isEmpty()) {
+        chainFlows.add(flow);
+      }
+    }
+    for (var event : receivables) {
+      chainFlows.add(
+          new OrderChainDTO.FlowDTO(
+              "PE" + event.id(),
+              null,
+              shopName,
+              OrderChainCommissionApi.FLOW_SHOP_RECEIVABLE,
+              event.amountCny().signum() < 0
+                  ? OrderChainCommissionApi.DIRECTION_DECREASE
+                  : OrderChainCommissionApi.DIRECTION_INCREASE,
+              event.amountCny().abs(),
+              event.businessAt(),
+              null,
+              null,
+              event.eventType(),
+              null,
+              null,
+              null));
+    }
     if (order.getSettledTime() != null && order.getShopId() != null) {
       chainFlows.add(
           new OrderChainDTO.FlowDTO(

@@ -54,7 +54,7 @@ public class OrderCommissionSync {
     if (order == null || items == null || items.isEmpty()) {
       return;
     }
-    boolean afterSales = hasUnconcludedRefund(order.getId());
+    boolean refundBlocked = hasBlockingRefund(order.getId());
     List<OrderSettlementFlowDO> flows =
         settlementFlows.listByRemoteOrderId(order.getShopId(), order.getWeidianOrderId());
     BasisOutcome basis = SettlementBasisCalculator.compute(order, items, flows);
@@ -62,16 +62,9 @@ public class OrderCommissionSync {
       // Owner-confirmed impossible case; defensive only, never logs personal data.
       LOG.warn("settlement basis blocked for order {}: MULTIPLE_KOLS", order.getId());
     }
+    boolean afterSales = refundBlocked || basis.refundGap();
     if (basis.refundGap()) {
-      // Settlement flows show refunds the CRM records lack; the gap is netted but needs a look.
-      LOG.warn("settlement refund gap netted for order {}", order.getId());
-    }
-    if (basis.refundGapUnallocated().signum() > 0) {
-      // Every line is already netted to zero; the rest of the flow refunds has nothing to reduce.
-      LOG.warn(
-          "settlement refund gap exceeds the remaining basis of order {}: {} not netted",
-          order.getId(),
-          basis.refundGapUnallocated().toPlainString());
+      LOG.warn("settlement refund needs matched item evidence for order {}", order.getId());
     }
     persistOutcome(order, basis);
     List<OrderItemsCommissionEvent.ItemFacts> facts =
@@ -101,7 +94,7 @@ public class OrderCommissionSync {
         item.getProductId(),
         lineBasis,
         lineBasis == null ? null : Boolean.FALSE,
-        successfulRefund(item, basis),
+        item.getRefundAmount(),
         settlementState,
         lineBasis == null ? order.getSettledTime() : basis.settlementTime(),
         // L-052 (owner 2026-11-03): completedTime is the Weidian trade-completion time. Neither
@@ -114,16 +107,6 @@ public class OrderCommissionSync {
         basis.reason());
   }
 
-  /** CRM successful refund of the line plus its share of the settlement refund gap (task 81). */
-  private static BigDecimal successfulRefund(OrderItemDO item, BasisOutcome basis) {
-    BigDecimal extra = basis.lineExtraRefund().get(item.getId());
-    if (extra == null) {
-      return item.getRefundAmount();
-    }
-    BigDecimal crm = item.getRefundAmount() == null ? BigDecimal.ZERO : item.getRefundAmount();
-    return crm.add(extra);
-  }
-
   /**
    * Persists the settlement time and the basis check reason on the order with a targeted update, so
    * the columns can also be cleared back to null. Only changed values are written.
@@ -131,8 +114,7 @@ public class OrderCommissionSync {
    * <p>The settlement time is cleared only when the stored confirmation no longer holds (task 91,
    * L-038): the order has income flows but they do not confirm the basis ({@code INCOME_MISMATCH}).
    * A round without income flows ({@code NO_SETTLEMENT}), an uncomputable basis (multiple KOLs,
-   * allocation failure) and the zero-basis shortcuts (closed, pre-settle refund) say nothing about
-   * the confirmation, so a time that was set earlier stays.
+   * allocation failure) do not invalidate a previously stored settlement fact.
    */
   private void persistOutcome(OrderDO order, BasisOutcome basis) {
     boolean confirmationLost =
@@ -172,22 +154,23 @@ public class OrderCommissionSync {
                     && UNCONCLUDED_REFUND_STATUSES.contains(refund.getRefundStatus()));
   }
 
-  /**
-   * Whether the order is in after-sales: any refund row of the order is unconcluded (PROCESSING /
-   * UNKNOWN, §8.4), whether or not it maps to a single line. One order belongs to one creator, so
-   * the whole order is judged at once (task 113, 定稿 §2.1, owner 2026-11-05): every line blocks
-   * release and new withdrawal occupation, and unreleased commission counts 0 until the refund
-   * concludes. A successful refund is already netted from the basis, so it no longer blocks (task
-   * 81 PR review, 2026-10-30); CLOSED never blocks. Until M0 maps the real Weidian raw values,
-   * every raw status other than 10 is UNKNOWN (design §8.1a).
-   */
-  private boolean hasUnconcludedRefund(long orderId) {
-    // The status column must be selected: the shared rule reads it from the fetched rows.
-    return hasUnconcludedRefund(
-        refunds.selectList(
+  /** Open refunds and successful refunds lacking a product line block the entire order. */
+  private boolean hasBlockingRefund(long orderId) {
+    return !refunds
+        .selectList(
             new LambdaQueryWrapper<RefundDO>()
-                .select(RefundDO::getId, RefundDO::getRefundStatus)
+                .select(RefundDO::getId)
                 .eq(RefundDO::getOrderId, orderId)
-                .in(RefundDO::getRefundStatus, UNCONCLUDED_REFUND_STATUSES)));
+                .and(
+                    query ->
+                        query
+                            .in(RefundDO::getRefundStatus, UNCONCLUDED_REFUND_STATUSES)
+                            .or(
+                                unassigned ->
+                                    unassigned
+                                        .eq(RefundDO::getRefundStatus, "SUCCESS")
+                                        .isNull(RefundDO::getOrderItemId)))
+                .last("LIMIT 1"))
+        .isEmpty();
   }
 }

@@ -71,11 +71,55 @@ const zhCN = {
     remaining: "剩余 {number} 个商品位"
   },
   analytics: {
+    fundFlows: {
+      title: "资金流水",
+      fundType: "资金类型",
+      direction: "方向",
+      orderNo: "订单号",
+      amount: "金额",
+      status: "状态",
+      settlementNo: "结算单号",
+      types: { COMMISSION: "佣金", PREPAY: "预付款" },
+      directions: { INCREASE: "增加", DECREASE: "减少" },
+      statuses: {
+        FROZEN: "冻结中",
+        AVAILABLE: "可提现",
+        WITHDRAWN: "已提现",
+        CLAWBACK: "扣回",
+        PREPAID: "已预付"
+      }
+    },
+    income: {
+      ranking: "达人明细",
+      identity: "达人名 / 社媒 / ID",
+      relationship: "达人状态",
+      ledger: "详情",
+      ordersAndUnits: "订单数/销量",
+      cohortRefundAmount: "退款金额",
+      paidPrepay: "已付预付款",
+      paidCommission: "已付佣金",
+      periodCommission: "当期预估佣金",
+      cumulativeExpense: "累计支出",
+      expenseThrough: "截止到{date}",
+      history: "历史累计",
+      historyThrough: "截至 {date}",
+      cumulativeNetSales: "累计净销售额",
+      cumulativeCommission: "预估总佣金",
+      cumulativePrepay: "累计预付款",
+      prepayDateHint: "按支付时间计入",
+      netSalesTrend: "净销售额趋势",
+      orderPaidDate: "按订单支付时间",
+      detailTitle: "达人收入详情",
+      search: "达人名 / ID / 邮箱",
+      estimatedHint:
+        "按所选支付期间汇总已核实订单的净佣金。各商品行含分摊运费，扣除已确认退款后按付款时锁定的费率计佣。"
+    },
     detailHeader: {
       totalInvited: "总邀请达人数",
       totalInvitedHint: "截至当前首次归属该邀请人的去重达人数，包含后来转出或停用的达人。"
     },
     creatorCards: {
+      totalInvited: "总邀请达人",
       selling: "有销售达人",
       sellingHint: "所选期间内有已支付订单的达人，按达人去重。",
       effective: "期间有效达人",
@@ -90,8 +134,7 @@ const zhCN = {
       netHint:
         "所选期间支付的销售额，减去同批订单自支付日起 30 个北京时间自然日内完结的成功退款。支付日计第 1 天。",
       totalCommission: "达人总佣金",
-      totalCommissionHint:
-        "所选期间内支付且已核实的订单佣金合计。未结算按预估，已结算按实际，已提现部分只计一次。",
+      totalCommissionHint: "按支付时间汇总已核实订单的净佣金。结算释放和提现沿用原订单佣金金额。",
       commissionForbiddenHint: "达人总佣金按所选支付期间统计，查看金额需要佣金权限。",
       relationship: "关系达人",
       peopleCount: "{value} 位",
@@ -105,7 +148,7 @@ const zhCN = {
       commissionBeforeClawback: "佣金",
       clawback: "扣回",
       clawbackHint:
-        "同批已核实订单发放佣金后，因成功退款确认入账的扣回，按正数展示。退款中暂时冻结、计佣前已减的退款及非退款调整不计入。无法核实原因时显示横线。"
+        "同批已核实订单因成功退款减少的佣金，含释放前后的扣减，按正数展示。缺少可核实依据时显示横线。"
     },
     productCreatorCount: "达人数",
     product: "商品",
@@ -115,6 +158,7 @@ const zhCN = {
     creatorSearch: "输入达人 ID 或达人名",
     inviterSearch: "输入 ID 或用户名",
     periodMode: {
+      cumulative: "累计",
       live: "实时",
       sevenDays: "7天",
       thirtyDays: "30天",
@@ -428,7 +472,7 @@ const zhCN = {
         amountRefundRate: "所选期间内完结的成功退款金额除以同期销售额。",
         commissionRate: "达人推广配置中当前生效的默认佣金比例。历史订单按支付时适用的比例计佣。",
         estimatedCommission:
-          "所选支付期间内，当前尚未结算的订单按计佣金额和支付时佣金比例计算的合计。",
+          "所选支付期间内已核实订单的净佣金。各商品行按支付时的费率计算，成功退款扣减对应行。",
         commissionExpense: "按所选期间的实际付款时间，汇总符合当前筛选的订单所分摊的已付款佣金。",
         cumulativeCommission:
           "沿用当前筛选，累计至今。未结算取预估，已结算取实际，已提现金额仍按原订单计一次。"
@@ -2098,6 +2142,9 @@ const zhCN = {
     itemImageDeveloping: "订单列表商品图片字段待接口支持",
     productInfo: "商品信息",
     actualPaidAmount: "支付金额",
+    includedFreight: "（含运费：{amount}）",
+    expandProducts: "展开商品",
+    collapseProducts: "收起商品",
     itemImageMissing: "暂无图片",
     listStatus: {
       UNPAID: "待付款",
@@ -2236,7 +2283,21 @@ const zhCN = {
       newItemId: "新商品ID",
       orderAmounts: "订单金额",
       successfulRefunds: "成功退款",
-      fundSummary: "资金概览",
+      creatorName: "达人名",
+      creatorId: "达人ID",
+      inviterLabel: "邀请人",
+      itemTotalPrice: "总价",
+      refundAmountLabel: "退款金额",
+      netSalesLabel: "净销售额",
+      salesAmountLabel: "销售额",
+      creatorCommissionAmount: "达人佣金金额",
+      movementTime: "变动时间",
+      orderAfterSalesHint: "售后处理中，佣金保留并冻结，退款成功后按对应商品行扣减",
+      frozenState: "冻结中",
+      platformExpense: "平台已支出",
+      currentFrozenCommission: "冻结佣金余额",
+      currentAvailableCommission: "可提现佣金余额",
+      fundSummary: "资金概况",
       weidianSettlementAmount: "微店结算金额",
       paidWithdrawal: "达人已支付提现",
       noPaidWithdrawal: "暂无已支付提现",
@@ -2289,6 +2350,22 @@ const zhCN = {
       commissionStatus: "佣金状态",
       settlementTime: "结算时间",
       settlementNo: "结算单号",
+      preIncome: "预收入",
+      preIncomeChange: "预收入改价",
+      preIncomeClosed: "预收入关闭冲销",
+      preIncomePaid: "预收入支付转出",
+      commissionPayableIncrease: "应付增加",
+      commissionPayableDecrease: "应付减少",
+      refundRequested: "应退",
+      refundInProgress: "退款中",
+      refundApplication: "已申请退款",
+      goodsRefunded: "已退款",
+      goodsSettleable: "可结算",
+      partiallyWithdrawn: "部分已提现",
+      releasedCommission: "可提现",
+      frozenReceivable: "冻结中收入",
+      accruedCommission: "冻结中佣金支出",
+      commissionClawback: "佣金扣回",
       orderMoneyStatus: {
         PENDING_SETTLEMENT: "待结算",
         DEDUCTION: "扣减",

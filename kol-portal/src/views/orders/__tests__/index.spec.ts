@@ -254,9 +254,8 @@ describe("sales summary cards (task 92 section 4.4)", () => {
       `${enUS.orders.summaryEstimatedCommission}¥300.00`
     ]);
     expect(wrapper.get('[data-test="summary-note"]').text()).toBe(
-      "Commission base = order sales − estimated refund. Estimated refund: a refunding order " +
-        "counts its full pay amount, a concluded one counts what was refunded. Estimated " +
-        "commission sums the rows' estimated commissions."
+      "Successful refunds use confirmed refund amounts. The commission base uses verified item amounts after refunds. " +
+        "Estimated commission uses each item’s locked payment-time rate. Open after-sales retains accrued commission."
     );
     wrapper.unmount();
   });
@@ -264,12 +263,11 @@ describe("sales summary cards (task 92 section 4.4)", () => {
   it("keeps the owner's Chinese wording", () => {
     const zh = (key: string) => i18n.global.t(key, {}, { locale: "zh-CN" });
     expect(zh("orders.summaryOrderSales")).toBe("订单销售额");
-    expect(zh("orders.summaryEstimatedRefund")).toBe("预估退款金额");
+    expect(zh("orders.summaryEstimatedRefund")).toBe("成功退款金额");
     expect(zh("orders.summaryCommissionBase")).toBe("计佣金额");
     expect(zh("orders.summaryEstimatedCommission")).toBe("预估总佣金");
     expect(zh("orders.summaryNote")).toBe(
-      "计佣金额 = 订单销售额 − 预估退款金额。预估退款金额：退款中订单按整单支付金额计，" +
-        "退款完成订单按已退金额计；预估总佣金为各行预估佣金合计。"
+      "成功退款金额按已确认的实退金额统计。计佣金额取已核实商品行的净基数，预估总佣金按各行支付时锁定的比例汇总。售后处理中保留已计提佣金。"
     );
   });
 

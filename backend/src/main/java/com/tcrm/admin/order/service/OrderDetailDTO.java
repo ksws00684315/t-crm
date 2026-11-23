@@ -32,6 +32,7 @@ public record OrderDetailDTO(
     Long kolId,
     String kolCode,
     String kolName,
+    String inviterName,
     String orderStatus,
     String refundStatus,
     String attributionStatus,

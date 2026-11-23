@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { ElMessage } from "element-plus";
-import { Picture } from "@element-plus/icons-vue";
+import { ArrowDown, ArrowUp, Picture } from "@element-plus/icons-vue";
 import { computed, onMounted, reactive, ref } from "vue";
 import { useI18n } from "vue-i18n";
 import { useRouter } from "vue-router";
@@ -49,6 +49,8 @@ interface GroupedOrderRow {
 const loading = ref(false);
 const loadFailed = ref(false);
 const rows = ref<OrderVO[]>([]);
+const visibleItemLimit = 3;
+const expandedOrders = ref(new Set<string>());
 const total = ref(0);
 const shops = ref<OrderSyncStateVO[]>([]);
 const query = reactive<{
@@ -119,7 +121,10 @@ const statusOptions = computed(() => [
 const tableRows = computed<GroupedOrderRow[]>(() =>
   rows.value.flatMap(order => {
     const items = order.items ?? [];
-    const itemCount = Math.max(items.length, 1);
+    const visibleItems = expandedOrders.value.has(order.id)
+      ? items
+      : items.slice(0, visibleItemLimit);
+    const itemCount = Math.max(visibleItems.length, 1);
     return [
       {
         id: `header:${order.id}`,
@@ -129,8 +134,8 @@ const tableRows = computed<GroupedOrderRow[]>(() =>
         itemIndex: -1,
         itemCount
       },
-      ...(items.length
-        ? items.map((item, itemIndex) => ({
+      ...(visibleItems.length
+        ? visibleItems.map((item, itemIndex) => ({
             id: `item:${order.id}:${item.id}`,
             kind: "item" as const,
             order,
@@ -151,6 +156,14 @@ const tableRows = computed<GroupedOrderRow[]>(() =>
     ];
   })
 );
+
+function toggleProducts(orderId: string) {
+  if (expandedOrders.value.has(orderId)) {
+    expandedOrders.value.delete(orderId);
+  } else {
+    expandedOrders.value.add(orderId);
+  }
+}
 
 function orderSpanMethod({
   row,
@@ -290,6 +303,7 @@ async function load() {
       size: query.size,
       ...appliedQuery()
     });
+    expandedOrders.value.clear();
     rows.value = page.items;
     total.value = Number(page.total);
   } catch (error) {
@@ -505,6 +519,22 @@ onMounted(() => {
             <span>{{ t("order.shop") }}</span>
             {{ shopText((row as GroupedOrderRow).order) }}
           </span>
+          <el-button
+            v-if="((row as GroupedOrderRow).order.items?.length ?? 0) > visibleItemLimit"
+            class="order-products-toggle"
+            text
+            :icon="expandedOrders.has((row as GroupedOrderRow).order.id) ? ArrowUp : ArrowDown"
+            :aria-expanded="expandedOrders.has((row as GroupedOrderRow).order.id)"
+            :aria-label="
+              t(
+                expandedOrders.has((row as GroupedOrderRow).order.id)
+                  ? 'order.collapseProducts'
+                  : 'order.expandProducts'
+              )
+            "
+            data-test="order-products-toggle"
+            @click="toggleProducts((row as GroupedOrderRow).order.id)"
+          />
         </div>
         <div v-else class="order-product-row">
           <el-image
@@ -580,11 +610,14 @@ onMounted(() => {
         </div>
       </template>
       <template #cell-payAmount="{ row }">
-        <span class="order-money">{{
-          (row as GroupedOrderRow).kind === "header"
-            ? ""
-            : formatAmountWithCurrency((row as GroupedOrderRow).order.payAmount)
-        }}</span>
+        <div v-if="(row as GroupedOrderRow).kind === 'item'" class="order-money">
+          <span>{{ formatAmountWithCurrency((row as GroupedOrderRow).order.payAmount) }}</span>
+          <span class="order-money__freight" data-test="order-freight">{{
+            t("order.includedFreight", {
+              amount: formatAmountWithCurrency((row as GroupedOrderRow).order.freight)
+            })
+          }}</span>
+        </div>
       </template>
       <template #actions="{ row }">
         <RowActions
@@ -615,8 +648,16 @@ onMounted(() => {
 
 <style scoped>
 .order-money {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
   white-space: nowrap;
   font-variant-numeric: tabular-nums;
+}
+.order-money__freight {
+  color: var(--tcrm-color-text-secondary);
+  font-size: var(--tcrm-font-size-help);
+  line-height: var(--tcrm-line-height-help);
 }
 :deep(.el-table .order-group-header > td) {
   /* The approved order groups replace shared stripe/hover fills on this page only. */
@@ -672,6 +713,10 @@ onMounted(() => {
 
 .order-group-band__field > span:first-child {
   color: var(--tcrm-color-text-secondary);
+}
+
+.order-products-toggle {
+  margin-inline-start: auto;
 }
 
 .order-group-band__field,

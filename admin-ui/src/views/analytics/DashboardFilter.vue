@@ -15,6 +15,7 @@ const props = defineProps<{
   optionsFailed: boolean;
   showInviter?: boolean;
   showProduct?: boolean;
+  income?: boolean;
   initialMode?: PeriodMode;
 }>();
 const filters = defineModel<Filters>({ required: true });
@@ -36,7 +37,7 @@ const custom = computed(() => [filters.value.startDate, filters.value.endDate]);
 const next = computed(() => adjacentPeriod(mode.value, filters.value, 1, today()));
 
 function setRange(range: DateRange): void {
-  filters.value = { ...filters.value, ...range };
+  filters.value = { ...filters.value, ...range, cumulative: range.cumulative };
   emit("periodChange", range, mode.value === "live");
 }
 
@@ -45,8 +46,8 @@ async function selectMode(value: PeriodMode): Promise<void> {
   mode.value = value;
   if (changed) {
     if (value === "custom") {
-      const { startDate, endDate } = filters.value;
-      emit("periodChange", { startDate, endDate }, false);
+      const { startDate, endDate, cumulative } = filters.value;
+      setRange(cumulative ? dates() : { startDate, endDate });
     } else {
       setRange(periodRange(value));
     }
@@ -112,7 +113,7 @@ function reset(): void {
               native-type="button"
               :icon="ArrowLeft"
               :aria-label="t('analytics.previousPeriod')"
-              :disabled="mode === 'live'"
+              :disabled="mode === 'live' || mode === 'cumulative'"
               @click="move(-1)"
             />
             <el-button
@@ -161,7 +162,7 @@ function reset(): void {
             :clearable="false"
             @update:model-value="setCustom"
           />
-          <span v-else class="analytics-filter__dates">
+          <span v-else-if="mode !== 'cumulative'" class="analytics-filter__dates">
             {{ filters.startDate
             }}<template v-if="filters.endDate !== filters.startDate">
               – {{ filters.endDate }}</template
@@ -178,55 +179,80 @@ function reset(): void {
       </div>
       <div class="analytics-filter__fields">
         <span class="analytics-filter__label">{{ t("analytics.conditions") }}</span>
-        <el-select
-          v-model="filters.shopId"
-          class="analytics-filter__shop"
-          clearable
-          filterable
-          :aria-label="t('analytics.shop')"
-          :placeholder="t('analytics.all')"
+        <template
+          v-for="field in income ? ['creator', 'status', 'shop'] : ['shop', 'channel', 'creator']"
+          :key="field"
         >
-          <template #prefix>
-            <span class="analytics-filter__caption">{{ t("analytics.shop") }}</span>
-          </template>
-          <template #label="{ label }">
-            <span :title="label">{{ selectedShopName ?? label }}</span>
-          </template>
-          <el-option
-            v-for="option in options?.shops"
-            :key="option.id"
-            :value="option.id"
-            :label="formatNameWithCode(option.name, option.code)"
+          <el-select
+            v-if="field === 'shop'"
+            v-model="filters.shopId"
+            class="analytics-filter__shop"
+            clearable
+            filterable
+            :aria-label="t('analytics.shop')"
+            :placeholder="t('analytics.all')"
           >
-            <NameCode v-if="option.code" :name="option.name" :code="option.code" />
-            <span v-else>{{ option.name }}</span>
-          </el-option>
-        </el-select>
-        <el-select
-          v-model="filters.channel"
-          class="analytics-filter__channel"
-          clearable
-          :aria-label="t('analytics.channel')"
-          :placeholder="t('analytics.all')"
-        >
-          <template #prefix>
-            <span class="analytics-filter__caption">{{ t("analytics.channel") }}</span>
-          </template>
-          <el-option value="WEIDIAN" :label="t('analytics.weidian')" />
-        </el-select>
-        <el-input
-          v-model="filters.creatorKeyword"
-          class="analytics-filter__creator"
-          clearable
-          :maxlength="100"
-          :aria-label="t('analytics.creatorSearch')"
-          :placeholder="t('analytics.creatorSearch')"
-        >
-          <template #prefix>
-            <span class="analytics-filter__caption">{{ t("analytics.creator") }}</span>
-            <el-icon class="analytics-filter__search-icon"><Search /></el-icon>
-          </template>
-        </el-input>
+            <template #prefix>
+              <span class="analytics-filter__caption">{{ t("analytics.shop") }}</span>
+            </template>
+            <template #label="{ label }">
+              <span :title="label">{{ selectedShopName ?? label }}</span>
+            </template>
+            <el-option
+              v-for="option in options?.shops"
+              :key="option.id"
+              :value="option.id"
+              :label="formatNameWithCode(option.name, option.code)"
+            >
+              <NameCode v-if="option.code" :name="option.name" :code="option.code" />
+              <span v-else>{{ option.name }}</span>
+            </el-option>
+          </el-select>
+          <el-select
+            v-else-if="field === 'channel'"
+            v-model="filters.channel"
+            class="analytics-filter__channel"
+            clearable
+            :aria-label="t('analytics.channel')"
+            :placeholder="t('analytics.all')"
+          >
+            <template #prefix>
+              <span class="analytics-filter__caption">{{ t("analytics.channel") }}</span>
+            </template>
+            <el-option value="WEIDIAN" :label="t('analytics.weidian')" />
+          </el-select>
+          <el-input
+            v-else-if="field === 'creator'"
+            v-model="filters.creatorKeyword"
+            class="analytics-filter__creator"
+            :data-test="income ? 'income-keyword' : undefined"
+            clearable
+            :maxlength="100"
+            :aria-label="t(income ? 'analytics.income.search' : 'analytics.creatorSearch')"
+            :placeholder="t(income ? 'analytics.income.search' : 'analytics.creatorSearch')"
+          >
+            <template #prefix>
+              <span class="analytics-filter__caption">{{ t("analytics.creator") }}</span>
+              <el-icon class="analytics-filter__search-icon"><Search /></el-icon>
+            </template>
+          </el-input>
+          <el-select
+            v-else
+            v-model="filters.creatorStatus"
+            class="analytics-filter__status"
+            clearable
+            :aria-label="t('analytics.income.relationship')"
+            :placeholder="t('analytics.all')"
+          >
+            <template #prefix>
+              <span class="analytics-filter__caption">{{
+                t("analytics.income.relationship")
+              }}</span>
+            </template>
+            <el-option :label="t('kol.relationStatusOption.PROMOTING')" value="PROMOTING" />
+            <el-option :label="t('kol.relationStatusOption.INVALID')" value="INVALID" />
+          </el-select>
+        </template>
         <el-input
           v-if="showInviter"
           v-model="filters.inviterKeyword"
@@ -337,7 +363,8 @@ function reset(): void {
 .analytics-filter__channel,
 .analytics-filter__creator,
 .analytics-filter__inviter,
-.analytics-filter__product {
+.analytics-filter__product,
+.analytics-filter__status {
   min-width: 0;
   width: 100%;
 }

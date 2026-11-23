@@ -197,7 +197,7 @@ class CommissionItemSnapshotServiceTest {
   }
 
   @Test
-  void shouldZeroUnreleasedAccrualInAfterSales_andRestoreWhenRefundIsRejected() {
+  void shouldKeepUnreleasedAccrualInAfterSales_andUnblockWhenRefundIsRejected() {
     // Task 113: pay 100, rate 10%, nothing released.
     whenRateAtPayTime(KOL_A, "0.1000", 3);
     CommissionItemStateDO row = firstRevision(new BigDecimal("100.00"));
@@ -205,7 +205,7 @@ class CommissionItemSnapshotServiceTest {
     assertFiveLayers(row, "0.00", "0.00", "0.00");
 
     syncAfterSales(true);
-    assertThat(row.getAccruedCommissionCny()).isEqualByComparingTo("0.00");
+    assertThat(row.getAccruedCommissionCny()).isEqualByComparingTo("10.00");
     assertThat(row.getReleaseBasis()).isEqualTo(CommissionSettlementRules.RELEASE_AFTER_SALES);
     assertThat(row.getVerified()).isTrue();
     assertFiveLayers(row, "0.00", "0.00", "0.00");

@@ -8,18 +8,33 @@ import java.time.ZoneId;
 import java.time.temporal.ChronoUnit;
 
 /** Inclusive Beijing dates with half-open UTC query bounds. */
-public record StatsPeriod(LocalDate startDate, LocalDate endDate) {
+public record StatsPeriod(LocalDate startDate, LocalDate endDate, boolean cumulative) {
+  private static final LocalDate EARLIEST_DATE = LocalDate.of(1900, 1, 1);
   static final ZoneId ZONE = ZoneId.of("Asia/Shanghai");
+
+  public StatsPeriod(LocalDate startDate, LocalDate endDate) {
+    this(startDate, endDate, false);
+  }
 
   public StatsPeriod {
     if (startDate == null
         || endDate == null
         || endDate.isBefore(startDate)
-        || ChronoUnit.DAYS.between(startDate, endDate) >= 90
+        || (!cumulative && ChronoUnit.DAYS.between(startDate, endDate) >= 90)
         || startDate.getYear() < 1800
         || endDate.getYear() > 9998) {
       throw new BusinessException(ErrorCode.COMMON_VALIDATION_FAILED);
     }
+  }
+
+  public static StatsPeriod resolve(LocalDate startDate, LocalDate endDate) {
+    return resolve(startDate, endDate, false);
+  }
+
+  public static StatsPeriod resolve(LocalDate startDate, LocalDate endDate, boolean cumulative) {
+    return cumulative
+        ? new StatsPeriod(EARLIEST_DATE, LocalDate.now(ZONE), true)
+        : resolve(startDate, endDate, LocalDate.now(ZONE));
   }
 
   public static StatsPeriod resolve(LocalDate startDate, LocalDate endDate, LocalDate today) {
@@ -41,6 +56,9 @@ public record StatsPeriod(LocalDate startDate, LocalDate endDate) {
   }
 
   public StatsPeriod previous() {
+    if (cumulative) {
+      return null;
+    }
     long days = ChronoUnit.DAYS.between(startDate, endDate) + 1;
     return new StatsPeriod(startDate.minusDays(days), startDate.minusDays(1));
   }

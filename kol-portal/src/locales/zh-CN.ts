@@ -197,11 +197,11 @@ const zhCN: MessageSchema = {
   orders: {
     title: "我的订单",
     summaryOrderSales: "订单销售额",
-    summaryEstimatedRefund: "预估退款金额",
+    summaryEstimatedRefund: "成功退款金额",
     summaryCommissionBase: "计佣金额",
     summaryEstimatedCommission: "预估总佣金",
     summaryNote:
-      "计佣金额 = 订单销售额 − 预估退款金额。预估退款金额：退款中订单按整单支付金额计，退款完成订单按已退金额计；预估总佣金为各行预估佣金合计。",
+      "成功退款金额按已确认的实退金额统计。计佣金额取已核实商品行的净基数，预估总佣金按各行支付时锁定的比例汇总。售后处理中保留已计提佣金。",
     summaryFailed: "汇总加载失败。",
     summaryRetry: "重试",
     dateRange: "时间范围",
@@ -223,7 +223,7 @@ const zhCN: MessageSchema = {
     split: "分段",
     splitHint: "该订单包含多个结算状态的佣金分段。",
     afterSales: "售后处理中",
-    afterSalesHint: "售后处理中，暂不计佣；已释放部分冻结，退款成功后按退款金额扣减",
+    afterSalesHint: "售后处理中保留已计提佣金，整单暂停释放。成功退款后重算对应商品行佣金。",
     settlement: {
       WITHDRAWN: "已提现",
       FROZEN: "冻结中",

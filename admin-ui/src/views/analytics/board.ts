@@ -9,6 +9,17 @@ export const boards: Record<string, Board> = {
 
 const trade = ["paidOrderCount", "units", "salesAmount", "completedRefundAmount", "netSalesAmount"];
 const risk = ["averageOrderAmount", "amountRefundRate", "periodRefundedOrderRate"];
+export const creatorIncomeColumns = [
+  "identity",
+  "relationship",
+  "ordersAndUnits",
+  "salesAmount",
+  "cohortRefundAmount",
+  "netSalesAmount",
+  "commissionRate",
+  "estimatedCommission",
+  "paidPrepay"
+];
 export const columnsByBoard: Record<Board, string[]> = {
   "shop-performance": [
     "identity",
@@ -47,9 +58,7 @@ export const columnsByBoard: Record<Board, string[]> = {
     "averageOrderAmount",
     "amountRefundRate",
     "commissionRate",
-    "estimatedCommission",
-    "commissionExpense",
-    "cumulativeCommission"
+    "estimatedCommission"
   ],
   "inviter-performance": [
     "identity",
@@ -90,8 +99,7 @@ export const money = new Set([
   "settlement",
   "settlementAmount",
   "estimatedCommission",
-  "commissionExpense",
-  "cumulativeCommission",
+  "paidPrepay",
   "prepayExpense",
   "totalEstimatedCommission",
   "totalExpense"
@@ -120,9 +128,17 @@ export function dates(days = 7, now = new Date()): Pick<Filters, "startDate" | "
   return { startDate, endDate };
 }
 
-export const periodModes = ["live", "sevenDays", "thirtyDays", "day", "month", "custom"] as const;
+export const periodModes = [
+  "live",
+  "sevenDays",
+  "thirtyDays",
+  "day",
+  "month",
+  "custom",
+  "cumulative"
+] as const;
 export type PeriodMode = (typeof periodModes)[number];
-export type DateRange = Pick<Filters, "startDate" | "endDate">;
+export type DateRange = Pick<Filters, "startDate" | "endDate" | "cumulative">;
 
 export function shiftDate(day: string, offset: number): string {
   return new Date(Date.parse(day) + offset * DAY).toISOString().slice(0, 10);
@@ -139,6 +155,7 @@ export function periodRange(mode: Exclude<PeriodMode, "custom">, now = new Date(
   if (mode === "sevenDays") return dates(7, now);
   if (mode === "thirtyDays") return dates(30, now);
   const day = dates(1, now);
+  if (mode === "cumulative") return { ...day, cumulative: true };
   return mode === "month" ? monthRange(day.endDate.slice(0, 7), day.endDate) : day;
 }
 
@@ -148,7 +165,7 @@ export function adjacentPeriod(
   direction: -1 | 1,
   today: string
 ): DateRange | undefined {
-  if (mode === "live") return undefined;
+  if (mode === "live" || mode === "cumulative") return undefined;
   if (mode === "month") {
     const start = new Date(`${range.startDate}T00:00:00Z`);
     start.setUTCMonth(start.getUTCMonth() + direction, 1);

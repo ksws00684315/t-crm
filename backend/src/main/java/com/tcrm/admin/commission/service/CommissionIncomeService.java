@@ -1,5 +1,6 @@
 package com.tcrm.admin.commission.service;
 
+import com.tcrm.admin.commission.api.CreatorPrepayApi;
 import com.tcrm.admin.commission.mapper.CommissionFinanceQueryMapper;
 import com.tcrm.admin.commission.mapper.CommissionFinanceQueryMapper.KolMoneyRow;
 import com.tcrm.admin.commission.mapper.CommissionFinanceQueryMapper.PrepayPaidRow;
@@ -31,6 +32,7 @@ import java.math.BigDecimal;
 import java.math.RoundingMode;
 import java.time.Instant;
 import java.util.ArrayList;
+import java.util.Collection;
 import java.util.Comparator;
 import java.util.HashMap;
 import java.util.HashSet;
@@ -47,7 +49,15 @@ import org.springframework.transaction.annotation.Transactional;
  * payment window and {@code paymentType} on both the row and the summary.
  */
 @Service
-public class CommissionIncomeService {
+public class CommissionIncomeService implements CreatorPrepayApi {
+  @Override
+  public Map<Long, BigDecimal> paidByCreator(
+      Collection<Long> creatorIds, Instant from, Instant until) {
+    return creatorIds.isEmpty()
+        ? Map.of()
+        : prepayMoneyMap(finance.prepayPaidSums(creatorIds, from, until));
+  }
+
   private static final Comparator<PaymentLine> NEWEST_PAYMENT =
       Comparator.comparing(
               PaymentLine::paidAt, Comparator.nullsFirst(Comparator.<Instant>naturalOrder()))
@@ -423,9 +433,7 @@ public class CommissionIncomeService {
       ItemRefDTO item = itemsById.get(row.getOrderItemId());
       CommissionItemRevisionDO revision = latestRevisions.get(row.getId());
       BigDecimal rate = revision == null ? null : revision.getRate();
-      BigDecimal adjustment =
-          CommissionSettlementRules.refundAdjustment(
-              row.getAccruedCommissionCny(), row.getReleasedCommissionCny());
+      BigDecimal adjustment = CommissionSettlementRules.refundAdjustment(row, rate);
       Instant businessAt = order == null ? null : order.payTime();
       lines.add(
           new CommissionLine(
@@ -439,8 +447,10 @@ public class CommissionIncomeService {
               rate == null ? null : rate.toPlainString(),
               row.getConfigVersion(),
               row.getRuleVersionId(),
-              row.getAccruedCommissionCny().toPlainString(),
-              adjustment.toPlainString(),
+              Boolean.TRUE.equals(row.getVerified())
+                  ? row.getAccruedCommissionCny().toPlainString()
+                  : null,
+              adjustment == null ? null : adjustment.toPlainString(),
               row.getReleaseBasis(),
               businessAt,
               CommissionSettlementRules.adjustmentDirection(adjustment),

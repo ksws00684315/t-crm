@@ -221,6 +221,20 @@ class OrderStatsIT {
       assertThat(counts.refundedOrders()).isEqualTo(1);
       assertThat(evidence.count(creatorEvidence, Kind.ORDERS)).isEqualTo(2);
       assertThat(evidence.count(creatorEvidence, Kind.REFUNDS)).isEqualTo(2);
+      var grouped = creatorEvidence.groupedByOrder();
+      for (var kind : Kind.values()) {
+        assertThat(evidence.count(grouped, kind)).isEqualTo(1);
+        assertThat(evidence.page(grouped, kind, 1, 0)).hasSize(2);
+        assertThat(evidence.page(grouped, kind, 1, 1)).isEmpty();
+      }
+      assertThat(
+              evidence.pageWithSort(grouped, Kind.REFUNDS, 1, 0, DetailSort.REFUND_AMOUNT, false))
+          .allSatisfy(
+              row -> {
+                assertThat(row.orderNo()).isEqualTo("t144-2");
+                assertThat(row.orderPaidAt()).isEqualTo(FROM.minusSeconds(1));
+                assertThat(row.eventTime()).isAfter(FROM);
+              });
       var shopEvidence = new Selection(scope, null, null, null, null, FROM, UNTIL);
       var productEvidence = new Selection(scope, null, null, "A", null, FROM, UNTIL);
       assertThat(evidence.count(shopEvidence, Kind.ORDERS)).isEqualTo(2);
@@ -773,26 +787,22 @@ class OrderStatsIT {
     jdbc.execute(
         """
         INSERT INTO crm_commission_item_state (id, tenant_id, order_id, order_item_id, kol_id,
-          source_key, settlement_state, verified, accrued_commission_cny, release_basis,
-          create_time, update_time)
-        VALUES (701, 4, 1, 1, 11, 't144-card-state', 'CONFIRMED', TRUE, 8, 'CONFIRMED', now(), now())
+          source_key, source_version, basis_cny, successful_refund_cny, basis_includes_refund,
+          settlement_state, verified, accrued_commission_cny, release_basis, create_time, update_time)
+        VALUES (701, 4, 1, 1, 11, 't144-card-state', 'refund', 100, 20, FALSE,
+            'CONFIRMED', TRUE, 8, 'CONFIRMED', now(), now()),
+          (702, 4, 1, 2, 11, 't144-card-state-2', 'initial', 40, 0, FALSE,
+            'CONFIRMED', TRUE, 0, 'CONFIRMED', now(), now())
         """);
     jdbc.execute(
         """
         INSERT INTO crm_commission_item_revision (id, tenant_id, item_state_id, source_version,
           basis_cny, successful_refund_cny, rate, accrued_cny, delta_cny, release_basis, create_time)
         VALUES (701, 4, 701, 'initial', 100, 0, .10, 10, 0, 'CONFIRMED', '2026-11-03T00:00:00Z'),
-               (702, 4, 701, 'refund', 80, 20, .10, 8, -2, 'CONFIRMED', '2026-11-04T00:00:00Z')
+               (702, 4, 701, 'refund', 100, 20, .10, 8, 0, 'CONFIRMED', '2026-11-04T00:00:00Z')
         """);
-    jdbc.execute(
-        """
-        INSERT INTO crm_commission_ledger (id, tenant_id, kol_id, entry_type, amount_cny, source_type,
-          source_id, source_key, occurred_at, balance_after_cny, create_time)
-        VALUES (701, 4, 11, 'COMMISSION_ADJUSTMENT', -2, 'COMMISSION', 701,
-          'COMMISSION_ITEM:701:refund', '2026-11-04T00:00:00Z', 8, now()),
-          (702, 4, 11, 'COMMISSION_ADJUSTMENT', -1, 'COMMISSION', 701,
-          'COMMISSION_ITEM:701:correction:K11', '2026-11-04T00:00:00Z', 7, now())
-        """);
+    // The cards sum a whole order only when every live line carries this creator's snapshot.
+    jdbc.update("UPDATE crm_order_item SET kol_id = 11 WHERE id = 2");
     try (var session = factory.openSession()) {
       var kols = session.getMapper(KolMapper.class);
       kols.recordReportingStatus(4L, 701L, false, UNTIL);
@@ -838,7 +848,12 @@ class OrderStatsIT {
       jdbc.update(
           "UPDATE crm_commission_item_state SET released_commission_cny = 9 WHERE id = 701");
       session.clearCache();
-      assertThat(orders.creatorCommission(scoped, FROM, UNTIL).total()).isEqualByComparingTo("9");
+      assertThat(orders.creatorCommission(scoped, FROM, UNTIL)).isNull();
+      jdbc.update("UPDATE crm_order_item SET kol_id = 11 WHERE id = 2");
+      session.clearCache();
+      assertThat(orders.creatorCommission(scoped, FROM, UNTIL).total()).isEqualByComparingTo("8");
+      // Restore the workbench fixture: the second line has no creator attribution.
+      jdbc.update("UPDATE crm_order_item SET kol_id = NULL WHERE id = 2");
       jdbc.update(
           "UPDATE crm_commission_item_state SET released_commission_cny = 8 WHERE id = 701");
       session.clearCache();
@@ -919,20 +934,15 @@ class OrderStatsIT {
           .singleElement()
           .satisfies(value -> assertThat(value.total()).isEqualByComparingTo("8"));
       assertThat(orders.inviterCommissions(scoped.withProductKeyword("Other"), FROM, UNTIL))
-          .isEmpty();
+          .singleElement()
+          .satisfies(value -> assertThat(value.actual()).isZero());
       var evidence = session.getMapper(OrderEvidenceMapper.class);
       var selection = new Selection(productScope, null, 9L, null, null, FROM, UNTIL);
       assertThat(evidence.count(selection, Kind.ORDERS)).isEqualTo(1L);
       assertThat(evidence.daily(selection))
           .singleElement()
           .satisfies(day -> assertThat(day.sales()).isEqualByComparingTo("60"));
-      jdbc.update(
-          """
-          INSERT INTO crm_commission_item_state (id, tenant_id, order_id, order_item_id, kol_id,
-            source_key, settlement_state, verified, accrued_commission_cny, release_basis,
-            create_time, update_time)
-          VALUES (702, 4, 1, 2, 11, 't144-unverified', 'UNKNOWN', FALSE, 0, 'UNVERIFIED', now(), now())
-          """);
+      jdbc.update("UPDATE crm_commission_item_state SET is_deleted = TRUE WHERE id = 702");
       session.clearCache();
       assertThat(orders.inviterCommissions(productScope, FROM, UNTIL)).isEmpty();
       assertThat(orders.inviterCreatorCommissions(productScope, FROM, UNTIL)).isEmpty();

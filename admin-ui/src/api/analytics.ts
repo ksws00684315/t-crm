@@ -3,6 +3,7 @@ import type { DisplayRelationStatus } from "@/api/types";
 
 export type Board = "shop-performance" | "best-sellers" | "kol-ranking" | "inviter-performance";
 export type Scalar = number | string;
+export type CreatorIncomeStatus = "PROMOTING" | "INVALID";
 export type Metric =
   | "paidOrderCount"
   | "units"
@@ -18,12 +19,14 @@ export type Metrics = Record<Metric, Scalar | null>;
 export interface Filters {
   startDate: string;
   endDate: string;
+  cumulative?: boolean;
   channel?: "WEIDIAN";
   shopId?: string;
   kolId?: string;
   inviterId?: string;
   keyword?: string;
   creatorKeyword?: string;
+  creatorStatus?: CreatorIncomeStatus;
   productKeyword?: string;
   inviterKeyword?: string;
   affiliateOnly?: boolean;
@@ -71,11 +74,15 @@ export interface Summary {
     totalCommission: Scalar | null;
     commissionBeforeClawback: Scalar | null;
     commissionClawback: Scalar | null;
+    expenseThrough?: string | null;
+    paidCommission?: Scalar | null;
+    paidPrepay?: Scalar | null;
+    cumulativeExpense?: Scalar | null;
   };
 }
 export interface Meta {
-  period: Pick<Filters, "startDate" | "endDate">;
-  previousPeriod: Pick<Filters, "startDate" | "endDate">;
+  period: Pick<Filters, "startDate" | "endDate" | "cumulative">;
+  previousPeriod: Pick<Filters, "startDate" | "endDate"> | null;
   timezone: string;
   filters: Omit<Filters, "startDate" | "endDate">;
   dataScope: "ALL" | "OWN";
@@ -112,8 +119,8 @@ export interface RankRow {
 export interface AnalyticsResult {
   meta: Meta;
   summary: Summary;
-  previous: Summary | Metrics;
-  change: Metrics;
+  previous: Summary | Metrics | null;
+  change: Metrics | null;
   ranking: { items: RankRow[]; total: Scalar; page: number; size: number };
   unavailable: { field: string; reason: string }[];
   sortBy: string;
@@ -134,6 +141,7 @@ export interface DetailSortQuery {
 export interface EvidenceRow {
   id: string;
   orderNo: string;
+  shopId?: string;
   refundNo?: string;
   product?: string;
   sku?: string;
@@ -142,6 +150,7 @@ export interface EvidenceRow {
   refundAmount?: Scalar;
   netTransactionAmount?: Scalar;
   eventTime: string;
+  orderPaidAt?: string | null;
   creatorName?: string;
   creatorCode?: string | null;
   spuId?: string;
@@ -164,6 +173,52 @@ export interface SettlementFlowRow {
   amount: Scalar | null;
   eventTime: string;
 }
+export type CreatorIncomeOrder = Pick<
+  EvidenceRow,
+  | "id"
+  | "orderNo"
+  | "shopId"
+  | "shopName"
+  | "eventTime"
+  | "amount"
+  | "refundAmount"
+  | "netTransactionAmount"
+> & { estimatedCommission: Scalar | null };
+
+export function queryCreatorIncomeOrders(
+  params: DetailQuery & Partial<DetailSortQuery> & { page: number; size: number }
+) {
+  return http.request<{ items: CreatorIncomeOrder[]; total: Scalar; page: number; size: number }>({
+    method: "get",
+    url: "/stats/creator-income/orders",
+    params
+  });
+}
+
+export interface CreatorFundFlow {
+  id: string;
+  fundType: "COMMISSION" | "PREPAY";
+  direction: "INCREASE" | "DECREASE";
+  orderNo: string | null;
+  amount: string;
+  status: "FROZEN" | "AVAILABLE" | "WITHDRAWN" | "CLAWBACK" | "PREPAID";
+  settlementNo: string | null;
+  occurredAt: string;
+}
+
+export function queryCreatorFundFlows(
+  params: Pick<DetailQuery, "startDate" | "endDate" | "cumulative" | "shopId" | "entityId"> & {
+    page: number;
+    size: number;
+  }
+) {
+  return http.request<{ items: CreatorFundFlow[]; total: Scalar; page: number; size: number }>({
+    method: "get",
+    url: "/stats/creator-income/fund-flows",
+    params
+  });
+}
+
 export function queryShopSettlementFlows(params: DetailQuery & { page: number; size: number }) {
   return http.request<{ items: SettlementFlowRow[]; total: Scalar; page: number; size: number }>({
     method: "get",
@@ -193,6 +248,16 @@ export interface InviterDetailOverview {
   settlementAmount: Scalar | null;
   orderCounts: OrderCounts | null;
 }
+export interface CreatorIncomeOverview {
+  metrics: Metrics;
+  dailyNetSales: { day: string; netSales: Scalar }[];
+  through: string;
+  cumulativeSales: Scalar;
+  cumulativeRefunds: Scalar;
+  cumulativeNetSales: Scalar;
+  totalCommission: Scalar | null;
+  funds: { frozen: Scalar; available: Scalar; withdrawn: Scalar; prepaid: Scalar | null } | null;
+}
 interface DetailResult {
   daily: DailyAmount[] | null;
   activity: { items: EvidenceRow[]; total: Scalar; page: number; size: number } | null;
@@ -200,13 +265,19 @@ interface DetailResult {
   productOrderCounts?: OrderCounts | null;
   creatorOverview?: CreatorDetailOverview | null;
   inviterOverview?: InviterDetailOverview | null;
+  incomeOverview?: CreatorIncomeOverview | null;
 }
 export function queryAnalyticsDetail(
   board: Board,
   params: DetailQuery &
-    Partial<DetailSortQuery> & { kind?: ActivityKind; page?: number; size?: number }
+    Partial<DetailSortQuery> & { kind?: ActivityKind; page?: number; size?: number },
+  income = false
 ) {
-  return http.request<DetailResult>({ method: "get", url: `/stats/${board}/details`, params });
+  return http.request<DetailResult>({
+    method: "get",
+    url: `/stats/${income ? "creator-income" : board}/details`,
+    params
+  });
 }
 export type ProductBreakdown = "SKUS" | "CREATORS" | "SHOPS";
 export interface ProductGroup {
@@ -252,11 +323,18 @@ export function queryInviterCreators(
     params
   });
 }
-export function queryAnalytics(board: Board, params: RankingQuery) {
-  return http.request<AnalyticsResult>({ method: "get", url: `/stats/${board}`, params });
+export function queryAnalytics(board: Board, params: RankingQuery, income = false) {
+  return http.request<AnalyticsResult>({
+    method: "get",
+    url: `/stats/${income ? "creator-income" : board}`,
+    params
+  });
 }
-export function analyticsOptions() {
-  return http.request<Options>({ method: "get", url: "/stats/options" });
+export function analyticsOptions(income = false) {
+  return http.request<Options>({
+    method: "get",
+    url: income ? "/stats/creator-income/options" : "/stats/options"
+  });
 }
 export function exportAnalytics(board: Board, params: RankingQuery) {
   return http.download({ method: "get", url: `/stats/${board}/exports`, params });

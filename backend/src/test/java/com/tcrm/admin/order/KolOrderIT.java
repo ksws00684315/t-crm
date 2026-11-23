@@ -307,42 +307,46 @@ class KolOrderIT {
   @Test
   void shouldSummariseOrdersByRefundStatesWithTheListFilters() throws Exception {
     // Task 115 §2.4 (amount terms §5a): the four summary cards over the same orders the list
-    // shows, refund states included.
-    // Order 1007 (pay 150.00) is refunding: its whole pay amount counts as estimated refund.
+    // shows. 计佣金额 and 预估总佣金 come from the verified product-line snapshots, so every line of a
+    // counted order needs one; 成功退款金额 counts concluded refunds only.
     order(1007, 1L, "W99000107", kolA, "COMPLETED", PAY_B);
     item(2011, 1007, 1L, kolA, "Settled Widget", "100.00");
     item(2012, 1007, 1L, kolA, "Frozen Widget", "40.00");
-    item(2013, 1007, 1L, kolA, "Unverified Widget", "60.00");
-    commissionState(3011, 1007, 2011, kolA, "10.00", "10.00");
-    commissionState(3012, 1007, 2012, kolA, "4.00", "0.00");
+    item(2013, 1007, 1L, kolA, "Refunding Widget", "10.00");
+    commissionState(3011, 1007, 2011, kolA, "100.00", "0.00", "10.00", "10.00");
+    commissionState(3012, 1007, 2012, kolA, "40.00", "0.00", "4.00", "0.00");
+    commissionState(3013, 1007, 2013, kolA, "10.00", "0.00", "1.00", "0.00");
+    commissionState(3001, 1001, 2001, kolA, "100.00", "0.00", "10.00", "0.00");
+    // Line 2002 (pay 50.00) carries the concluded 30.00 refund, so its basis is 20.00.
+    commissionState(3002, 1001, 2002, kolA, "50.00", "30.00", "2.00", "0.00");
     refund(7001, 1007, "R9900010701", "20.00", "PROCESSING", null);
-    // Order 1001 (pay 150.00) finished a partial refund: only the refunded 30 counts.
     refund(7002, 1001, "R9900010101", "30.00", "SUCCESS", Instant.parse("2026-10-17T00:00:00Z"));
     String token = kolLogin("a@example.test");
 
     mvc.perform(get("/kol-api/orders/summary").header(KOL_TOKEN, token))
         .andExpect(status().isOk())
-        // 订单销售额 = 150 + 150; 预估退款金额 = 150(退款中整单) + 30(已退); 计佣金额 = 300 − 180.
+        // 订单销售额 = 150 + 150; 成功退款 = 30; 计佣金额 = 100 + 20 + 100 + 40 + 10.
         .andExpect(jsonPath("$.data.orderSalesCny").value("300.00"))
-        .andExpect(jsonPath("$.data.estimatedRefundCny").value("180.00"))
-        .andExpect(jsonPath("$.data.commissionBaseCny").value("120.00"))
-        // 预估总佣金 sums the rows' commission amounts (10 + 4; the unverified line has none).
-        .andExpect(jsonPath("$.data.estimatedCommissionCny").value("14.00"));
+        .andExpect(jsonPath("$.data.estimatedRefundCny").value("30.00"))
+        .andExpect(jsonPath("$.data.commissionBaseCny").value("270.00"))
+        // 预估总佣金 sums the verified lines' accruals (10 + 2 + 10 + 4 + 1).
+        .andExpect(jsonPath("$.data.estimatedCommissionCny").value("27.00"));
     // The summary follows the list filters: product name, order number and status.
     mvc.perform(
             get("/kol-api/orders/summary").param("productName", "frozen").header(KOL_TOKEN, token))
         .andExpect(status().isOk())
-        // Refunding order: the whole pay amount is held back and the commission base is zero.
+        // The open refund on order 1007 deducts nothing: the base sums its three line bases.
         .andExpect(jsonPath("$.data.orderSalesCny").value("150.00"))
-        .andExpect(jsonPath("$.data.estimatedRefundCny").value("150.00"))
-        .andExpect(jsonPath("$.data.commissionBaseCny").value("0.00"))
-        .andExpect(jsonPath("$.data.estimatedCommissionCny").value("14.00"));
+        .andExpect(jsonPath("$.data.estimatedRefundCny").value("0.00"))
+        .andExpect(jsonPath("$.data.commissionBaseCny").value("150.00"))
+        .andExpect(jsonPath("$.data.estimatedCommissionCny").value("15.00"));
     mvc.perform(get("/kol-api/orders/summary").param("orderNo", "0101").header(KOL_TOKEN, token))
         .andExpect(status().isOk())
+        // The concluded 30.00 refund already sits in line 2002's basis: 100 + 20.
         .andExpect(jsonPath("$.data.orderSalesCny").value("150.00"))
         .andExpect(jsonPath("$.data.estimatedRefundCny").value("30.00"))
         .andExpect(jsonPath("$.data.commissionBaseCny").value("120.00"))
-        .andExpect(jsonPath("$.data.estimatedCommissionCny").value("0.00"));
+        .andExpect(jsonPath("$.data.estimatedCommissionCny").value("12.00"));
     mvc.perform(
             get("/kol-api/orders/summary")
                 .param("settlementStatus", "WITHDRAWABLE")
@@ -350,8 +354,8 @@ class KolOrderIT {
         .andExpect(status().isOk())
         // Only order 1007 has a WITHDRAWABLE line.
         .andExpect(jsonPath("$.data.orderSalesCny").value("150.00"))
-        .andExpect(jsonPath("$.data.commissionBaseCny").value("0.00"))
-        .andExpect(jsonPath("$.data.estimatedCommissionCny").value("14.00"));
+        .andExpect(jsonPath("$.data.commissionBaseCny").value("150.00"))
+        .andExpect(jsonPath("$.data.estimatedCommissionCny").value("15.00"));
     mvc.perform(
             get("/kol-api/orders/summary")
                 .param("payFrom", "2026-10-16T00:00:00Z")
@@ -370,11 +374,13 @@ class KolOrderIT {
   void shouldKeepTheOrderSummaryOwnAndInCompany() throws Exception {
     // kolB owns order 1002 only (pay 150.00); the 70.00 line on kolA's order 1001 does not count.
     String tokenB = kolLogin("b@example.test");
+    commissionState(3021, 1002, 2004, kolB, "30.00", "0.00", "0.00", "0.00");
     mvc.perform(get("/kol-api/orders/summary").header(KOL_TOKEN, tokenB))
         .andExpect(status().isOk())
         .andExpect(jsonPath("$.data.orderSalesCny").value("150.00"))
         .andExpect(jsonPath("$.data.estimatedRefundCny").value("0.00"))
-        .andExpect(jsonPath("$.data.commissionBaseCny").value("150.00"))
+        // The base is the verified line, not the order pay amount with kolA's other lines in it.
+        .andExpect(jsonPath("$.data.commissionBaseCny").value("30.00"))
         .andExpect(jsonPath("$.data.estimatedCommissionCny").value("0.00"));
     // Unpaid order 1003 and the other company's order 1004 never count for kolA.
     String tokenA = kolLogin("a@example.test");
@@ -384,19 +390,34 @@ class KolOrderIT {
     mvc.perform(get("/kol-api/orders/summary")).andExpect(status().isUnauthorized());
   }
 
+  /**
+   * One verified product-line snapshot. The source basis and its successful refunds are explicit
+   * because 计佣金额 sums {@code basis − refund}, not the order pay amount.
+   */
   private void commissionState(
-      long id, long orderId, long itemId, long kolId, String accrued, String released) {
+      long id,
+      long orderId,
+      long itemId,
+      long kolId,
+      String basis,
+      String successfulRefund,
+      String accrued,
+      String released) {
     boolean releasedLine = new BigDecimal(released).signum() > 0;
     jdbc.update(
         "INSERT INTO crm_commission_item_state(id,tenant_id,order_id,order_item_id,kol_id,"
-            + "source_key,settlement_state,verified,accrued_commission_cny,"
-            + "released_commission_cny,release_basis,is_deleted,create_time,update_time)"
-            + " VALUES(?,1,?,?,?,?,?,TRUE,?,?,?,FALSE,now(),now())",
+            + "source_key,basis_cny,successful_refund_cny,basis_includes_refund,settlement_state,"
+            + "verified,accrued_commission_cny,released_commission_cny,release_basis,is_deleted,"
+            + "create_time,update_time)"
+            + " VALUES(?,1,?,?,?,?,?,?,?,?,TRUE,?,?,?,FALSE,now(),now())",
         id,
         orderId,
         itemId,
         kolId,
         "it-" + id,
+        new BigDecimal(basis),
+        new BigDecimal(successfulRefund),
+        false,
         releasedLine ? "CONFIRMED" : "UNSETTLED",
         new BigDecimal(accrued),
         new BigDecimal(released),

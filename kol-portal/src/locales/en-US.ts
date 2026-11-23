@@ -200,11 +200,11 @@ const enUS = {
   orders: {
     title: "My orders",
     summaryOrderSales: "Order sales",
-    summaryEstimatedRefund: "Estimated refund",
+    summaryEstimatedRefund: "Successful refunds",
     summaryCommissionBase: "Commission base",
     summaryEstimatedCommission: "Estimated commission",
     summaryNote:
-      "Commission base = order sales − estimated refund. Estimated refund: a refunding order counts its full pay amount, a concluded one counts what was refunded. Estimated commission sums the rows' estimated commissions.",
+      "Successful refunds use confirmed refund amounts. The commission base uses verified item amounts after refunds. Estimated commission uses each item’s locked payment-time rate. Open after-sales retains accrued commission.",
     summaryFailed: "The summary could not be loaded.",
     summaryRetry: "Retry",
     dateRange: "Date range",
@@ -227,7 +227,7 @@ const enUS = {
     splitHint: "This order contains settlement amounts in more than one state.",
     afterSales: "After-sales",
     afterSalesHint:
-      "After-sales in progress: no commission is counted for now; released commission stays frozen and is reduced by the refund amount once the refund succeeds",
+      "Open after-sales retains accrued commission and blocks release for the whole order. Confirmed refunds reduce commission on the affected items.",
     settlement: {
       WITHDRAWN: "Withdrawn",
       FROZEN: "Frozen",

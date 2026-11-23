@@ -215,6 +215,7 @@ const orderDetail: OrderDetailVO = {
   kolId: "201",
   kolName: "Zoe",
   kolCode: "KOL-ZS01",
+  inviterName: "BD Demo",
   orderStatus: "PAID",
   refundStatus: "PARTIAL_SUCCESS",
   attributionStatus: "ATTRIBUTED",
@@ -334,15 +335,20 @@ describe("order chain page (task 40)", () => {
     const text = wrapper.text();
     expect(text).not.toContain("LC001");
     const orderNode = wrapper.get('[data-test="chain-stage-order"]');
-    expect(orderNode.text()).toContain("2026102100001");
-    expect(text).toContain("7900222333");
+    expect(orderNode.text()).toContain("¥180.00");
+    expect(text).not.toContain("7900222333");
     expect(text).not.toContain("8001");
-    expect(text).toContain("9001");
+    expect(text).not.toContain("9001");
     const header = wrapper.get('[data-test="chain-header"]');
-    expect(header.text()).toContain("订单信息");
+    expect(header.get("h1").text()).toBe("订单信息");
+    expect(header.findAll("dl").map(row => row.findAll("dt").map(label => label.text()))).toEqual([
+      ["渠道", "店铺", "下单时间", "支付时间"],
+      ["达人名", "达人ID", "佣金比例", "邀请人"]
+    ]);
+    expect(header.text()).toContain("BD Demo");
     const creators = header.get('[data-test="chain-creators"]');
     expect(creators.get('[data-test="identity-name"]').text()).toBe("Zoe");
-    const code = creators.get('[data-test="identity-code"]');
+    const code = header.get('[data-test="identity-code"]');
     expect(code.get('[data-test="value"]').text()).toBe("KOL-ZS01");
     expect(code.find('[data-test="copy"]').exists()).toBe(true);
     expect(text).toContain("t40 Shop（S001）");
@@ -369,60 +375,30 @@ describe("order chain page (task 40)", () => {
       "Zoe",
       "Lena"
     ]);
-    expect(creators.findAll('[data-test="value"]').map(code => code.text())).toEqual([
-      "KOL-ZS01",
-      "KOL-LN02"
-    ]);
-    expect(creators.findAll('[data-test="copy"]')).toHaveLength(2);
+    expect(
+      wrapper
+        .get('[data-test="chain-header"]')
+        .findAll('[data-test="identity-code"] [data-test="value"]')
+        .map(code => code.text())
+    ).toEqual(["KOL-ZS01", "KOL-LN02"]);
+    expect(wrapper.findAll('[data-test="identity-code"] [data-test="copy"]')).toHaveLength(2);
     wrapper.unmount();
   });
 
-  it("shows product IDs only with their respective item rows, and keeps the copy job in the journey", async () => {
+  it("shows each task with its measured status in the five-stage journey", async () => {
     signIn("SUPER_ADMIN", ["order:view"]);
-    const [first, second] = chain.lines;
-    vi.mocked(orderApi.getOrderChain).mockResolvedValue({
-      ...chain,
-      lines: [
-        first,
-        {
-          ...second,
-          link: {
-            ...first.link!,
-            kolItemId: "702",
-            linkCode: "LC002",
-            sourceItemId: "7900222444",
-            targetItemId: "9002"
-          }
-        }
-      ]
-    });
-    const { wrapper, router } = await mountPage();
+    const { wrapper } = await mountPage();
     const journey = wrapper.get('[data-test="chain-order-info"]');
-    expect(journey.find("details, a").exists()).toBe(false);
-    expect(journey.get('[data-test="chain-stage-source"]').text()).toBe("原商品已关联");
-    expect(journey.get('[data-test="chain-stage-link"]').text()).toBe("达人商品链接已生成");
+    expect(journey.findAll(".chain-stages > li")).toHaveLength(5);
     const copyJob = journey.get('[data-test="chain-stage-copy"]');
     expect(copyJob.get('[data-test="value"]').text()).toBe("JOB-20261020-01");
     expect(journey.findAll("button").map(button => button.attributes("data-test"))).toEqual([
       "copy"
     ]);
-    await copyJob.trigger("click");
-    expect(router.currentRoute.value.name).toBe("OrderChain");
-
-    const rows = wrapper.get('[data-test="chain-product-summary"]').findAll("tbody tr");
-    expect(rows).toHaveLength(2);
-    for (const [index, ids] of [
-      [0, ["9001", "7900222333"]],
-      [1, ["9002", "7900222444"]]
-    ] as const) {
-      const row = rows[index];
-      expect(row.findAll('[data-test="value"]').map(value => value.text())).toEqual([...ids]);
-      expect(row.findAll('[data-test="copy"]')).toHaveLength(2);
-    }
     wrapper.unmount();
   });
 
-  it("renders the item fields directly and keeps both platform IDs in the product cell", async () => {
+  it("shows the nine requested item columns and net sales after the line refund", async () => {
     signIn("SUPER_ADMIN", ["order:view"]);
     saveTablePrefs("chain-order-items", defaultPrefs(["status", "product", "sku"], 20));
     const { wrapper } = await mountPage();
@@ -430,16 +406,13 @@ describe("order chain page (task 40)", () => {
     expect(summary.findAll("thead th").map(item => item.text())).toEqual([
       "商品图",
       "商品名/SKU",
-      "新商品ID/原商品ID",
       "状态",
       "单价",
       "件数",
-      "商品总价",
-      "运费",
+      "总价",
       "实付金额",
-      "佣金比例",
-      "预估佣金",
-      "提现占用"
+      "退款金额",
+      "净销售额"
     ]);
     const rows = summary.findAll("tbody tr");
     expect(rows).toHaveLength(2);
@@ -449,26 +422,19 @@ describe("order chain page (task 40)", () => {
     expect(rows[0].text()).toContain("t40 Item");
     expect(rows[0].text()).toContain("Blue / L");
     const cells = rows[0].findAll("td");
-    expect(cells[2]?.text()).toContain("新商品ID9001");
-    expect(cells[2]?.text()).toContain("原商品ID7900222333");
-    expect(cells[3]?.classes()).toContain("is-left");
-    expect(summary.findAll("thead th")[3]?.classes()).toContain("is-left");
-    expect(rows[1].text()).toContain("9002");
-    expect(rows[1].text()).toContain("—");
+    expect(cells[2]?.classes()).toContain("is-left");
+    expect(summary.findAll("thead th")[2]?.classes()).toContain("is-left");
+    expect(cells.slice(6).map(cell => cell.text())).toEqual(["¥120.00", "¥20.00", "¥100.00"]);
     expect(summary.findAll('[data-test="chain-item-total"]').map(cell => cell.text())).toEqual([
       "¥120.00",
       "¥60.00"
     ]);
-    expect(summary.findAll('tbody [data-test="chain-order-freight"]')).toHaveLength(1);
-    const freightCell = rows[0].get('td[rowspan="2"]');
-    expect(freightCell.get('[data-test="chain-order-freight"]').text()).toContain("¥5.00");
-    expect(freightCell.text()).toContain("整单");
     expect(summary.find('[data-test="identity-code"]').exists()).toBe(false);
     expect(summary.find("details").exists()).toBe(false);
     wrapper.unmount();
   });
 
-  it("marks a supplemented rate on the corresponding product row", async () => {
+  it("marks a supplemented commission rate in the order header", async () => {
     signIn("SUPER_ADMIN", ["order:view", "commission:view"]);
     const supplemented: OrderChainVO = {
       ...financedChain,
@@ -505,11 +471,10 @@ describe("order chain page (task 40)", () => {
         .findAll(".chain-page > section[data-test]")
         .map(section => section.attributes("data-test"))
     ).toEqual(["chain-order-info", "chain-product-details", "chain-reconciliation"]);
-    expect(wrapper.findAll(".chain-stages > li")).toHaveLength(7);
+    expect(wrapper.findAll(".chain-stages > li")).toHaveLength(5);
     const withdrawalNode = wrapper.get('[data-test="chain-stage-withdrawal"]').text();
     expect(withdrawalNode).toContain("提现中");
-    expect(withdrawalNode).toContain("提现中 1 笔");
-    expect(withdrawalNode).toContain("已提现 1 笔");
+    expect(withdrawalNode).toContain("¥16.00");
     const band = wrapper.get('[data-test="chain-header"]').text();
     expect(band).toContain("2026102100001");
     expect(band).not.toContain("7900222333");
@@ -517,10 +482,7 @@ describe("order chain page (task 40)", () => {
 
     const finance = wrapper.get('[data-test="chain-reconciliation"]');
     expect(finance.get("h2").text()).toBe("资金变动");
-    const funds = finance.get('[data-test="chain-funds"]').text();
-    expect(funds).toContain("微店结算金额¥160.00");
-    expect(funds).toContain("¥10.00");
-    expect(funds).not.toContain("已入账");
+    expect(finance.find('[data-test="chain-funds"]').exists()).toBe(false);
     const flows = finance.get('[data-test="chain-flows"]');
     expect(finance.findAll("table thead")).toHaveLength(1);
     expect(flows.findAll("thead th").map(item => item.text())).toEqual([
@@ -528,37 +490,38 @@ describe("order chain page (task 40)", () => {
       "方向",
       "金额",
       "状态",
-      "结算/发生/付款时间",
+      "变动时间",
       "结算单号/提现单号"
     ]);
     const rows = flows.findAll("tbody tr").map(row => row.findAll("td").map(cell => cell.text()));
-    expect(rows).toHaveLength(5);
-    expect(rows[0].slice(0, 4)).toEqual(["货款", "应收增加", "+¥180.00", "已结算"]);
+    expect(rows).toHaveLength(4);
+    expect(rows[0].slice(0, 4)).toEqual(["货款", "应收增加", "+¥180.00", "可结算"]);
     expect(rows[0][5]).toBe("WD-SETTLEMENT-1");
     expect(rows[1]).toEqual([
       "货款",
       "应收减少",
       "-¥20.00",
-      "已结算",
+      "已退款",
       formatInstant("2026-10-22T00:00:00Z"),
       "—"
     ]);
     expect(rows[2]).toEqual([
       "佣金",
-      "支出",
+      "应付减少",
       "-¥11.00",
-      "已结算",
+      "平台已支出",
       formatInstant("2026-10-23T00:00:00Z"),
       "—"
     ]);
-    expect(rows[3].slice(0, 4)).toEqual(["佣金", "支出", "-¥10.00", "已提现"]);
+    expect(rows[3].slice(0, 4)).toEqual(["佣金", "应付减少", "-¥10.00", "部分已提现"]);
     expect(rows[3][4]).not.toBe("—");
-    expect(rows[3][5]).toBe("W20261023000001");
-    expect(rows[4]).toEqual(["佣金", "待支出", "¥6.00", "提现中", "—", "W20261025000002"]);
+    expect(rows[3][5]).toContain("W20261023000001");
+    expect(rows[3][5]).toContain("W20261025000002");
     const flowRows = flows.findAll("tbody tr");
     expect(flowRows[0].findAll("td")[1]?.find(".el-tag").exists()).toBe(false);
     expect(flowRows[0].get(".chain-money--positive").text()).toBe("+¥180.00");
-    expect(flowRows[3].get(".chain-money--negative").text()).toBe("-¥10.00");
+    expect(flowRows[1].get(".chain-money--negative").text()).toBe("-¥20.00");
+    expect(flowRows[3].get(".chain-money--positive").text()).toBe("-¥10.00");
     expect(flowRows[3].get(".chain-fund-tag--commission").text()).toBe("佣金");
     expect(flows.text()).not.toContain("待支付");
     expect(flows.text()).not.toContain("W20261025000003");
@@ -576,13 +539,55 @@ describe("order chain page (task 40)", () => {
       )
     });
     const { wrapper } = await mountPage();
+    const flows = wrapper.get('[data-test="chain-flows"]');
+    expect(flows.text()).not.toContain("¥3.00");
+    expect(flows.text()).not.toContain("待提现");
+    wrapper.unmount();
+  });
+
+  it("shows only the two payment events for a paid order with frozen commission", async () => {
+    signIn("SUPER_ADMIN", ["order:view", "commission:view"]);
+    const payment = {
+      orderItemId: null,
+      shopName: "t40 Shop",
+      direction: "INCREASE" as const,
+      businessAt: "2026-10-21T00:00:00Z",
+      transferredAt: null,
+      withdrawalNo: null,
+      orderStatus: "PENDING_SETTLEMENT"
+    };
+    vi.mocked(orderApi.getOrderChain).mockResolvedValue({
+      ...financedChain,
+      funds: {
+        ...financedChain.funds!,
+        payAmount: "150.00",
+        kolCommission: "30.00",
+        financeStatus: "FROZEN"
+      },
+      lines: financedChain.lines.map(line => ({
+        ...line,
+        commission: { ...line.commission!, occupiedTotal: "0.00", withdrawals: [] }
+      })),
+      weidianReconciliation: { settlementAmount: null, settlementAt: null, flows: [] },
+      financeFlows: [
+        { ...payment, flowNo: "SR1", type: "SHOP_RECEIVABLE", amount: "150.00" },
+        { ...payment, flowNo: "CA1", type: "COMMISSION_ACCRUAL", amount: "30.00" }
+      ]
+    });
+    const { wrapper } = await mountPage();
     const rows = wrapper.get('[data-test="chain-flows"]').findAll("tbody tr");
-    expect(rows.map(row => row.findAll("td").map(cell => cell.text()))).toEqual(
-      expect.arrayContaining([
-        ["佣金", "—", "¥3.00", "冻结中", "—", "—"],
-        ["佣金", "—", "¥6.00", "待提现", "—", "—"]
-      ])
-    );
+    expect(
+      rows.map(row =>
+        row
+          .findAll("td")
+          .map(cell => cell.text())
+          .slice(0, 4)
+      )
+    ).toEqual([
+      ["货款", "应收增加", "¥150.00", "冻结中"],
+      ["佣金", "应付增加", "¥30.00", "冻结中"]
+    ]);
+    expect(rows[1].get(".chain-money--negative").text()).toBe("¥30.00");
     wrapper.unmount();
   });
 
@@ -590,10 +595,8 @@ describe("order chain page (task 40)", () => {
     signIn("STAFF", ["order:view"]);
     vi.mocked(orderApi.getOrderChain).mockResolvedValue(financedChain);
     const { wrapper } = await mountPage();
-    expect(wrapper.get('[data-test="chain-funds"]').text()).toContain("¥180.00");
-    expect(wrapper.get('[data-test="chain-funds"]').text()).not.toContain("¥11.00");
     expect(wrapper.get('[data-test="chain-product-summary"]').text()).not.toContain("10%");
-    expect(wrapper.get('[data-test="chain-product-summary"]').text()).toContain("无权限查看佣金");
+    expect(wrapper.get('[data-test="chain-header"]').text()).toContain("当前账号无佣金查看权限");
     expect(wrapper.get('[data-test="chain-stage-withdrawal"]').text()).not.toContain("W202610");
     expect(wrapper.find('[data-test="chain-flows-no-permission"]').exists()).toBe(true);
     expect(wrapper.find('[data-test="chain-flows"]').exists()).toBe(false);
@@ -608,7 +611,7 @@ describe("order chain page (task 40)", () => {
         ...financedChain.funds!,
         financeStatus: "REFUNDING",
         financeAmount: "26.00",
-        kolCommission: "0.00",
+        kolCommission: "26.00",
         commissionStatus: "FROZEN"
       },
       financeFlows: [],
@@ -622,16 +625,71 @@ describe("order chain page (task 40)", () => {
       commission: { ...financedDetail.commission!, afterSales: true }
     });
     const { wrapper } = await mountPage();
-    const rows = wrapper.get('[data-test="chain-flows"]').findAll("tbody tr");
-    expect(rows.map(row => row.findAll("td").map(cell => cell.text()))).toContainEqual([
-      "佣金",
-      "—",
-      "¥26.00",
-      "冻结中",
-      "—",
-      "—"
-    ]);
+    expect(wrapper.get('[data-test="chain-flows"]').text()).not.toContain("¥26.00");
     expect(wrapper.get('[data-test="chain-stage-withdrawal"]').text()).toContain("冻结中");
+    wrapper.unmount();
+  });
+
+  it("shows one refund after completion and one payout row after commission release", async () => {
+    signIn("SUPER_ADMIN", ["order:view", "commission:view"]);
+    const common = {
+      orderItemId: "301",
+      shopName: "t40 Shop",
+      transferredAt: null,
+      withdrawalNo: null
+    };
+    vi.mocked(orderApi.getOrderChain).mockResolvedValue({
+      ...financedChain,
+      financeFlows: [
+        ...financedChain.financeFlows!,
+        {
+          ...common,
+          flowNo: "SRA1",
+          type: "REFUND_REQUEST",
+          direction: null,
+          orderStatus: "REFUNDING",
+          amount: "20.00",
+          businessAt: "2026-10-21T10:00:00Z"
+        },
+        {
+          ...common,
+          flowNo: "SRF1",
+          type: "SHOP_RECEIVABLE",
+          direction: "DECREASE",
+          orderStatus: "DEDUCTION",
+          amount: "20.00",
+          businessAt: "2026-10-22T00:00:00Z"
+        },
+        {
+          ...common,
+          flowNo: "WS1",
+          type: "ORDER_SETTLEMENT",
+          direction: null,
+          orderStatus: "SETTLEABLE",
+          amount: "160.00",
+          businessAt: "2026-10-23T00:00:00Z"
+        }
+      ]
+    });
+    const { wrapper } = await mountPage();
+    const rows = wrapper
+      .get('[data-test="chain-flows"]')
+      .findAll("tbody tr")
+      .map(row =>
+        row
+          .findAll("td")
+          .map(cell => cell.text())
+          .slice(0, 4)
+      );
+    expect(rows).not.toContainEqual(["货款", "—", "¥20.00", "退款中"]);
+    expect(
+      rows.filter(row => row[0] === "佣金" && ["可提现", "部分已提现"].includes(row[3]))
+    ).toEqual([["佣金", "应付减少", "-¥10.00", "部分已提现"]]);
+    expect(rows.filter(row => row[2] === "-¥20.00")).toEqual([
+      ["货款", "应收减少", "-¥20.00", "已退款"]
+    ]);
+    expect(rows).toContainEqual(["货款", "—", "¥160.00", "可结算"]);
+    expect(rows).not.toContainEqual(["货款", "应收增加", "+¥180.00", "可结算"]);
     wrapper.unmount();
   });
 
@@ -643,7 +701,6 @@ describe("order chain page (task 40)", () => {
     });
     const { wrapper } = await mountPage();
     expect(wrapper.get('[data-test="chain-stage-settlement"]').text()).toContain("待核实");
-    expect(wrapper.get('[data-test="chain-funds"]').text()).toContain("微店结算金额—待核实");
     wrapper.unmount();
   });
 
@@ -662,7 +719,6 @@ describe("order chain page (task 40)", () => {
       )
     });
     const { wrapper, router } = await mountPage();
-    expect(wrapper.get('[data-test="chain-funds"]').text()).toContain("¥15.00");
     const rows = wrapper.get('[data-test="chain-flows"]').findAll("tbody tr");
     const paidRows = rows.filter(row => row.text().includes(paid.applicationNo));
     expect(paidRows).toHaveLength(1);
@@ -687,7 +743,7 @@ describe("order chain page (task 40)", () => {
     const rows = wrapper
       .get('[data-test="chain-product-summary"]')
       .findAll("tbody tr")
-      .map(row => row.findAll("td")[4]?.text());
+      .map(row => row.findAll("td")[3]?.text());
     expect(rows).toEqual(["缺失历史售价", "¥60.00"]);
     wrapper.unmount();
   });
@@ -735,10 +791,9 @@ describe("order chain page (task 40)", () => {
     const { wrapper } = await mountPage();
     expect(wrapper.find('[data-test="chain-flows-incomplete"]').exists()).toBe(true);
     const flows = wrapper.get('[data-test="chain-flows"]');
-    expect(flows.findAll("tbody tr")).toHaveLength(2);
+    expect(flows.findAll("tbody tr")).toHaveLength(1);
     expect(flows.text()).toContain("W20261023000001");
     expect(flows.text()).not.toContain("货款");
-    expect(wrapper.get('[data-test="chain-funds"]').text()).not.toContain("¥16.00");
     wrapper.unmount();
   });
 
@@ -754,14 +809,8 @@ describe("order chain page (task 40)", () => {
     });
     const { wrapper } = await mountPage();
     const reconciliation = wrapper.get('[data-test="chain-reconciliation"]');
-    expect(
-      reconciliation
-        .get('[data-test="chain-funds"]')
-        .findAll("dd")
-        .map(amount => amount.text())
-    ).toEqual(["¥180.00", "¥20.00", "¥160.00", "—", "¥10.00"]);
-    expect(reconciliation.text()).toContain("待结算");
-    expect(reconciliation.get('[data-test="chain-flows"]').findAll("tbody tr")).toHaveLength(2);
+    expect(wrapper.get('[data-test="chain-stage-settlement"]').text()).toContain("待结算");
+    expect(reconciliation.get('[data-test="chain-flows"]').findAll("tbody tr")).toHaveLength(1);
     wrapper.unmount();
   });
 
@@ -801,11 +850,10 @@ describe("order chain page (task 40)", () => {
     vi.mocked(orderApi.getOrder).mockRejectedValue(new Error("detail unavailable"));
     const { wrapper } = await mountPage();
     expect(wrapper.get('[data-test="chain-stage-refund"]').text()).toContain("¥20.00");
-    expect(wrapper.get('[data-test="chain-funds"]').text()).toContain("¥20.00");
     wrapper.unmount();
   });
 
-  it("explains a zero estimated commission while the order is in after-sales (task 113)", async () => {
+  it("explains that after-sales freezes accrued commission", async () => {
     signIn("SUPER_ADMIN", ["order:view", "commission:view"]);
     vi.mocked(orderApi.getOrderChain).mockResolvedValue(financedChain);
     vi.mocked(orderApi.getOrder).mockResolvedValue({
@@ -823,7 +871,7 @@ describe("order chain page (task 40)", () => {
         .get('[data-test="chain-stage-withdrawal"]')
         .get('[data-test="chain-after-sales"]')
         .text()
-    ).toBe("售后处理中，暂不计佣；已释放部分冻结，退款成功后按退款金额扣减");
+    ).toBe("售后处理中，佣金保留并冻结，退款成功后按对应商品行扣减");
     wrapper.unmount();
   });
 
@@ -854,9 +902,7 @@ describe("order chain page (task 40)", () => {
       .map(cell => cell.text());
     expect(totals).toEqual(["¥120.00", "¥60.00"]);
     expect(wrapper.get('[data-test="chain-item-total"]').text()).toBe("—");
-    const funds = wrapper.get('[data-test="chain-funds"]').text();
     expect(wrapper.get('[data-test="chain-product-summary"]').text()).toContain("缺失历史售价");
-    expect(funds).toContain("¥180.00");
     wrapper.unmount();
   });
 

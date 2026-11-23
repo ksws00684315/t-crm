@@ -109,9 +109,9 @@ class OrderCommissionSyncTest {
 
   @Test
   @SuppressWarnings("unchecked")
-  void shouldCarrySettlementRefundGapIntoSuccessfulRefundOnce() {
+  void shouldBlockReleaseWhenSettlementRefundHasNoItemEvidence() {
     // Goods income 6.00 matches pay 6.00; the flows show a refund 0.60 that no CRM record has.
-    // The gap is netted into the line's successful refund, the basis stays the pay amount.
+    // The gap blocks release while the basis stays the pay amount.
     when(refunds.selectList(any(LambdaQueryWrapper.class))).thenReturn(List.of());
     when(flows.listByRemoteOrderId(anyLong(), anyString()))
         .thenReturn(
@@ -129,15 +129,15 @@ class OrderCommissionSyncTest {
     OrderItemsCommissionEvent.ItemFacts facts = captor.getValue().items().getFirst();
     assertThat(facts.basisCny()).isEqualByComparingTo("6.00");
     assertThat(facts.basisIncludesRefund()).isFalse();
-    assertThat(facts.successfulRefundCny()).isEqualByComparingTo("0.60");
+    assertThat(facts.successfulRefundCny()).isEqualByComparingTo("0.00");
+    assertThat(facts.afterSales()).isTrue();
     assertThat(facts.basisCheckReason()).isNull();
   }
 
   @Test
   @SuppressWarnings("unchecked")
-  void shouldQueryOnlyProcessingAndUnknownRefundsAsAfterSales() {
-    // A successful refund is netted from the basis already (task 81 PR review, 2026-10-30), so only
-    // an unconcluded refund may block release.
+  void shouldQueryOpenAndUnallocatedSuccessfulRefunds() {
+    // A successful refund blocks only when its product line is unknown.
     when(refunds.selectList(any(LambdaQueryWrapper.class))).thenReturn(List.of());
     when(flows.listByRemoteOrderId(anyLong(), anyString())).thenReturn(List.of());
     TestTransactions.template()
@@ -149,8 +149,8 @@ class OrderCommissionSyncTest {
     LambdaQueryWrapper<RefundDO> wrapper = captor.getValue();
     assertThat(wrapper.getSqlSegment()).contains("refund_status IN");
     assertThat(wrapper.getParamNameValuePairs().values())
-        .contains("PROCESSING", "UNKNOWN")
-        .doesNotContain("SUCCESS");
+        .contains("PROCESSING", "UNKNOWN", "SUCCESS");
+    assertThat(wrapper.getSqlSegment()).contains("order_item_id IS NULL");
   }
 
   @Test
@@ -327,7 +327,7 @@ class OrderCommissionSyncTest {
 
   @Test
   @SuppressWarnings("unchecked")
-  void shouldCapRefundGapAtTheLineBasisWhenNoLineCanTakeMore() {
+  void shouldKeepAnOversizedUnmatchedRefundOutOfItemAmounts() {
     when(refunds.selectList(any(LambdaQueryWrapper.class))).thenReturn(List.of());
     when(flows.listByRemoteOrderId(anyLong(), anyString()))
         .thenReturn(
@@ -342,9 +342,9 @@ class OrderCommissionSyncTest {
     ArgumentCaptor<OrderItemsCommissionEvent> captor =
         ArgumentCaptor.forClass(OrderItemsCommissionEvent.class);
     verify(events).publishEvent(captor.capture());
-    // The line takes everything it has left (6.00 of the 10.00 gap); the basis is never negative.
     assertThat(captor.getValue().items().getFirst().successfulRefundCny())
-        .isEqualByComparingTo("6.00");
+        .isEqualByComparingTo("0.00");
+    assertThat(captor.getValue().items().getFirst().afterSales()).isTrue();
   }
 
   @Test

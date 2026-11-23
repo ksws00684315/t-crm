@@ -160,15 +160,7 @@ public class KolOrderService {
         filter.size());
   }
 
-  /**
-   * Sales summary over the same orders the list shows for these filters (paging ignored),
-   * amount-terms §5a (task 115). 订单销售额 sums the orders' pay amounts (freight and refunds included).
-   * 预估退款金额 adds the full pay amount of every order with an unconcluded refund (any refund row
-   * PROCESSING/UNKNOWN, the same rule the commission sync uses for after-sales) and the successful
-   * refund amount of the concluded ones. 计佣金额 is their difference, so it equals the sum of the
-   * per-order commission bases (§2.1). 预估总佣金 sums the rows' estimated commissions, i.e. the line
-   * commission amounts the list rows show.
-   */
+  /** Paid-order summary over the same filters as the list, using verified commission snapshots. */
   public KolOrderSummaryDTO summary(KolOrderFilterDTO filter) {
     if (invalidConditions(filter)) {
       throw new BusinessException(ErrorCode.COMMON_VALIDATION_FAILED);
@@ -210,50 +202,55 @@ public class KolOrderService {
       }
     }
     BigDecimal orderSales = BigDecimal.ZERO;
-    BigDecimal estimatedRefund = BigDecimal.ZERO;
+    BigDecimal completedRefunds = BigDecimal.ZERO;
     for (Long orderId : orderIds) {
-      BigDecimal pay = payByOrder.getOrDefault(orderId, BigDecimal.ZERO);
-      orderSales = orderSales.add(pay);
-      List<RefundDO> refundRows = refundsByOrder.getOrDefault(orderId, List.of());
-      // Same unconcluded-refund rule the commission sync uses for after-sales (task 115 review).
-      boolean unconcluded = OrderCommissionSync.hasUnconcludedRefund(refundRows);
-      estimatedRefund =
-          estimatedRefund.add(
-              unconcluded
-                  ? pay
-                  : refundRows.stream()
-                      .filter(refund -> "SUCCESS".equals(refund.getRefundStatus()))
-                      .map(
-                          refund ->
-                              refund.getAmount() == null ? BigDecimal.ZERO : refund.getAmount())
-                      .reduce(BigDecimal.ZERO, BigDecimal::add));
+      orderSales = orderSales.add(payByOrder.getOrDefault(orderId, BigDecimal.ZERO));
+      completedRefunds =
+          completedRefunds.add(
+              refundsByOrder.getOrDefault(orderId, List.of()).stream()
+                  .filter(refund -> "SUCCESS".equals(refund.getRefundStatus()))
+                  .map(RefundDO::getAmount)
+                  .filter(Objects::nonNull)
+                  .reduce(BigDecimal.ZERO, BigDecimal::add));
     }
+    boolean verified = true;
+    BigDecimal commissionBase = BigDecimal.ZERO;
     BigDecimal estimatedCommission = BigDecimal.ZERO;
     for (int from = 0; from < orderIds.size(); from += SUMMARY_CHUNK) {
       List<Long> chunk = orderIds.subList(from, Math.min(from + SUMMARY_CHUNK, orderIds.size()));
       List<OrderItemDO> lines =
           orderItems.selectList(
               new LambdaQueryWrapper<OrderItemDO>()
-                  .select(OrderItemDO::getId)
+                  .select(OrderItemDO::getId, OrderItemDO::getOrderId)
                   .in(OrderItemDO::getOrderId, chunk)
                   .eq(OrderItemDO::getKolId, kol.id()));
-      if (lines.isEmpty()) {
-        continue;
+      if (lines.stream().map(OrderItemDO::getOrderId).distinct().count() != chunk.size()) {
+        verified = false;
       }
-      estimatedCommission =
-          estimatedCommission.add(
-              commissionStates
-                  .listByOrderItemIds(kol.id(), lines.stream().map(OrderItemDO::getId).toList())
-                  .stream()
-                  .map(CommissionOrderStateApi.ItemCommissionStateDTO::commissionAmount)
-                  .filter(Objects::nonNull)
-                  .reduce(BigDecimal.ZERO, BigDecimal::add));
+      var snapshots =
+          commissionStates
+              .listByOrderItemIds(kol.id(), lines.stream().map(OrderItemDO::getId).toList())
+              .stream()
+              .collect(
+                  Collectors.toMap(
+                      CommissionOrderStateApi.ItemCommissionStateDTO::orderItemId, state -> state));
+      for (var line : lines) {
+        var snapshot = snapshots.get(line.getId());
+        if (snapshot == null
+            || snapshot.commissionAmount() == null
+            || snapshot.commissionBase() == null) {
+          verified = false;
+          continue;
+        }
+        commissionBase = commissionBase.add(snapshot.commissionBase());
+        estimatedCommission = estimatedCommission.add(snapshot.commissionAmount());
+      }
     }
     return new KolOrderSummaryDTO(
         money(orderSales),
-        money(estimatedRefund),
-        money(orderSales.subtract(estimatedRefund)),
-        money(estimatedCommission));
+        money(completedRefunds),
+        verified ? money(commissionBase) : null,
+        verified ? money(estimatedCommission) : null);
   }
 
   /** Conditions shared by the list and the summary; paging is validated by the list only. */

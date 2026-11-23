@@ -158,7 +158,8 @@ public class CommissionOrderStateService implements CommissionOrderStateApi {
         rate,
         commissionAmount,
         releasedAmount,
-        Boolean.TRUE.equals(row.getAfterSales()));
+        Boolean.TRUE.equals(row.getAfterSales()),
+        commissionAmount == null ? null : CommissionSettlementRules.commissionable(row));
   }
 
   private static long nz(Long value) {

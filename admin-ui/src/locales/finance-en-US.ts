@@ -90,7 +90,7 @@ export default {
   unverified: "Needs verification",
   afterSalesShort: "After-sales",
   afterSalesHint:
-    "After-sales in progress: no commission is counted for now; released commission stays frozen and is reduced by the refund amount once the refund succeeds",
+    "Open after-sales retains accrued commission and blocks release for the whole order. Confirmed refunds reduce commission on the affected items.",
   unverifiedNotice:
     "{count} unverified records are excluded from totals. Their commission is unknown, not zero.",
   balanceNote:
@@ -109,7 +109,7 @@ export default {
   rateVersion: "Historical rate version",
   ruleVersion: "Rule version",
   commission: "Estimated Commission",
-  adjustment: "Refund adjustment",
+  adjustment: "Commission clawback",
   releaseBasis: "Release basis",
   businessAt: "Business time",
   CONFIRMED: "Weidian settlement confirmed",

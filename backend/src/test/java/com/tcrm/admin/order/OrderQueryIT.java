@@ -489,13 +489,16 @@ class OrderQueryIT {
         .andExpect(jsonPath("$.data.lines[0].commission.occupiedTotal").value("0.00"))
         .andExpect(jsonPath("$.data.lines[0].commission.withdrawals").isEmpty())
         .andExpect(jsonPath("$.data.funds.accountStatus").value("UNVERIFIED"))
-        .andExpect(jsonPath("$.data.financeFlows.length()").value(3))
+        .andExpect(jsonPath("$.data.financeFlows.length()").value(4))
         .andExpect(jsonPath("$.data.financeFlows[0].type").value("SHOP_RECEIVABLE"))
         .andExpect(jsonPath("$.data.financeFlows[0].amount").value("10.00"))
-        .andExpect(jsonPath("$.data.financeFlows[1].direction").value("DECREASE"))
+        .andExpect(jsonPath("$.data.financeFlows[1].type").value("REFUND_REQUEST"))
         .andExpect(jsonPath("$.data.financeFlows[1].amount").value("5.00"))
-        .andExpect(jsonPath("$.data.financeFlows[2].type").value("COMMISSION_REFUND"))
-        .andExpect(jsonPath("$.data.financeFlows[2].amount").isEmpty());
+        .andExpect(jsonPath("$.data.financeFlows[2].type").value("SHOP_RECEIVABLE"))
+        .andExpect(jsonPath("$.data.financeFlows[2].direction").value("DECREASE"))
+        .andExpect(jsonPath("$.data.financeFlows[2].amount").value("5.00"))
+        .andExpect(jsonPath("$.data.financeFlows[3].type").value("COMMISSION_REFUND"))
+        .andExpect(jsonPath("$.data.financeFlows[3].amount").isEmpty());
   }
 
   @Test

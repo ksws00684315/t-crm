@@ -70,7 +70,7 @@ export interface CommissionLine {
   adjustment: string | null;
   releaseBasis: "CONFIRMED" | "FALLBACK" | "UNSETTLED" | "AFTER_SALES" | "UNVERIFIED";
   businessAt: string;
-  direction: "CREDIT" | "DEBIT";
+  direction: "CREDIT" | "DEBIT" | null;
   subject: string;
   kol: string; /** The order is in after-sales (task 113), verified or not: the line shows the hint. */
   afterSales: boolean;

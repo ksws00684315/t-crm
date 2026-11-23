@@ -84,6 +84,7 @@ public class OrderWriter {
       next.setSettledTime(existing.getSettledTime());
       orders.updateById(next);
     }
+    recordPreIncome(next, existing);
     var previous = listItems(next.getId());
     for (var line : payload.items()) {
       line.setOrderId(next.getId());
@@ -129,6 +130,47 @@ public class OrderWriter {
         next.getShopId(), next.getWeidianOrderId(), next.getId(), Instant.now());
     commissionSync.sync(next, all);
     markStatsDates(next, existing == null ? null : existing.getPayTime(), next.getPayTime());
+  }
+
+  /** The existing order lock serializes the balance comparison with the event append. */
+  private void recordPreIncome(OrderDO order, OrderDO previous) {
+    boolean eligible =
+        order.getPayTime() == null
+            && "UNPAID".equals(order.getOrderStatus())
+            && !"part_pay".equals(order.getRawStatus());
+    if (eligible
+        && previous != null
+        && (previous.getPayTime() != null || "CLOSED".equals(previous.getOrderStatus()))) {
+      return;
+    }
+    boolean paid = order.getPayTime() != null;
+    boolean closed = "CLOSED".equals(order.getOrderStatus());
+    if ((!eligible && !paid && !closed) || (eligible && order.getTotalAmount() == null)) {
+      return;
+    }
+    BigDecimal recorded =
+        Objects.requireNonNullElse(orders.recordedPreIncome(order.getId()), BigDecimal.ZERO);
+    BigDecimal target = eligible ? order.getTotalAmount() : BigDecimal.ZERO;
+    BigDecimal difference = target.subtract(recorded);
+    if (difference.signum() == 0) {
+      return;
+    }
+    String eventType;
+    Instant businessAt;
+    if (paid) {
+      eventType = "PRE_INCOME_PAID";
+      businessAt = order.getPayTime();
+    } else if (closed) {
+      eventType = "PRE_INCOME_CLOSED";
+      businessAt = order.getCloseTime();
+    } else if (recorded.signum() == 0) {
+      eventType = "PRE_INCOME";
+      businessAt = previous == null ? order.getOrderTime() : null;
+    } else {
+      eventType = "PRE_INCOME_CHANGE";
+      businessAt = order.getSourceUpdateTime();
+    }
+    orders.appendReceivableEvent(order.getId(), eventType, difference, businessAt);
   }
 
   private void detachRefundsFromItem(Long orderItemId) {

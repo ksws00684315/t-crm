@@ -68,6 +68,10 @@ public class StatsOverviewService {
   }
 
   ResolvedFilter resolve(FilterDTO filter) {
+    return resolve(filter, false);
+  }
+
+  ResolvedFilter resolve(FilterDTO filter, boolean includeCreatorEmail) {
     var account = current.user();
     if (account.tenantId() == null) {
       throw new BusinessException(ErrorCode.AUTH_FORBIDDEN);
@@ -76,13 +80,13 @@ public class StatsOverviewService {
     if (channel != null && !channel.isBlank() && !WEIDIAN.equals(channel)) {
       throw new BusinessException(ErrorCode.COMMON_VALIDATION_FAILED);
     }
-    var period =
-        StatsPeriod.resolve(filter.startDate(), filter.endDate(), LocalDate.now(StatsPeriod.ZONE));
+    var period = StatsPeriod.resolve(filter.startDate(), filter.endDate(), filter.cumulative());
     String creatorKeyword =
         filter.creatorKeyword() == null || filter.creatorKeyword().isBlank()
             ? null
             : filter.creatorKeyword().strip();
-    var matchedCreators = creatorKeyword == null ? null : findCreators(creatorKeyword);
+    var matchedCreators =
+        creatorKeyword == null ? null : findCreators(creatorKeyword, includeCreatorEmail);
     String inviterKeyword =
         filter.inviterKeyword() == null || filter.inviterKeyword().isBlank()
             ? null
@@ -119,8 +123,18 @@ public class StatsOverviewService {
         account.ownScope() ? DataScope.OWN : DataScope.ALL);
   }
 
-  private List<Long> findCreators(String keyword) {
+  private List<Long> findCreators(String keyword, boolean includeEmail) {
     String needle = keyword.toLowerCase(Locale.ROOT);
+    if (includeEmail) {
+      var ids = new java.util.LinkedHashSet<>(creators.findIdsByKeyword(keyword));
+      if (keyword.matches("[0-9]{1,19}")) {
+        creators.listAll().stream()
+            .map(KolRefDTO::id)
+            .filter(id -> id.toString().equals(keyword))
+            .forEach(ids::add);
+      }
+      return List.copyOf(ids);
+    }
     return creators.listAll().stream()
         .filter(
             kol ->
@@ -136,9 +150,11 @@ public class StatsOverviewService {
     var previousPeriod = period.previous();
     var scope = resolved.scope();
     var totals = orders.totals(scope, period.from(), period.until());
-    var previousTotals = orders.totals(scope, previousPeriod.from(), previousPeriod.until());
     var metrics = metrics(totals);
-    var previous = metrics(previousTotals);
+    var previous =
+        previousPeriod == null
+            ? null
+            : metrics(orders.totals(scope, previousPeriod.from(), previousPeriod.until()));
     var meta =
         new MetaDTO(
             period,
@@ -147,7 +163,8 @@ public class StatsOverviewService {
             resolved.filters(),
             resolved.dataScope(),
             totals.updatedAt());
-    return new OverviewDTO(meta, metrics, previous, changes(metrics, previous), UNAVAILABLE);
+    return new OverviewDTO(
+        meta, metrics, previous, previous == null ? null : changes(metrics, previous), UNAVAILABLE);
   }
 
   static MetricsDTO metrics(TotalsDTO totals) {
@@ -202,7 +219,33 @@ public class StatsOverviewService {
       String creatorKeyword,
       String inviterKeyword,
       String productKeyword,
-      boolean affiliateOnly) {
+      boolean affiliateOnly,
+      boolean cumulative) {
+    public FilterDTO(
+        LocalDate startDate,
+        LocalDate endDate,
+        Long shopId,
+        Long kolId,
+        Long inviterId,
+        String channel,
+        String creatorKeyword,
+        String inviterKeyword,
+        String productKeyword,
+        boolean affiliateOnly) {
+      this(
+          startDate,
+          endDate,
+          shopId,
+          kolId,
+          inviterId,
+          channel,
+          creatorKeyword,
+          inviterKeyword,
+          productKeyword,
+          affiliateOnly,
+          false);
+    }
+
     public FilterDTO withAffiliateOnly(boolean enabled) {
       return new FilterDTO(
           startDate,
@@ -214,7 +257,8 @@ public class StatsOverviewService {
           creatorKeyword,
           inviterKeyword,
           productKeyword,
-          enabled);
+          enabled,
+          cumulative);
     }
 
     public FilterDTO(

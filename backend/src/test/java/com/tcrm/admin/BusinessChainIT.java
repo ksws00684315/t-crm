@@ -170,32 +170,24 @@ class BusinessChainIT {
   }
 
   @Test
-  void shouldNetRefundGapOnceWhenIncomeDetailRefundFlowArrivesAfterRelease() throws Exception {
+  void shouldFreezeUnmatchedRefundWithoutChangingTheWallet() throws Exception {
     world.open("refund");
     world.syncPaidOrder();
     world.stubIncome();
     assertThat(world.pull()).isTrue();
     world.release();
     ChainWorld.money(world.overview().at("/income/available"), "6.50");
-    // A later income-detail refund of -100 fen = -1.00 reaches the flows with no CRM refund record
-    // (task 81 PR review, 2026-10-30): the gap 1.00 is netted by pay ratio 40 : 20, so the lines
-    // carry 0.67 and 0.33 extra refund. The basis stays 43.33 / 21.67 and the accrual drops to
-    // (43.33 - 0.67) x 10% = 4.27 and (21.67 - 0.33) x 10% = 2.13. The released surplus is taken
-    // back as COMMISSION_ADJUSTMENT: -0.06 and -0.04.
+    // The settlement feed reports a refund but does not identify a product line.
     int revisions = world.revisionCount();
     world.stubIncome(world.refundFlow());
     assertThat(world.pull()).isTrue();
     assertThat(world.revisionCount()).isEqualTo(revisions + 2);
     world.release();
-    assertConfirmed("43.33", "4.27", "21.67", "2.13");
-    ChainWorld.money(world.overview().at("/income/available"), "6.40");
-    ChainWorld.assertLedger(
-        world.ledger(),
-        "COMMISSION_CREDIT=4.33",
-        "COMMISSION_CREDIT=2.17",
-        "COMMISSION_ADJUSTMENT=-0.06",
-        "COMMISSION_ADJUSTMENT=-0.04");
-    assertChain("6.40", "4.27", "2.13", "6.50", "0.10");
+    assertThat(world.itemStates())
+        .allSatisfy(state -> assertThat(state.get("release_basis")).isEqualTo("AFTER_SALES"));
+    ChainWorld.money(world.overview().at("/income/available"), "0.00");
+    ChainWorld.money(world.overview().at("/income/frozen"), "6.50");
+    ChainWorld.assertLedger(world.ledger(), "COMMISSION_CREDIT=4.33", "COMMISSION_CREDIT=2.17");
   }
 
   @Test
@@ -203,48 +195,45 @@ class BusinessChainIT {
     world.open("presettle");
     world.syncPaidOrder();
     // The only flow is a pre-settle refund of -6500 fen = -65.00, opposite the 65.00 pay.
-    // With no income rows the basis is a verified 0.00, so release posts nothing.
+    // The missing product-line refund evidence prevents release.
     world.stubPreSettleRefund();
     assertThat(world.pull()).isTrue();
     List<Map<String, Object>> states = world.itemStates();
     assertThat(states).hasSize(2);
     for (Map<String, Object> state : states) {
       assertThat(state.get("verified")).isEqualTo(true);
-      assertThat(ChainWorld.money(state.get("basis_cny"))).isEqualByComparingTo("0.00");
-      assertThat(ChainWorld.money(state.get("accrued_commission_cny")))
-          .isEqualByComparingTo("0.00");
-      assertThat(state.get("release_basis")).isEqualTo("UNSETTLED");
+      assertThat(ChainWorld.money(state.get("basis_cny"))).isPositive();
+      assertThat(ChainWorld.money(state.get("accrued_commission_cny"))).isPositive();
+      assertThat(state.get("release_basis")).isEqualTo("AFTER_SALES");
       assertThat(state.get("release_at")).isNull();
     }
     world.release();
     assertThat(world.ledger()).isEmpty();
     ChainWorld.money(world.overview().at("/income/available"), "0.00");
     JsonNode chain = world.chain(world.bdToken());
-    ChainWorld.money(chain.at("/funds/kolCommission"), "0.00");
+    ChainWorld.money(chain.at("/funds/kolCommission"), "6.50");
     assertThat(chain.at("/funds/accountStatus").asString()).isEqualTo("POSTED");
   }
 
   @Test
-  void shouldZeroCommissionWhenOrderClosesBeforeSettlementWithoutRefundRecord() throws Exception {
+  void shouldPreserveFrozenCommissionWhenOrderClosesWithoutRefundEvidence() throws Exception {
     world.open("closed");
     world.syncPaidOrder();
     assertPaidButUnsettled("43.33", "4.33", "21.67", "2.17");
-    // Closed after payment and before any settlement, with no CRM refund (task 81 PR review,
-    // 2026-10-30): the basis is a verified zero, so the frozen commission goes to zero.
+    // Closure alone supplies no refund amount.
     world.restubOrderStatus("close");
     world.awaitOrderStatus("CLOSED");
     for (Map<String, Object> state : world.itemStates()) {
       assertThat(state.get("verified")).isEqualTo(true);
-      assertThat(ChainWorld.money(state.get("basis_cny"))).isEqualByComparingTo("0.00");
-      assertThat(ChainWorld.money(state.get("accrued_commission_cny")))
-          .isEqualByComparingTo("0.00");
+      assertThat(ChainWorld.money(state.get("basis_cny"))).isPositive();
+      assertThat(ChainWorld.money(state.get("accrued_commission_cny"))).isPositive();
     }
     world.release();
     assertThat(world.ledger()).isEmpty();
     ChainWorld.money(world.overview().at("/income/available"), "0.00");
     JsonNode kolOrders = world.kolOrders(world.kolToken());
-    assertThat(kolLineStatus(kolOrders, "t79-a")).isEqualTo("NO_COMMISSION");
-    assertThat(kolLineStatus(kolOrders, "t79-b")).isEqualTo("NO_COMMISSION");
+    assertThat(kolLineStatus(kolOrders, "t79-a")).isEqualTo("FROZEN");
+    assertThat(kolLineStatus(kolOrders, "t79-b")).isEqualTo("FROZEN");
   }
 
   @Test
@@ -262,9 +251,9 @@ class BusinessChainIT {
     world.pay(withdrawalId, "6.50");
     ChainWorld.money(world.overview().at("/income/available"), "0.00");
     // Both lines are refunded in full with SUCCESS, then the order closes after settlement.
-    world.stubRefund(world.refund(1), "1", 4000, "10");
+    world.stubRefund(world.refund(1), "1", 4333, "10");
     world.awaitRefundStatus(world.refund(1), "SUCCESS");
-    world.stubRefund(world.refund(2), "2", 2000, "10");
+    world.stubRefund(world.refund(2), "2", 2167, "10");
     world.awaitRefundStatus(world.refund(2), "SUCCESS");
     world.restubOrderStatus("close");
     world.awaitOrderStatus("CLOSED");
@@ -358,7 +347,7 @@ class BusinessChainIT {
   }
 
   @Test
-  void shouldZeroUnreleasedCommissionWhileRefundIsOpenAndRestoreWhenRejected() throws Exception {
+  void shouldKeepUnreleasedCommissionFrozenUntilRefundCloses() throws Exception {
     // Task 113 timeline 1: pay → refund opens (nothing released) → refund rejected.
     world.open("t113-open");
     world.syncPaidOrder();
@@ -367,23 +356,22 @@ class BusinessChainIT {
     assertFiveLayers(world.overview().path("income"), "6.50");
     ChainWorld.money(world.overview().at("/income/frozen"), "6.50");
 
-    // Refund on line B only; raw status 2 stays UNKNOWN. The whole order counts 0.
+    // Refund on line B only; raw status 2 stays UNKNOWN. Both product lines retain their accrual.
     world.stubRefund(world.refund(2), "2", 2000, "2");
     world.awaitRefundStatus(world.refund(2), "UNKNOWN");
     assertThat(world.pull()).isTrue();
     for (Map<String, Object> state : world.itemStates()) {
       assertThat(state.get("verified")).isEqualTo(true);
       assertThat(state.get("release_basis")).isEqualTo("AFTER_SALES");
-      assertThat(ChainWorld.money(state.get("accrued_commission_cny")))
-          .isEqualByComparingTo("0.00");
+      assertThat(ChainWorld.money(state.get("accrued_commission_cny"))).isPositive();
     }
     world.release();
     assertThat(world.ledger()).isEmpty();
-    assertFiveLayers(world.overview().path("income"), "0.00");
+    assertFiveLayers(world.overview().path("income"), "6.50");
     JsonNode kolOrder = world.kolOrders(world.kolToken()).path("items").get(0);
     assertThat(kolOrder.path("afterSales").asBoolean()).isTrue();
     JsonNode chain = world.chain(world.bdToken());
-    ChainWorld.money(chain.at("/funds/kolCommission"), "0.00");
+    ChainWorld.money(chain.at("/funds/kolCommission"), "6.50");
 
     // Rejected (CLOSED once RefundDictionary maps it, M0): the accrual returns and releases.
     world.closeRefund(world.refund(2));
@@ -829,7 +817,7 @@ class BusinessChainIT {
             .isIn(
                 "SHOP_RECEIVABLE",
                 "COMMISSION_ACCRUAL",
-                "COMMISSION_REFUND_PENDING",
+                "REFUND_REQUEST",
                 "COMMISSION_REFUND",
                 "ORDER_SETTLEMENT");
         continue;
