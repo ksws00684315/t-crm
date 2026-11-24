@@ -389,10 +389,21 @@ class OrderQueryIT {
         .andExpect(status().isOk())
         .andExpect(jsonPath("$.data.items[0].refundStatus").value("PARTIAL_SUCCESS"))
         .andExpect(jsonPath("$.data.items[0].refundAmount").value("5.00"));
-    refund(2, orderId, null, "R2", "PROCESSING", "REFUND_ONLY", "5.00");
-    mvc.perform(get("/admin-api/order/orders").header("X-Admin-Token", admin))
+    refund(2, orderId, null, "R2", "UNKNOWN", "REFUND_ONLY", "5.00");
+    mvc.perform(
+            get("/admin-api/order/orders")
+                .param("refundState", "REFUNDING")
+                .header("X-Admin-Token", admin))
         .andExpect(status().isOk())
-        .andExpect(jsonPath("$.data.items[0].refundStatus").value("PROCESSING"));
+        .andExpect(jsonPath("$.data.total").value("1"))
+        .andExpect(jsonPath("$.data.items[0].refundStatus").value("PROCESSING"))
+        .andExpect(jsonPath("$.data.items[0].refundAmount").value("5.00"));
+    mvc.perform(get("/admin-api/order/orders/" + orderId).header("X-Admin-Token", admin))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.data.refundStatus").value("PROCESSING"))
+        .andExpect(jsonPath("$.data.pendingRefundAmount").value("5.00"))
+        .andExpect(jsonPath("$.data.refundAmount").value("5.00"))
+        .andExpect(jsonPath("$.data.netReceived").value("5.00"));
     jdbc.update("DELETE FROM crm_refund WHERE id=2");
     jdbc.update("UPDATE crm_refund SET amount=10.00 WHERE id=1");
     mvc.perform(get("/admin-api/order/orders").header("X-Admin-Token", admin))

@@ -2292,7 +2292,7 @@ const zhCN = {
       salesAmountLabel: "销售额",
       creatorCommissionAmount: "达人佣金金额",
       movementTime: "变动时间",
-      orderAfterSalesHint: "售后处理中，佣金保留并冻结，退款成功后按对应商品行扣减",
+      orderAfterSalesHint: "退款中佣金冻结，退款完成后扣减",
       frozenState: "冻结中",
       platformExpense: "平台已支出",
       currentFrozenCommission: "冻结佣金余额",

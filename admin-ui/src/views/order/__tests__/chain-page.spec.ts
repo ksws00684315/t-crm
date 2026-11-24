@@ -336,9 +336,9 @@ describe("order chain page (task 40)", () => {
     expect(text).not.toContain("LC001");
     const orderNode = wrapper.get('[data-test="chain-stage-order"]');
     expect(orderNode.text()).toContain("¥180.00");
-    expect(text).not.toContain("7900222333");
+    expect(orderNode.text()).not.toContain("7900222333");
+    expect(orderNode.text()).not.toContain("9001");
     expect(text).not.toContain("8001");
-    expect(text).not.toContain("9001");
     const header = wrapper.get('[data-test="chain-header"]');
     expect(header.get("h1").text()).toBe("订单信息");
     expect(header.findAll("dl").map(row => row.findAll("dt").map(label => label.text()))).toEqual([
@@ -398,7 +398,7 @@ describe("order chain page (task 40)", () => {
     wrapper.unmount();
   });
 
-  it("shows the nine requested item columns and net sales after the line refund", async () => {
+  it("shows both platform product IDs and net sales after the line refund", async () => {
     signIn("SUPER_ADMIN", ["order:view"]);
     saveTablePrefs("chain-order-items", defaultPrefs(["status", "product", "sku"], 20));
     const { wrapper } = await mountPage();
@@ -406,6 +406,8 @@ describe("order chain page (task 40)", () => {
     expect(summary.findAll("thead th").map(item => item.text())).toEqual([
       "商品图",
       "商品名/SKU",
+      "原商品ID",
+      "新商品ID",
       "状态",
       "单价",
       "件数",
@@ -422,9 +424,16 @@ describe("order chain page (task 40)", () => {
     expect(rows[0].text()).toContain("t40 Item");
     expect(rows[0].text()).toContain("Blue / L");
     const cells = rows[0].findAll("td");
-    expect(cells[2]?.classes()).toContain("is-left");
-    expect(summary.findAll("thead th")[2]?.classes()).toContain("is-left");
-    expect(cells.slice(6).map(cell => cell.text())).toEqual(["¥120.00", "¥20.00", "¥100.00"]);
+    expect(cells[2]?.get('[data-test="value"]').text()).toBe("7900222333");
+    expect(cells[3]?.get('[data-test="value"]').text()).toBe("9001");
+    expect(cells[2]?.find('[data-test="copy"]').exists()).toBe(true);
+    expect(cells[3]?.find('[data-test="copy"]').exists()).toBe(true);
+    const unlinked = rows[1].findAll("td");
+    expect(unlinked[2]?.text()).toBe("—");
+    expect(unlinked[3]?.get('[data-test="value"]').text()).toBe("9002");
+    expect(cells[4]?.classes()).toContain("is-left");
+    expect(summary.findAll("thead th")[4]?.classes()).toContain("is-left");
+    expect(cells.slice(8).map(cell => cell.text())).toEqual(["¥120.00", "¥20.00", "¥100.00"]);
     expect(summary.findAll('[data-test="chain-item-total"]').map(cell => cell.text())).toEqual([
       "¥120.00",
       "¥60.00"
@@ -743,7 +752,7 @@ describe("order chain page (task 40)", () => {
     const rows = wrapper
       .get('[data-test="chain-product-summary"]')
       .findAll("tbody tr")
-      .map(row => row.findAll("td")[3]?.text());
+      .map(row => row.findAll("td")[5]?.text());
     expect(rows).toEqual(["缺失历史售价", "¥60.00"]);
     wrapper.unmount();
   });
@@ -853,6 +862,45 @@ describe("order chain page (task 40)", () => {
     wrapper.unmount();
   });
 
+  it("shows an unconcluded refund without subtracting it from sales or commission", async () => {
+    signIn("SUPER_ADMIN", ["order:view", "commission:view"]);
+    vi.mocked(orderApi.getOrderChain).mockResolvedValue({
+      ...financedChain,
+      funds: { ...financedChain.funds!, kolCommission: "21.00", commissionStatus: "FROZEN" },
+      financeFlows: [],
+      lines: [
+        {
+          ...chain.lines[0]!,
+          refunds: [{ ...chain.lines[0]!.refunds[0]!, refundStatus: "UNKNOWN", amount: "105.00" }]
+        }
+      ]
+    });
+    vi.mocked(orderApi.getOrder).mockResolvedValue({
+      ...financedDetail,
+      refundStatus: "NONE",
+      payAmount: "105.00",
+      refundAmount: "0.00",
+      netReceived: "105.00",
+      items: [{ ...orderDetail.items[0]!, payAmount: "105.00", refundAmount: "0.00" }],
+      commission: {
+        commissionableAmount: "105.00",
+        rates: ["0.2000"],
+        estimatedCommission: "21.00",
+        afterSales: true
+      }
+    });
+    const { wrapper } = await mountPage();
+    const refundStage = wrapper.get('[data-test="chain-stage-refund"]');
+    expect(refundStage.text()).toContain("退款中");
+    expect(refundStage.text()).toContain("¥105.00");
+    expect(wrapper.get('[data-test="chain-stage-withdrawal"]').text()).toContain("¥21.00");
+    const item = wrapper.get('[data-test="chain-product-summary"]').get("tbody tr");
+    expect(item.text()).toContain("退款中");
+    expect(item.text()).toContain("¥105.00");
+    expect(item.text()).toContain("¥0.00");
+    wrapper.unmount();
+  });
+
   it("explains that after-sales freezes accrued commission", async () => {
     signIn("SUPER_ADMIN", ["order:view", "commission:view"]);
     vi.mocked(orderApi.getOrderChain).mockResolvedValue(financedChain);
@@ -871,7 +919,7 @@ describe("order chain page (task 40)", () => {
         .get('[data-test="chain-stage-withdrawal"]')
         .get('[data-test="chain-after-sales"]')
         .text()
-    ).toBe("售后处理中，佣金保留并冻结，退款成功后按对应商品行扣减");
+    ).toBe("退款中佣金冻结，退款完成后扣减");
     wrapper.unmount();
   });
 

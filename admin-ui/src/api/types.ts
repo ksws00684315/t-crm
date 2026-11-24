@@ -530,6 +530,8 @@ export interface OrderDetailVO {
   discount: string | null;
   /** Refund amount: successful refunds deduplicated by refund id; "0.00" without refunds. */
   refundAmount: string;
+  /** Unconcluded refund requests, excluded from net sales. */
+  pendingRefundAmount?: string | null;
   /** Net received = paid amount − refund amount. */
   netReceived: string | null;
   /** Order-level commission; null without commission:view or outside the OWN coverage. */
