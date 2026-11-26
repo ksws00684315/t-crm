@@ -3,6 +3,9 @@ package com.tcrm.admin.order.mapper;
 import com.baomidou.mybatisplus.annotation.InterceptorIgnore;
 import com.baomidou.mybatisplus.core.mapper.BaseMapper;
 import com.tcrm.admin.order.api.OrderEvidenceApi.SettlementFlowRow;
+import com.tcrm.admin.order.api.OrderEvidenceApi.SettlementLedgerRow;
+import com.tcrm.admin.order.api.OrderEvidenceApi.SettlementLedgerTotals;
+import com.tcrm.admin.order.api.OrderStatsApi.ScopeDTO;
 import com.tcrm.admin.order.api.OrderStatsApi.ShopSettlementDTO;
 import com.tcrm.admin.order.model.OrderSettlementFlowDO;
 import java.math.BigDecimal;
@@ -29,15 +32,15 @@ public interface OrderSettlementFlowMapper extends BaseMapper<OrderSettlementFlo
   @Select(
       """
       <script>
-      SELECT ROUND(COALESCE(SUM(amount_raw) FILTER (WHERE trade_sub_type = '货款收入'), 0), 2) AS increase,
-             ROUND(COALESCE(SUM(-amount_raw) FILTER (WHERE trade_sub_type = '退款'), 0), 2) AS decrease
+      SELECT ROUND(COALESCE(SUM(amount_cny) FILTER (WHERE trade_sub_type = '货款收入'), 0), 2) AS increase,
+             ROUND(COALESCE(SUM(-amount_cny) FILTER (WHERE trade_sub_type = '退款'), 0), 2) AS decrease
       FROM crm_order_settlement_flow
       WHERE tenant_id = #{tenantId} AND is_deleted = FALSE AND query_type = 'INCOME_DETAIL'
         AND trade_time &gt;= #{from} AND trade_time &lt; #{until}
         AND shop_id IN
         <foreach collection="shopIds" item="shopId" open="(" separator="," close=")">#{shopId}</foreach>
         AND trade_sub_type IN ('货款收入', '退款')
-      HAVING COUNT(*) &gt; 0 AND COUNT(*) = COUNT(amount_raw)
+      HAVING COUNT(*) &gt; 0 AND COUNT(*) = COUNT(amount_cny)
       </script>
       """)
   ShopSettlementDTO shopReceivables(
@@ -71,7 +74,7 @@ public interface OrderSettlementFlowMapper extends BaseMapper<OrderSettlementFlo
       """
       <script>
       WITH paged AS (
-        SELECT id, weidian_order_id, refund_id, trade_time, trade_sub_type, amount_raw
+        SELECT id, weidian_order_id, refund_id, trade_time, trade_sub_type, amount_cny
         FROM crm_order_settlement_flow
         WHERE <![CDATA[
       """
@@ -85,7 +88,7 @@ public interface OrderSettlementFlowMapper extends BaseMapper<OrderSettlementFlo
              CASE WHEN item.item_count = 1 THEN item.image_url END AS image_url,
              item.item_count,
              CASE WHEN f.trade_sub_type = '退款' THEN 'REFUND' ELSE 'INCREASE' END AS amount_type,
-             ROUND(f.amount_raw, 2) AS amount, f.trade_time AS event_time, item.spu_id
+             f.amount_cny AS amount, f.trade_time AS event_time, item.spu_id
       FROM paged f
       LEFT JOIN crm_order o ON o.tenant_id = #{tenantId} AND o.shop_id = #{shopId}
         AND o.weidian_order_id = f.weidian_order_id AND NOT o.is_deleted
@@ -133,6 +136,89 @@ public interface OrderSettlementFlowMapper extends BaseMapper<OrderSettlementFlo
       @Param("shopId") long shopId,
       @Param("from") Instant from,
       @Param("until") Instant until);
+
+  String LEDGER_SCOPE =
+      """
+      FROM crm_order_settlement_flow f
+      WHERE f.tenant_id = #{scope.tenantId} AND NOT f.is_deleted
+        AND f.query_type = 'INCOME_DETAIL'
+        AND COALESCE(f.trade_sub_type, '') NOT LIKE '%提现%'
+        AND f.trade_time &gt;= #{from} AND f.trade_time &lt; #{until}
+        AND f.shop_id IN
+        <foreach collection="scope.visibleShopIds" item="shop" open="(" separator="," close=")">#{shop}</foreach>
+        <if test="scope.shopId != null">AND f.shop_id = #{scope.shopId}</if>
+        <if test="scope.ownerId != null">
+          AND EXISTS (
+            SELECT 1 FROM crm_order o
+            WHERE o.tenant_id = f.tenant_id AND o.shop_id = f.shop_id AND NOT o.is_deleted
+              AND o.weidian_order_id = f.weidian_order_id AND (f.order_id IS NULL OR f.order_id = o.id)
+              AND o.bd_user_id = #{scope.ownerId}
+          )
+        </if>
+      """;
+
+  @InterceptorIgnore(tenantLine = "true")
+  @Select(
+      """
+      <script>
+      WITH paged AS (SELECT f.*
+      """
+          + LEDGER_SCOPE
+          + """
+          ORDER BY f.trade_time DESC, f.id DESC LIMIT #{size} OFFSET #{offset})
+          SELECT f.id, f.trade_time AS occurred_at,
+                 CASE f.trade_type WHEN '收入' THEN 'INCOME' WHEN '支出' THEN 'EXPENSE' ELSE f.trade_type END AS trade_type,
+                 f.amount_cny AS amount,
+                 f.trade_sub_type AS bill_type, NULL::numeric AS balance, f.weidian_order_id AS order_no,
+                 k.name AS creator_name, k.kol_code AS creator_code, commission.amount AS commission_amount
+          FROM paged f
+          LEFT JOIN LATERAL (
+            SELECT o.id, o.kol_id FROM crm_order o
+            WHERE o.tenant_id = f.tenant_id AND o.shop_id = f.shop_id AND NOT o.is_deleted
+              AND o.weidian_order_id = f.weidian_order_id AND (f.order_id IS NULL OR f.order_id = o.id)
+            ORDER BY o.id DESC LIMIT 1
+          ) p ON TRUE
+          LEFT JOIN crm_kol k ON k.id = p.kol_id AND k.tenant_id = f.tenant_id AND NOT k.is_deleted
+          LEFT JOIN LATERAL (
+            SELECT SUM(s.accrued_commission_cny) AS amount
+            FROM crm_order_item i
+            LEFT JOIN crm_commission_item_state s ON s.order_item_id = i.id AND s.order_id = p.id
+              AND s.tenant_id = f.tenant_id AND NOT s.is_deleted
+            WHERE i.order_id = p.id AND i.tenant_id = f.tenant_id AND NOT i.is_deleted
+            HAVING BOOL_AND(
+          """
+          + OrderStatsMapper.VERIFIED_COMMISSION_LINE
+          + """
+            )
+          ) commission ON p.kol_id IS NOT NULL
+          ORDER BY f.trade_time DESC, f.id DESC
+          </script>
+          """)
+  List<SettlementLedgerRow> pageSettlementLedger(
+      @Param("scope") ScopeDTO scope,
+      @Param("from") Instant from,
+      @Param("until") Instant until,
+      @Param("size") int size,
+      @Param("offset") long offset);
+
+  @InterceptorIgnore(tenantLine = "true")
+  @Select("<script>SELECT COUNT(*) " + LEDGER_SCOPE + "</script>")
+  long countSettlementLedger(
+      @Param("scope") ScopeDTO scope, @Param("from") Instant from, @Param("until") Instant until);
+
+  @InterceptorIgnore(tenantLine = "true")
+  @Select(
+      """
+      <script>
+      SELECT COALESCE(SUM(f.amount_cny) FILTER (
+                 WHERE f.trade_type = '收入' AND f.trade_sub_type = '货款收入'), 0) AS settled_goods_amount,
+             -COALESCE(SUM(f.amount_cny) FILTER (
+                 WHERE f.trade_sub_type IN ('交易手续费', '高频高额技术服务费')), 0) AS platform_fee_amount
+      """
+          + LEDGER_SCOPE
+          + "</script>")
+  SettlementLedgerTotals settlementLedgerTotals(
+      @Param("scope") ScopeDTO scope, @Param("from") Instant from, @Param("until") Instant until);
 
   /** All live flows of one remote order id; the commission basis check filters by query type. */
   @Select(

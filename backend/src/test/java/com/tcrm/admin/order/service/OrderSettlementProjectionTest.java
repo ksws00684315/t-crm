@@ -184,6 +184,7 @@ class OrderSettlementProjectionTest {
     flow.setTradeType(tradeType);
     flow.setTradeSubType(subType);
     flow.setAmountRaw(new BigDecimal(amount));
+    flow.setAmountCny(SettlementBasisCalculator.toCny(flow.getAmountRaw()));
     flow.setQueryType(SettlementBasisCalculator.QUERY_INCOME_DETAIL);
     return flow;
   }

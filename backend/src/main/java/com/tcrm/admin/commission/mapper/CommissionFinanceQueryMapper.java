@@ -78,6 +78,29 @@ public interface CommissionFinanceQueryMapper {
       @Param("start") Instant start,
       @Param("end") Instant end);
 
+  @Select(
+      """
+      <script>
+      SELECT pr.applicant_id, SUM(pp.pay_amount_cny) AS amount_cny
+      FROM crm_prepay_payment pp JOIN crm_prepay pr ON pr.id = pp.prepay_id AND pr.tenant_id = pp.tenant_id
+      WHERE pr.applicant_id IN
+      <foreach collection="applicantIds" item="id" open="(" separator="," close=")">#{id}</foreach>
+      <if test="creatorIds != null">
+        AND pr.kol_id IN
+        <foreach collection="creatorIds" item="id" open="(" separator="," close=")">#{id}</foreach>
+      </if>
+      AND pp.pay_time &gt;= #{from} AND pp.pay_time &lt; #{until}
+      GROUP BY pr.applicant_id
+      </script>
+      """)
+  List<ApplicantPrepayRow> prepayPaidByApplicant(
+      @Param("applicantIds") Collection<Long> applicantIds,
+      @Param("creatorIds") Collection<Long> creatorIds,
+      @Param("from") Instant from,
+      @Param("until") Instant until);
+
+  record ApplicantPrepayRow(long applicantId, BigDecimal amountCny) {}
+
   /**
    * Prepay payment rows for income details and KOL fund records, newest first. Commission
    * withdrawal payments are read from {@code WithdrawalMapper}.

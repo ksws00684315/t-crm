@@ -1,9 +1,11 @@
 package com.tcrm.admin.order.service;
 
 import com.tcrm.admin.order.api.OrderEvidenceApi;
+import com.tcrm.admin.order.api.OrderStatsApi.ScopeDTO;
 import com.tcrm.admin.order.mapper.OrderEvidenceMapper;
 import com.tcrm.admin.order.mapper.OrderSettlementFlowMapper;
 import com.tcrm.admin.shared.PageResult;
+import java.math.BigDecimal;
 import java.time.Instant;
 import java.util.List;
 import org.springframework.stereotype.Service;
@@ -28,6 +30,29 @@ public class OrderEvidenceService implements OrderEvidenceApi {
         rows.size() < size && (page == 1 || !rows.isEmpty())
             ? offset + rows.size()
             : settlements.countShopReceivables(tenantId, shopId, from, until);
+    return new PageResult<>(rows, total, page, size);
+  }
+
+  @Override
+  public SettlementLedgerTotals settlementLedgerTotals(
+      ScopeDTO scope, Instant from, Instant until) {
+    return scope.visibleShopIds().isEmpty()
+        ? new SettlementLedgerTotals(BigDecimal.ZERO, BigDecimal.ZERO)
+        : settlements.settlementLedgerTotals(scope, from, until);
+  }
+
+  @Override
+  public PageResult<SettlementLedgerRow> settlementLedger(
+      ScopeDTO scope, Instant from, Instant until, int page, int size) {
+    if (scope.visibleShopIds().isEmpty()) {
+      return new PageResult<>(List.of(), 0, page, size);
+    }
+    long offset = (long) (page - 1) * size;
+    var rows = settlements.pageSettlementLedger(scope, from, until, size, offset);
+    long total =
+        rows.size() < size && (page == 1 || !rows.isEmpty())
+            ? offset + rows.size()
+            : settlements.countSettlementLedger(scope, from, until);
     return new PageResult<>(rows, total, page, size);
   }
 

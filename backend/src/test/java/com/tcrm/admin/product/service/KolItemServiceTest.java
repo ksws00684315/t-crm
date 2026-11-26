@@ -94,6 +94,16 @@ class KolItemServiceTest {
   }
 
   @Test
+  void filtersOriginalAndCopiedIdsAndTreatsProductKeywordAsLiteralText() {
+    when(items.selectPage(any(), any())).thenAnswer(inv -> emptyPage(inv.getArgument(0)));
+    service.page(new KolItemFilterDTO(null, null, 5L, null, 1, 20, "123", "456", "Green_100%"));
+    var query = capturedQuery();
+    assertThat(query.getSqlSegment())
+        .contains("p.weidian_item_id", "p.tenant_id", "weidian_item_id", "strpos(lower");
+    assertThat(paramText(query)).contains("123", "456", "Green_100%");
+  }
+
+  @Test
   void shouldKeepEnabledOnTheOpenWindow() {
     when(items.selectPage(any(), any())).thenAnswer(inv -> emptyPage(inv.getArgument(0)));
 

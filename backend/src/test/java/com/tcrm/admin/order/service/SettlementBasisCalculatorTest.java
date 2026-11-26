@@ -403,6 +403,24 @@ class SettlementBasisCalculatorTest {
   }
 
   @Test
+  void usesTheStoredCnyAmountAndBlocksReleaseWhenRefundAmountIsUnverified() {
+    var goods = income("6");
+    goods.setAmountCny(new BigDecimal("6.00"));
+    assertThat(SettlementBasisCalculator.incomeDetailTotal(List.of(goods)))
+        .isEqualByComparingTo("6.00");
+    assertThat(SettlementBasisCalculator.compute(order("6.00"), items(1), List.of(goods)).reason())
+        .isNull();
+
+    var refund =
+        flow("支出", "退款", "-200", INCOME_TIME, SettlementBasisCalculator.QUERY_INCOME_DETAIL);
+    refund.setAmountCny(null);
+    var flows = List.of(goods, refund);
+    assertThat(SettlementBasisCalculator.incomeDetailTotal(flows)).isNull();
+    assertThat(SettlementBasisCalculator.compute(order("6.00"), items(1), flows).refundGap())
+        .isTrue();
+  }
+
+  @Test
   void shouldReturnNullWithdrawableWithoutIncomeDetailOrReadableAmount() {
     assertThat(SettlementBasisCalculator.incomeDetailTotal(List.of())).isNull();
     assertThat(
@@ -480,6 +498,7 @@ class SettlementBasisCalculatorTest {
     flow.setTradeType(tradeType);
     flow.setTradeSubType(subType);
     flow.setAmountRaw(amount == null ? null : new BigDecimal(amount));
+    flow.setAmountCny(SettlementBasisCalculator.toCny(flow.getAmountRaw()));
     flow.setTradeTime(tradeTime);
     flow.setQueryType(queryType);
     return flow;

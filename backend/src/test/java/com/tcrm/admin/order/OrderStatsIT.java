@@ -113,11 +113,12 @@ class OrderStatsIT {
         """
         INSERT INTO crm_order_settlement_flow (
           id, tenant_id, shop_id, weidian_order_id, refund_id, trade_sub_type, trade_time,
-          amount_raw, query_type, fingerprint, first_pulled_at, last_pulled_at, create_time, update_time
+          amount_raw, amount_cny, query_type, fingerprint, first_pulled_at, last_pulled_at, create_time, update_time
         )
         SELECT id, tenant, shop, CASE WHEN id IN (1, 2) THEN 't144-1' ELSE 't144-flow-' || id END,
                CASE WHEN id = 2 THEN 't144-r1' END, subtype, posted::timestamptz,
-               amount, query_type, lpad(id::text, 64, '0'), now(), now(), now(), now()
+               CASE WHEN id = 9 THEN 7500 ELSE amount * 100 END, amount, query_type,
+               lpad(id::text, 64, '0'), now(), now(), now(), now()
         FROM (VALUES
           (1, 4, 1, '货款收入', '2026-11-02T16:00:00Z', 100.75, 'INCOME_DETAIL'),
           (2, 4, 1, '退款', '2026-11-03T15:59:59Z', -20.25, 'INCOME_DETAIL'),
@@ -165,6 +166,7 @@ class OrderStatsIT {
               },
               income -> {
                 assertThat(income.amountType()).isEqualTo("INCREASE");
+                assertThat(income.amount()).isEqualByComparingTo("100.75");
                 assertThat(income.eventTime()).isEqualTo(FROM);
                 assertThat(income.itemCount()).isEqualTo(2);
                 assertThat(income.product()).isNull();
@@ -180,6 +182,9 @@ class OrderStatsIT {
           .singleElement()
           .satisfies(flow -> assertThat(flow.id()).isEqualTo(1L));
       assertThat(settlements.shopReceivables(4, java.util.List.of(3L), FROM, UNTIL)).isNull();
+      assertThat(settlements.pageShopReceivables(4, 3, FROM, UNTIL, 20, 0))
+          .singleElement()
+          .satisfies(flow -> assertThat(flow.amount()).isNull());
       assertThat(settlements.shopReceivables(4, java.util.List.of(4L), FROM, UNTIL)).isNull();
       var own = mapper.totals(new ScopeDTO(4, 9L, 1L, 11L, 9L), FROM, UNTIL);
       assertThat(own.paidOrders()).isEqualTo(1);

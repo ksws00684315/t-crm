@@ -62,6 +62,7 @@ class ShopPerformanceExportTest {
             new AnalyticsRankingService.BestCreator(
                 901L, "Best example", new BigDecimal("80"), "KOL-EXAMPLE"),
             new BigDecimal("8.25"),
+            new BigDecimal("75.00"),
             3L,
             4L,
             new AnalyticsRankingService.CreatorMoney(
@@ -107,14 +108,12 @@ class ShopPerformanceExportTest {
                     "Refunded units",
                     "Sales (CNY)",
                     "Completed refunds (CNY)",
-                    "Net sales (CNY)",
-                    "Settlement amount (CNY)");
+                    "Net sales (CNY)");
             assertThat(data.getCell(0).getStringCellValue()).isEqualTo("1");
             assertThat(data.getCell(2).getStringCellValue()).isEqualTo("source-1");
             assertThat(data.getCell(3).getStringCellValue()).isEqualTo("3");
             assertThat(data.getCell(4).getStringCellValue()).isEqualTo("0 / 4");
             assertThat(data.getCell(7).getStringCellValue()).isEmpty();
-            assertThat(data.getCell(11).getStringCellValue()).isEmpty();
           } else if (board == AnalyticsRankingService.Board.CREATOR) {
             assertThat(labels)
                 .containsExactly(
@@ -148,15 +147,15 @@ class ShopPerformanceExportTest {
                     "Net sales (CNY)",
                     "Amount refund rate",
                     "Average order amount (CNY)",
-                    "Prepayments paid out (CNY)",
                     "Total estimated commission (CNY)",
+                    "Prepayments paid out (CNY)",
                     "Total paid out (CNY)",
                     "Top creator",
                     "Top creator net sales (CNY)");
             assertThat(data.getCell(0).getStringCellValue()).isEqualTo("'=item / CODE");
             assertThat(data.getCell(2).getStringCellValue()).isEqualTo("1 / 2");
-            assertThat(data.getCell(9).getStringCellValue()).isEmpty();
-            assertThat(data.getCell(10).getStringCellValue()).isEqualTo("8.25");
+            assertThat(data.getCell(9).getStringCellValue()).isEqualTo("8.25");
+            assertThat(data.getCell(10).getStringCellValue()).isEqualTo("75.00");
             assertThat(data.getCell(11).getStringCellValue()).isEmpty();
             assertThat(data.getCell(12).getStringCellValue()).isEqualTo("Best example");
             assertThat(data.getCell(13).getStringCellValue()).isEqualTo("80");

@@ -9,6 +9,22 @@ import java.time.Instant;
 public interface CreatorFundFlowApi {
   PageResult<FundFlow> list(AccountDTO user, Query query);
 
+  PageResult<Application> applications(AccountDTO user, Query query);
+
+  enum ApplicationStatus {
+    PENDING_REVIEW,
+    PENDING_PAYMENT,
+    PAID
+  }
+
+  record Application(
+      String id,
+      FundType fundType,
+      BigDecimal amount,
+      ApplicationStatus status,
+      String applicationNo,
+      Instant appliedAt) {}
+
   Totals totals(AccountDTO user, Query query);
 
   record Totals(BigDecimal frozen, BigDecimal available, BigDecimal withdrawn, BigDecimal prepaid) {

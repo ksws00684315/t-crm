@@ -79,7 +79,26 @@ public class KolItemService {
         new LambdaQueryWrapper<KolItemDO>()
             .eq(linkCode != null, KolItemDO::getLinkCode, linkCode)
             .in(kolIds != null, KolItemDO::getKolId, kolIds == null ? List.of() : kolIds)
-            .eq(filter.shopId() != null, KolItemDO::getShopId, filter.shopId());
+            .eq(filter.shopId() != null, KolItemDO::getShopId, filter.shopId())
+            .eq(filter.targetItemId() != null, KolItemDO::getWeidianItemId, filter.targetItemId());
+    String source =
+        "SELECT 1 FROM crm_product p WHERE p.id = crm_kol_item.product_id"
+            + " AND p.tenant_id = crm_kol_item.tenant_id AND NOT p.is_deleted";
+    if (filter.sourceItemId() != null) {
+      query.exists(source + " AND p.weidian_item_id = {0}", filter.sourceItemId());
+    }
+    if (filter.productKeyword() != null) {
+      query.and(
+          names ->
+              names
+                  .apply(
+                      "strpos(lower(crm_kol_item.item_name), lower({0})) > 0",
+                      filter.productKeyword())
+                  .or()
+                  .exists(
+                      source + " AND strpos(lower(p.name), lower({0})) > 0",
+                      filter.productKeyword()));
+    }
     applyStatus(query, filter.status(), now);
     query.orderByDesc(KolItemDO::getCreateTime).orderByDesc(KolItemDO::getId);
     var result = items.selectPage(new Page<>(filter.page(), filter.size()), query);

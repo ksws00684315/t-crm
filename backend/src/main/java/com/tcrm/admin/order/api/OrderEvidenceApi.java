@@ -89,6 +89,25 @@ public interface OrderEvidenceApi {
   PageResult<SettlementFlowRow> shopSettlementFlows(
       long tenantId, long shopId, Instant from, Instant until, int page, int size);
 
+  record SettlementLedgerRow(
+      long id,
+      Instant occurredAt,
+      String tradeType,
+      BigDecimal amount,
+      String billType,
+      BigDecimal balance,
+      String orderNo,
+      String creatorName,
+      String creatorCode,
+      BigDecimal commissionAmount) {}
+
+  record SettlementLedgerTotals(BigDecimal settledGoodsAmount, BigDecimal platformFeeAmount) {}
+
+  SettlementLedgerTotals settlementLedgerTotals(ScopeDTO scope, Instant from, Instant until);
+
+  PageResult<SettlementLedgerRow> settlementLedger(
+      ScopeDTO scope, Instant from, Instant until, int page, int size);
+
   enum ProductBreakdown {
     SKUS,
     CREATORS,

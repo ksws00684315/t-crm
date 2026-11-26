@@ -50,7 +50,9 @@ public interface OrderStatsApi {
       BigDecimal amount,
       BigDecimal refundAmount,
       BigDecimal netTransactionAmount,
-      BigDecimal estimatedCommission) {}
+      BigDecimal estimatedCommission,
+      String orderStatus,
+      String commissionStatus) {}
 
   PageResult<CreatorIncomeOrder> creatorIncomeOrders(
       ScopeDTO scope,

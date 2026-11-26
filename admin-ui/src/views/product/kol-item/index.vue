@@ -45,13 +45,19 @@ const query = reactive<{
   page: number;
   size: number;
   linkCode: string;
+  sourceItemId: string;
+  targetItemId: string;
+  productKeyword: string;
   kolId?: string;
   shopId?: string;
   status?: "ENABLED" | "DISABLED";
 }>({
   page: 1,
   size: readPageSize("kol-items", 20),
-  linkCode: ""
+  linkCode: "",
+  sourceItemId: "",
+  targetItemId: "",
+  productKeyword: ""
 });
 
 function asItem(row: object): KolItemVO {
@@ -81,7 +87,6 @@ function named(group: "channels" | "statuses" | "cleanups", value: string | null
 }
 
 const columns = computed<DataColumn[]>(() => [
-  { key: "linkCode", align: "left" as const, label: t("mapping.linkCode"), minWidth: 180 },
   {
     key: "product",
     align: "left" as const,
@@ -112,15 +117,26 @@ const columns = computed<DataColumn[]>(() => [
 
 const applied = ref({
   linkCode: "",
+  sourceItemId: "",
+  targetItemId: "",
+  productKeyword: "",
   kolKeyword: "",
   shopId: undefined as string | undefined,
   status: undefined as "ENABLED" | "DISABLED" | undefined
 });
+const productFilters = [
+  { key: "sourceItemId", label: "mapping.sourceItemSearch" },
+  { key: "targetItemId", label: "mapping.targetItemId" },
+  { key: "productKeyword", label: "mapping.productNameSearch" }
+] as const;
 
 const chips = computed<SearchChip[]>(() => {
   const list: SearchChip[] = [];
   if (applied.value.linkCode) {
     list.push({ key: "linkCode", label: t("mapping.linkCode"), text: applied.value.linkCode });
+  }
+  for (const { key, label } of productFilters) {
+    if (applied.value[key]) list.push({ key, label: t(label), text: applied.value[key] });
   }
   if (applied.value.kolKeyword) {
     const remembered =
@@ -252,6 +268,9 @@ function selectedKolCode(): string {
 function appliedQuery() {
   return {
     linkCode: applied.value.linkCode || undefined,
+    sourceItemId: applied.value.sourceItemId || undefined,
+    targetItemId: applied.value.targetItemId || undefined,
+    productKeyword: applied.value.productKeyword || undefined,
     kolKeyword: applied.value.kolKeyword || undefined,
     shopId: applied.value.shopId || undefined,
     status: applied.value.status || undefined
@@ -310,6 +329,9 @@ async function loadShops() {
 function snapshotFilters(): void {
   applied.value = {
     linkCode: query.linkCode.trim(),
+    sourceItemId: query.sourceItemId.trim(),
+    targetItemId: query.targetItemId.trim(),
+    productKeyword: query.productKeyword.trim(),
     kolKeyword: selectedKolCode(),
     shopId: query.shopId,
     status: query.status
@@ -324,18 +346,21 @@ function search() {
 
 function reset() {
   query.linkCode = "";
+  for (const { key } of productFilters) query[key] = "";
   query.kolId = undefined;
   query.shopId = undefined;
   query.status = undefined;
   query.page = 1;
   selectedFilterKol.value = null;
   filterKolOptions.value = [];
-  applied.value = { linkCode: "", kolKeyword: "", shopId: undefined, status: undefined };
+  snapshotFilters();
   void load();
 }
 
 function removeChip(key: string): void {
   if (key === "linkCode") query.linkCode = "";
+  const productFilter = productFilters.find(field => field.key === key);
+  if (productFilter) query[productFilter.key] = "";
   if (key === "kol") {
     query.kolId = undefined;
     selectedFilterKol.value = null;
@@ -387,6 +412,7 @@ watch(
   ([linkCode, status]) => {
     if (status === "ENABLED") {
       query.linkCode = "";
+      for (const { key } of productFilters) query[key] = "";
       query.kolId = undefined;
       query.shopId = undefined;
       query.status = "ENABLED";
@@ -414,6 +440,9 @@ onMounted(() => {
       <template #primary>
         <el-form-item :label="t('mapping.linkCode')">
           <el-input v-model="query.linkCode" clearable maxlength="16" data-test="link-code" />
+        </el-form-item>
+        <el-form-item v-for="{ key, label } in productFilters" :key="key" :label="t(label)">
+          <el-input v-model="query[key]" clearable maxlength="128" :data-test="key" />
         </el-form-item>
         <el-form-item :label="t('mapping.kol')">
           <el-select
@@ -514,9 +543,6 @@ onMounted(() => {
       @retry="load"
       @clear-filters="reset"
     >
-      <template #cell-linkCode="{ row }">
-        <CopyText :value="asItem(row).linkCode" />
-      </template>
       <template #cell-product="{ row }">
         <div class="product-cell">
           <el-image

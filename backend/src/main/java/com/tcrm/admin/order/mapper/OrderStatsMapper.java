@@ -91,7 +91,7 @@ public interface OrderStatsMapper {
           + PRODUCT_ITEMS
           + """
       scoped_orders AS NOT MATERIALIZED (
-        SELECT o.id, o.shop_id, o.kol_id, o.bd_user_id, o.pay_time, o.weidian_order_id,
+        SELECT o.id, o.shop_id, o.kol_id, o.bd_user_id, o.pay_time, o.weidian_order_id, o.order_status,
         <choose>
           <when test="scope.affiliateOnly or scope.productKeyword != null">matched.amount</when>
           <otherwise>o.pay_amount</otherwise>
@@ -189,14 +189,14 @@ public interface OrderStatsMapper {
   @Select(
       SCOPED_ORDERS
           + """
-      SELECT ROUND(SUM(f.amount_raw), 2)
+      SELECT ROUND(SUM(f.amount_cny), 2)
       FROM scoped_orders o
       JOIN crm_order_settlement_flow f ON f.shop_id = o.shop_id AND f.weidian_order_id = o.weidian_order_id
         AND (f.order_id IS NULL OR f.order_id = o.id)
         AND f.tenant_id = #{scope.tenantId} AND NOT f.is_deleted
       WHERE f.query_type = 'INCOME_DETAIL' AND f.trade_sub_type IN ('货款收入', '退款')
         AND f.trade_time &gt;= #{from} AND f.trade_time &lt; #{until}
-      HAVING COUNT(*) &gt; 0 AND COUNT(*) = COUNT(f.amount_raw)
+      HAVING COUNT(*) &gt; 0 AND COUNT(*) = COUNT(f.amount_cny)
       </script>
       """)
   BigDecimal scopedSettlement(
@@ -469,15 +469,29 @@ public interface OrderStatsMapper {
       )
       SELECT p.id, p.weidian_order_id AS order_no, p.shop_id, shop.shop_name, p.pay_time AS event_time,
              p.pay_amount AS amount, p.refund_amount, p.net_transaction_amount,
-             commission.amount AS estimated_commission
+             commission.amount AS estimated_commission,
+             CASE WHEN after_sales.active THEN 'REFUNDING' ELSE p.order_status END AS order_status,
+             CASE
+               WHEN commission.amount IS NULL THEN NULL
+               WHEN payouts.paid &gt; 0 AND payouts.paid &gt;= commission.amount THEN 'WITHDRAWN'
+               WHEN commission.amount &lt;= 0 THEN NULL
+               WHEN after_sales.active OR commission.released &lt;= payouts.occupied THEN 'FROZEN'
+               ELSE 'AVAILABLE'
+             END AS commission_status
       FROM paged p
       LEFT JOIN crm_shop shop ON shop.id = p.shop_id AND shop.tenant_id = #{scope.tenantId}
+      CROSS JOIN LATERAL (
+        SELECT EXISTS (
+          SELECT 1 FROM crm_refund r WHERE r.order_id = p.id AND r.tenant_id = #{scope.tenantId}
+            AND NOT r.is_deleted AND r.refund_status IN ('PROCESSING', 'UNKNOWN')
+        ) AS active
+      ) after_sales
       LEFT JOIN LATERAL (
         SELECT SUM(s.accrued_commission_cny)
         <if test="scope.productKeyword != null">
           FILTER (WHERE EXISTS (SELECT 1 FROM product_items matched WHERE matched.id = i.id))
         </if>
-        AS amount
+        AS amount, COALESCE(SUM(s.released_commission_cny), 0) AS released
         FROM crm_order_item i
         LEFT JOIN crm_commission_item_state s ON s.order_item_id = i.id AND s.order_id = p.id
           AND s.tenant_id = #{scope.tenantId} AND NOT s.is_deleted
@@ -488,6 +502,15 @@ public interface OrderStatsMapper {
           + """
         )
       ) commission ON TRUE
+      CROSS JOIN LATERAL (
+        SELECT COALESCE(SUM(a.occupied_cny), 0) AS occupied,
+               COALESCE(SUM(a.occupied_cny) FILTER (WHERE w.status = 'PAID'), 0) AS paid
+        FROM crm_order_item i
+        JOIN crm_commission_withdrawal_allocation a ON a.order_item_id = i.id AND a.tenant_id = i.tenant_id
+        JOIN crm_commission_withdrawal w ON w.id = a.withdrawal_id AND w.tenant_id = a.tenant_id
+        WHERE i.order_id = p.id AND i.tenant_id = #{scope.tenantId} AND NOT i.is_deleted
+          AND w.kol_id = p.kol_id AND w.status IN ('PENDING_REVIEW', 'PENDING_PAYMENT', 'PAID')
+      ) payouts
       ORDER BY
       """
           + INCOME_ORDER_SORT

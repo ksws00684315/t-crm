@@ -114,7 +114,7 @@ public final class SettlementBasisCalculator {
       if (!QUERY_INCOME_DETAIL.equals(flow.getQueryType())) {
         continue;
       }
-      BigDecimal cny = toCny(flow.getAmountRaw());
+      BigDecimal cny = flow.getAmountCny();
       if (cny == null) {
         return null;
       }
@@ -146,15 +146,14 @@ public final class SettlementBasisCalculator {
     if (lineBasis == null) {
       return BasisOutcome.unverified(REASON_ALLOCATION_FAILED);
     }
-    return new BasisOutcome(
-        reason, settlementTime, lineBasis, refundGap(items, flows).signum() > 0);
+    return new BasisOutcome(reason, settlementTime, lineBasis, hasRefundGap(items, flows));
   }
 
   /**
-   * Settlement refund total minus the CRM successful refund total: positive when the settlement
-   * flows show refunds the CRM records do not. A refund both sources show is netted once.
+   * Blocks release when a settlement refund lacks a CNY amount or exceeds CRM's successful refunds.
+   * A refund both sources show is netted once.
    */
-  static BigDecimal refundGap(List<OrderItemDO> items, List<OrderSettlementFlowDO> flows) {
+  private static boolean hasRefundGap(List<OrderItemDO> items, List<OrderSettlementFlowDO> flows) {
     BigDecimal fromFlows = BigDecimal.ZERO;
     boolean incomeRefundPresent =
         flows.stream()
@@ -168,12 +167,13 @@ public final class SettlementBasisCalculator {
           || !TRADE_SUB_TYPE_REFUND.equals(flow.getTradeSubType())) {
         continue;
       }
-      BigDecimal cny = toCny(flow.getAmountRaw());
-      if (cny != null) {
-        fromFlows = fromFlows.add(cny.abs());
+      BigDecimal cny = flow.getAmountCny();
+      if (cny == null) {
+        return true;
       }
+      fromFlows = fromFlows.add(cny.abs());
     }
-    return fromFlows.subtract(crmRefund(items)).setScale(2, RoundingMode.HALF_UP);
+    return fromFlows.compareTo(crmRefund(items)) > 0;
   }
 
   private static BigDecimal crmRefund(List<OrderItemDO> items) {
@@ -202,7 +202,7 @@ public final class SettlementBasisCalculator {
   /** The goods income equals the pay amount, or the pay amount less the CRM successful refunds. */
   private static boolean incomeConfirms(
       OrderSettlementFlowDO income, OrderDO order, List<OrderItemDO> items) {
-    BigDecimal incomeCny = toCny(income.getAmountRaw());
+    BigDecimal incomeCny = income.getAmountCny();
     if (incomeCny == null || order.getPayAmount() == null) {
       return false;
     }

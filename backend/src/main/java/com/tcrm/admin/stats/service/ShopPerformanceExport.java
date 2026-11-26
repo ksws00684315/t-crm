@@ -143,8 +143,8 @@ public class ShopPerformanceExport {
             label("net"),
             label("amountRefundRate"),
             label("average"),
-            label("prepayExpense"),
             label("totalEstimatedCommission"),
+            label("prepayExpense"),
             label("totalExpense"),
             label("bestCreator"),
             label("bestCreatorNet"));
@@ -163,8 +163,8 @@ public class ShopPerformanceExport {
                       money(m.netSalesAmount()),
                       percent(m.amountRefundRate()),
                       money(m.averageOrderAmount()),
-                      "",
                       money(row.totalEstimatedCommission()),
+                      money(row.prepayExpense()),
                       "",
                       row.bestCreator() == null ? "" : text(row.bestCreator().name()),
                       row.bestCreator() == null ? "" : money(row.bestCreator().netSalesAmount()));
@@ -252,8 +252,7 @@ public class ShopPerformanceExport {
             label("refundUnits"),
             label("sales"),
             label("refund"),
-            label("net"),
-            label("settlementAmount"));
+            label("net"));
     var rows =
         result.ranking().items().stream()
             .map(
@@ -274,8 +273,7 @@ public class ShopPerformanceExport {
                       "",
                       money(m.salesAmount()),
                       money(m.completedRefundAmount()),
-                      money(m.netSalesAmount()),
-                      "");
+                      money(m.netSalesAmount()));
                 })
             .toList();
     return excel.export(metadata, headers, rows);

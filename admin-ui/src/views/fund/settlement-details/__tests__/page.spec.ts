@@ -2,199 +2,117 @@ import { flushPromises, mount } from "@vue/test-utils";
 import ElementPlus from "element-plus";
 import { createPinia, setActivePinia } from "pinia";
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import * as financeApi from "@/api/commission/finance";
-import type { Settlement } from "@/api/commission/finance-types";
-import * as shopApi from "@/api/product/shop";
+import { listSettlementLedger } from "@/api/commission/finance";
+import { listShops } from "@/api/product/shop";
 import DataTable from "@/components/DataTable.vue";
 import { i18n } from "@/locales";
 import { notifyError } from "@/utils/notify";
-import { saveSession } from "@/utils/session";
+import { dates } from "@/views/analytics/board";
 import SettlementDetailsPage from "../index.vue";
 
-vi.mock("@/api/commission/finance", () => ({ listSettlements: vi.fn() }));
+vi.mock("@/api/commission/finance", () => ({ listSettlementLedger: vi.fn() }));
 vi.mock("@/api/product/shop", () => ({ listShops: vi.fn() }));
 vi.mock("@/utils/notify", () => ({ notifyError: vi.fn() }));
 
-const shopOption = {
-  id: "7001",
-  shopCode: "t87_SHOP_A",
-  shopName: "t87_店铺A",
-  channel: "WEIDIAN",
-  status: 1
+const ledger = {
+  settledGoodsAmount: "65.00",
+  pendingAmount: "15.00",
+  platformFeeAmount: "1.04",
+  activity: {
+    items: [
+      {
+        id: "5001",
+        occurredAt: "2026-11-24T06:22:17Z",
+        tradeType: "EXPENSE",
+        amount: "-0.39",
+        billType: "交易手续费",
+        balance: null,
+        orderNo: "t87_order",
+        creatorName: "演示达人",
+        creatorCode: "KOL0001",
+        commissionAmount: "13.00"
+      }
+    ],
+    total: "1",
+    page: 1,
+    size: 20
+  }
 };
 
-const frozenRow: Settlement = {
-  id: "5001",
-  orderNo: "791029213203",
-  channel: "WEIDIAN",
-  shop: "Shop A",
-  kolNames: ["tsim 达人"],
-  payment: "65.00",
-  refund: "0.00",
-  weidianWithdrawable: null,
-  commission: "6.50",
-  rates: ["0.1000"],
-  status: "FROZEN",
-  businessAt: "2026-10-20T08:00:00Z",
-  lines: []
-};
-
-const postedRow: Settlement = {
-  ...frozenRow,
-  id: "5002",
-  orderNo: "791029213204",
-  weidianWithdrawable: "64.70",
-  status: "POSTED"
-};
-
-const unverifiedRow: Settlement = {
-  ...frozenRow,
-  id: "5003",
-  orderNo: "791029213205",
-  commission: null,
-  rates: [],
-  status: "UNVERIFIED"
-};
-
-function signIn(permissions: string[]) {
-  saveSession({
-    token: "test-token",
-    expiresAt: Date.now() + 3_600_000,
-    user: {
-      id: "1",
-      username: "me",
-      nickname: "Me",
-      email: null,
-      role: "STAFF",
-      postTemplate: null,
-      permissions,
-      dataScope: "ALL",
-      tenantId: "1",
-      tenantName: "t87_公司",
-      status: 1,
-      lastLoginTime: null,
-      createTime: "2026-10-01T00:00:00Z"
-    }
-  });
+function mountPage() {
+  return mount(SettlementDetailsPage, { global: { plugins: [i18n, ElementPlus] } });
 }
 
-describe("settlement details page", () => {
+describe("settlement ledger", () => {
   beforeEach(() => {
     localStorage.clear();
     setActivePinia(createPinia());
-    vi.mocked(notifyError).mockClear();
-    vi.mocked(shopApi.listShops).mockReset();
-    vi.mocked(financeApi.listSettlements).mockResolvedValue({
-      items: [frozenRow, postedRow, unverifiedRow],
-      total: 3,
-      page: 1,
-      size: 20
-    } as never);
-    vi.mocked(shopApi.listShops).mockResolvedValue([shopOption] as never);
+    i18n.global.locale.value = "zh-CN";
+    vi.clearAllMocks();
+    vi.mocked(listShops).mockResolvedValue([]);
+    vi.mocked(listSettlementLedger).mockResolvedValue(ledger);
   });
 
-  it("picks the shop filter from the shop list instead of a typed id", async () => {
-    signIn(["commission:view", "product:view"]);
-    const wrapper = mount(SettlementDetailsPage, {
-      global: { plugins: [i18n, ElementPlus] }
-    });
+  it("renders the journal and cumulative settlement metrics", async () => {
+    const wrapper = mountPage();
     await flushPromises();
-
-    const shopSelect = wrapper
-      .findAllComponents({ name: "ElSelect" })
-      .find(select => select.attributes("data-test") === "settlement-shop-id");
-    expect(shopSelect).toBeDefined();
-    shopSelect!.vm.$emit("update:modelValue", "7001");
-    wrapper.findComponent({ name: "ListSearch" }).vm.$emit("search");
-    await flushPromises();
-
-    expect(financeApi.listSettlements).toHaveBeenLastCalledWith(
-      expect.objectContaining({ shopId: "7001" })
-    );
-    expect(wrapper.text()).toContain("t87_店铺A");
-    wrapper.unmount();
-  });
-
-  it("hides the shop filter without product:view and never calls its endpoint (L-015)", async () => {
-    signIn(["commission:view"]);
-    vi.mocked(shopApi.listShops).mockRejectedValue(new Error("403"));
-    const wrapper = mount(SettlementDetailsPage, {
-      global: { plugins: [i18n, ElementPlus] }
-    });
-    await flushPromises();
-
-    expect(shopApi.listShops).not.toHaveBeenCalled();
-    expect(notifyError).not.toHaveBeenCalled();
     expect(
       wrapper
-        .findAllComponents({ name: "ElSelect" })
-        .some(select => select.attributes("data-test") === "settlement-shop-id")
-    ).toBe(false);
-    expect(wrapper.text()).not.toContain("店铺 ID");
+        .getComponent(DataTable)
+        .props("columns")
+        .map(column => column.label)
+    ).toEqual([
+      "时间",
+      "收支类型",
+      "收入（元）",
+      "账单类型",
+      "余额",
+      "订单号",
+      "达人名/ID",
+      "佣金金额"
+    ]);
+    expect(wrapper.get('[data-test="wallet-settled"]').text()).toBe("¥65.00");
+    expect(wrapper.get('[data-test="wallet-pending"]').text()).toBe("¥15.00");
+    expect(wrapper.get('[data-test="wallet-platform-fee"]').text()).toBe("¥1.04");
+    expect(wrapper.text()).toContain("KOL0001");
+    expect(wrapper.text()).toContain("¥13.00");
+    expect(wrapper.text()).toContain("交易手续费");
+    expect(wrapper.text()).toContain("-¥0.39");
+    expect(wrapper.text()).not.toContain("提现记录");
     wrapper.unmount();
   });
 
-  it("shows the Weidian withdrawable column without a shop profit column", async () => {
-    const wrapper = mount(SettlementDetailsPage, {
-      global: { plugins: [i18n, ElementPlus] }
-    });
+  it("defaults to seven days and resets pagination when a preset is selected", async () => {
+    const wrapper = mountPage();
     await flushPromises();
-
-    const text = wrapper.text();
-    expect(text).toContain("结算金额");
-    expect(text).not.toContain("店铺获利");
-    expect(text).not.toContain("净增减");
-    wrapper.unmount();
-  });
-
-  it("shows applied filters as chips only after the user searches", async () => {
-    signIn(["commission:view", "product:view"]);
-    const wrapper = mount(SettlementDetailsPage, {
-      global: { plugins: [i18n, ElementPlus] }
-    });
+    expect(listSettlementLedger).toHaveBeenLastCalledWith(
+      expect.objectContaining({ ...dates(7), page: 1 })
+    );
+    wrapper.getComponent(DataTable).vm.$emit("update:page", 2);
     await flushPromises();
-    await wrapper.get('[data-test="settlement-order"]').setValue("791029213203");
-    expect(wrapper.find('[data-test="search-chip"]').exists()).toBe(false);
-    wrapper.findComponent({ name: "ListSearch" }).vm.$emit("search");
+    await wrapper.get('[data-test="period-30"]').trigger("click");
     await flushPromises();
-    expect(wrapper.find('[data-test="search-chip"]').exists()).toBe(true);
-    expect(financeApi.listSettlements).toHaveBeenLastCalledWith(
-      expect.objectContaining({ orderNo: "791029213203" })
+    expect(listSettlementLedger).toHaveBeenLastCalledWith(
+      expect.objectContaining({ ...dates(30), page: 1 })
     );
     wrapper.unmount();
   });
 
-  it("left-aligns long content columns", async () => {
-    const wrapper = mount(SettlementDetailsPage, {
-      global: { plugins: [i18n, ElementPlus] }
-    });
+  it("retains a confirmed zero and allows retry after a failed read", async () => {
+    vi.mocked(listSettlementLedger).mockRejectedValueOnce(new Error("network"));
+    const wrapper = mountPage();
     await flushPromises();
-    const columns = wrapper.getComponent(DataTable).props("columns") as Array<{
-      key: string;
-      align?: string;
-    }>;
-    for (const key of ["orderNo", "shop", "creator"]) {
-      expect(columns.find(column => column.key === key)?.align).toBe("left");
-    }
-    wrapper.unmount();
-  });
-
-  it("shows a dash for an unknown withdrawable amount and labels the three row states", async () => {
-    const wrapper = mount(SettlementDetailsPage, {
-      global: { plugins: [i18n, ElementPlus] }
+    expect(notifyError).toHaveBeenCalledOnce();
+    expect(wrapper.getComponent(DataTable).props("failed")).toBe(true);
+    vi.mocked(listSettlementLedger).mockResolvedValue({
+      ...ledger,
+      settledGoodsAmount: "0.00",
+      pendingAmount: "12.23"
     });
+    wrapper.getComponent(DataTable).vm.$emit("retry");
     await flushPromises();
-
-    const rows = wrapper.findAll(".el-table__body tbody tr");
-    expect(rows).toHaveLength(3);
-    const headers = wrapper.findAll(".el-table__header th").map(th => th.text());
-    const column = headers.findIndex(header => header.includes("结算金额"));
-    expect(column).toBeGreaterThan(-1);
-    expect(rows[0].findAll("td")[column].text()).toBe("-");
-    expect(rows[0].text()).toContain("冻结中");
-    expect(rows[1].text()).toContain("已入账");
-    expect(rows[1].findAll("td")[column].text()).toContain("64.70");
-    expect(rows[2].text()).toContain("待核实");
+    expect(wrapper.get('[data-test="wallet-settled"]').text()).toBe("¥0.00");
+    expect(wrapper.get('[data-test="wallet-pending"]').text()).toBe("¥12.23");
     wrapper.unmount();
   });
 });

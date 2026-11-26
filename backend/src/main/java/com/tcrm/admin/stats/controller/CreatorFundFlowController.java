@@ -2,6 +2,7 @@ package com.tcrm.admin.stats.controller;
 
 import cn.dev33.satoken.annotation.SaCheckPermission;
 import com.tcrm.admin.commission.api.CreatorFundFlowApi;
+import com.tcrm.admin.commission.api.CreatorFundFlowApi.Application;
 import com.tcrm.admin.commission.api.CreatorFundFlowApi.FundFlow;
 import com.tcrm.admin.commission.api.CreatorFundFlowApi.Query;
 import com.tcrm.admin.security.api.CurrentUserContext;
@@ -33,19 +34,26 @@ public class CreatorFundFlowController {
       @RequestParam @Positive long entityId,
       @RequestParam(required = false) Integer page,
       @RequestParam(required = false) Integer size) {
+    return R.ok(flows.list(current.user(), query(filters, entityId, page, size)));
+  }
+
+  @GetMapping("/admin-api/stats/creator-income/fund-applications")
+  @SaCheckPermission("commission:view")
+  public R<PageResult<Application>> applications(
+      @Valid @ModelAttribute StatsOverviewQuery filters,
+      @RequestParam @Positive long entityId,
+      @RequestParam(required = false) Integer page,
+      @RequestParam(required = false) Integer size) {
+    return R.ok(flows.applications(current.user(), query(filters, entityId, page, size)));
+  }
+
+  private static Query query(
+      StatsOverviewQuery filters, long entityId, Integer page, Integer size) {
     var period =
         StatsPeriod.resolve(
             filters.startDate(), filters.endDate(), Boolean.TRUE.equals(filters.cumulative()));
     var paging = StatsRanking.resolve(page, size, null);
-    return R.ok(
-        flows.list(
-            current.user(),
-            new Query(
-                entityId,
-                filters.shopId(),
-                period.from(),
-                period.until(),
-                paging.page(),
-                paging.size())));
+    return new Query(
+        entityId, filters.shopId(), period.from(), period.until(), paging.page(), paging.size());
   }
 }

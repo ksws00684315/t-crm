@@ -7,6 +7,9 @@ export interface KolItemQuery {
   size?: number;
   /** Exact link code. */
   linkCode?: string;
+  sourceItemId?: string;
+  targetItemId?: string;
+  productKeyword?: string;
   /** Creator name (fuzzy) or code / email (exact). The page sends the selected creator's code. */
   kolKeyword?: string;
   /** Target shop id. */
