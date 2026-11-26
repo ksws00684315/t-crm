@@ -29,7 +29,7 @@ vi.mock("@/api/commission/finance", () => ({
   getIncome: vi.fn(),
   getConfig: vi.fn(),
   saveConfig: vi.fn(),
-  listSettlements: vi.fn(),
+  listSettlementLedger: vi.fn(),
   listFinanceTasks: vi.fn(),
   getWithdrawal: vi.fn(),
   reviewWithdrawal: vi.fn(),
@@ -130,7 +130,12 @@ beforeEach(() => {
   };
   vi.mocked(analytics.queryAnalytics).mockResolvedValue(data);
   vi.mocked(api.getConfig).mockResolvedValue(demo.getConfig("SUPER_ADMIN", "data"));
-  vi.mocked(api.listSettlements).mockResolvedValue(demo.settlements("SUPER_ADMIN", "data", {}));
+  vi.mocked(api.listSettlementLedger).mockResolvedValue({
+    settledGoodsAmount: "0",
+    pendingAmount: "0",
+    platformFeeAmount: "0",
+    activity: { items: [], total: "0", page: 1, size: 20 }
+  });
   vi.mocked(api.listFinanceTasks).mockResolvedValue(
     (() => {
       const result = demo.listWithdrawals("SUPER_ADMIN", "data", {});
@@ -394,13 +399,11 @@ describe("finance admin pages", () => {
     wrapper.unmount();
   });
 
-  it("keeps all settlement columns, multiple creators and unknown amounts distinct", async () => {
+  it("shows settlement journal columns and zero amounts for an empty ledger", async () => {
     const wrapper = mount(SettlementPage, { global });
     await flushPromises();
-    expect(wrapper.getComponent(DataTable).props("columns")).toHaveLength(12);
-    expect(wrapper.get('[data-test="settlement-page"]').text()).toContain("多个");
-    expect(wrapper.get('[data-test="settlement-page"]').text()).toContain("待核实");
-    expect(wrapper.get('[data-test="settlement-page"]').text()).toContain("t1023_WD001");
+    expect(wrapper.getComponent(DataTable).props("columns")).toHaveLength(8);
+    expect(wrapper.get('[data-test="wallet-settled"]').text()).toBe("¥0.00");
     wrapper.unmount();
   });
   it("sends the shop filter as shopId and omits the unsupported BD name filter", async () => {
@@ -419,7 +422,7 @@ describe("finance admin pages", () => {
       .vm.$emit("update:modelValue", "1023001");
     await wrapper.get('[data-test="search"]').trigger("click");
     await flushPromises();
-    const query = vi.mocked(api.listSettlements).mock.lastCall?.[0];
+    const query = vi.mocked(api.listSettlementLedger).mock.lastCall?.[0];
     expect(query).toMatchObject({ shopId: "1023001" });
     expect(query).not.toHaveProperty("shop");
     const taskPage = mount(TasksPage, { global });
@@ -483,7 +486,7 @@ describe("finance admin pages", () => {
     "presents API errors and stops loading for %s",
     async component => {
       vi.mocked(api.getConfig).mockRejectedValue(new Error("network"));
-      vi.mocked(api.listSettlements).mockRejectedValue(new Error("network"));
+      vi.mocked(api.listSettlementLedger).mockRejectedValue(new Error("network"));
       vi.mocked(api.listFinanceTasks).mockRejectedValue(new Error("network"));
       const wrapper = mount(component, { global });
       await flushPromises();

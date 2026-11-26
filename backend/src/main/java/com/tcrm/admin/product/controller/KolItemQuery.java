@@ -9,6 +9,9 @@ import jakarta.validation.constraints.Size;
 
 public record KolItemQuery(
     @Size(max = 16) String linkCode,
+    @Size(max = 128) String sourceItemId,
+    @Size(max = 128) String targetItemId,
+    @Size(max = 128) String productKeyword,
     @Size(max = 128) String kolKeyword,
     @Min(1) Long shopId,
     @Pattern(regexp = "\\s*(ENABLED|DISABLED)?\\s*") String status,
@@ -21,7 +24,10 @@ public record KolItemQuery(
         shopId,
         blankToNull(status),
         page == null ? 1 : page,
-        size == null ? 20 : size);
+        size == null ? 20 : size,
+        blankToNull(sourceItemId),
+        blankToNull(targetItemId),
+        blankToNull(productKeyword));
   }
 
   private static String blankToNull(String value) {

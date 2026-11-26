@@ -111,6 +111,7 @@ export interface RankRow {
   linkCount?: Scalar;
   commissionRate?: Scalar;
   creatorMoney?: Record<string, Scalar | null> | null;
+  prepayExpense?: Scalar | null;
   imageUrl?: string;
   bestCreator?: { id: string; name: string | null; netSalesAmount: Scalar; code?: string | null };
   metrics?: Metrics;
@@ -183,7 +184,11 @@ export type CreatorIncomeOrder = Pick<
   | "amount"
   | "refundAmount"
   | "netTransactionAmount"
-> & { estimatedCommission: Scalar | null };
+> & {
+  estimatedCommission: Scalar | null;
+  orderStatus: string | null;
+  commissionStatus: "FROZEN" | "AVAILABLE" | "WITHDRAWN" | null;
+};
 
 export function queryCreatorIncomeOrders(
   params: DetailQuery & Partial<DetailSortQuery> & { page: number; size: number }
@@ -195,26 +200,28 @@ export function queryCreatorIncomeOrders(
   });
 }
 
-export interface CreatorFundFlow {
+export interface CreatorFundApplication {
   id: string;
   fundType: "COMMISSION" | "PREPAY";
-  direction: "INCREASE" | "DECREASE";
-  orderNo: string | null;
   amount: string;
-  status: "FROZEN" | "AVAILABLE" | "WITHDRAWN" | "CLAWBACK" | "PREPAID";
-  settlementNo: string | null;
-  occurredAt: string;
+  status: "PENDING_REVIEW" | "PENDING_PAYMENT" | "PAID";
+  applicationNo: string;
 }
 
-export function queryCreatorFundFlows(
+export function queryCreatorFundApplications(
   params: Pick<DetailQuery, "startDate" | "endDate" | "cumulative" | "shopId" | "entityId"> & {
     page: number;
     size: number;
   }
 ) {
-  return http.request<{ items: CreatorFundFlow[]; total: Scalar; page: number; size: number }>({
+  return http.request<{
+    items: CreatorFundApplication[];
+    total: Scalar;
+    page: number;
+    size: number;
+  }>({
     method: "get",
-    url: "/stats/creator-income/fund-flows",
+    url: "/stats/creator-income/fund-applications",
     params
   });
 }

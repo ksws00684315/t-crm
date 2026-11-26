@@ -13,6 +13,7 @@ import com.tcrm.admin.order.api.OrderEvidenceApi.ProductGroup;
 import com.tcrm.admin.order.api.OrderEvidenceApi.ProductOrderCounts;
 import com.tcrm.admin.order.api.OrderEvidenceApi.Selection;
 import com.tcrm.admin.order.api.OrderEvidenceApi.SettlementFlowRow;
+import com.tcrm.admin.order.api.OrderEvidenceApi.SettlementLedgerRow;
 import com.tcrm.admin.order.api.OrderEvidenceApi.ShopCreatorCounts;
 import com.tcrm.admin.order.api.OrderStatsApi;
 import com.tcrm.admin.order.api.OrderStatsApi.RankDimension;
@@ -331,6 +332,44 @@ public class AnalyticsDetailService {
         resolved.period().until(),
         ranking.page(),
         ranking.size());
+  }
+
+  public record SettlementLedger(
+      BigDecimal settledGoodsAmount,
+      BigDecimal pendingAmount,
+      BigDecimal platformFeeAmount,
+      PageResult<SettlementLedgerRow> activity) {}
+
+  @Transactional(readOnly = true, isolation = Isolation.REPEATABLE_READ)
+  public SettlementLedger settlementLedger(
+      LocalDate startDate, LocalDate endDate, Long shopId, Integer page, Integer size) {
+    if (!overview.canViewCommission()) {
+      throw new BusinessException(ErrorCode.AUTH_FORBIDDEN);
+    }
+    var user = current.user();
+    if (user.tenantId() == null) {
+      throw new BusinessException(ErrorCode.AUTH_FORBIDDEN);
+    }
+    var visible = shops.listShops().stream().map(ShopAccessDTO::id).toList();
+    if (shopId != null && !visible.contains(shopId)) {
+      throw new BusinessException(ErrorCode.COMMON_NOT_FOUND);
+    }
+    var period = StatsPeriod.resolve(startDate, endDate);
+    var ranking = StatsRanking.resolve(page, size, null);
+    var scope =
+        new ScopeDTO(
+            user.tenantId(), user.ownScope() ? user.id() : null, shopId, null, null, visible);
+    var cumulative = StatsPeriod.resolve(null, null, true);
+    var settlement = evidence.settlementLedgerTotals(scope, cumulative.from(), cumulative.until());
+    var sales = orders.totals(scope, cumulative.from(), cumulative.until());
+    return new SettlementLedger(
+        settlement.settledGoodsAmount(),
+        StatsOverviewService.metrics(sales)
+            .netSalesAmount()
+            .subtract(settlement.settledGoodsAmount()),
+        settlement.platformFeeAmount(),
+        evidence.settlementLedger(
+            scope, period.from(), period.until(), ranking.page(), ranking.size()));
   }
 
   private boolean settlementAllowed(StatsOverviewService.ResolvedFilter resolved) {

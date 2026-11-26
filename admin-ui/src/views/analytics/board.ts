@@ -43,8 +43,7 @@ export const columnsByBoard: Record<Board, string[]> = {
     "paidOrderCount",
     "salesAmount",
     "completedRefundAmount",
-    "netSalesAmount",
-    "settlementAmount"
+    "netSalesAmount"
   ],
   "kol-ranking": [
     "identity",
@@ -70,8 +69,8 @@ export const columnsByBoard: Record<Board, string[]> = {
     "netSalesAmount",
     "amountRefundRate",
     "averageOrderAmount",
-    "prepayExpense",
     "totalEstimatedCommission",
+    "prepayExpense",
     "totalExpense",
     "bestCreator"
   ]
@@ -97,7 +96,6 @@ export const money = new Set([
   "averageOrderAmount",
   "netCommission",
   "settlement",
-  "settlementAmount",
   "estimatedCommission",
   "paidPrepay",
   "prepayExpense",
@@ -107,9 +105,7 @@ export const money = new Set([
 export const rates = new Set(["amountRefundRate", "periodRefundedOrderRate", "commissionRate"]);
 export const pending = new Set([
   "refundUnits",
-  "settlementAmount",
   "netCommission",
-  "prepayExpense",
   "totalEstimatedCommission",
   "totalExpense"
 ]);

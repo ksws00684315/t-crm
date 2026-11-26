@@ -133,7 +133,6 @@ const columnWidths: Record<string, DataColumn["minWidth"]> = {
   relationship: { "zh-CN": 128, "en-US": 186 },
   linkCount: { "zh-CN": 132, "en-US": 168 },
   commissionRate: { "zh-CN": 120, "en-US": 172 },
-  settlementAmount: { "zh-CN": 108, "en-US": 176 },
   estimatedCommission: { "zh-CN": 108, "en-US": 202 },
   prepayExpense: { "zh-CN": 108, "en-US": 198 },
   totalEstimatedCommission: { "zh-CN": 126, "en-US": 240 },
@@ -278,15 +277,9 @@ function label(key: string): string {
   }
   if (
     product &&
-    [
-      "identity",
-      "channelCode",
-      "shop",
-      "kolCount",
-      "paidOrderCount",
-      "netSalesAmount",
-      "settlementAmount"
-    ].includes(key)
+    ["identity", "channelCode", "shop", "kolCount", "paidOrderCount", "netSalesAmount"].includes(
+      key
+    )
   ) {
     return t(`analytics.best-sellers.${key}`);
   }
@@ -379,14 +372,21 @@ const cards = computed(() => {
       return formatAmountWithCurrency(`${whole}.${fraction.padEnd(2, "0")}`);
     };
     const forbidden = isCommissionForbidden("commissionRate");
-    const selling = term("selling");
-    const effective = term(
-      "effective",
-      undefined,
-      extras?.periodEffectiveCount == null && result.value
-        ? "effectiveUnavailableHint"
-        : "effectiveHint"
-    );
+    const selling = income
+      ? { ...term("selling"), label: t("analytics.income.sellingCreators") }
+      : term("selling");
+    const effective = income
+      ? {
+          label: t("analytics.income.totalInvitedCreators"),
+          hint: t("analytics.income.totalInvitedNote")
+        }
+      : term(
+          "effective",
+          undefined,
+          extras?.periodEffectiveCount == null && result.value
+            ? "effectiveUnavailableHint"
+            : "effectiveHint"
+        );
     const orderCount = term("orders");
     const units = term("units");
     const net = term("net");
@@ -402,21 +402,27 @@ const cards = computed(() => {
         tone: "purple" as const,
         icon: User,
         label: `${selling.label} / ${effective.label}`,
-        value: pair(summary?.sellingCount, extras?.periodEffectiveCount),
+        value: pair(
+          summary?.sellingCount,
+          income ? extras?.relationshipCount : extras?.periodEffectiveCount
+        ),
         labelTerms: [selling, effective],
-        detailTerms: [
-          {
-            ...term(
-              "relationship",
-              extras?.relationshipCount == null
-                ? "—"
-                : t("analytics.creatorCards.peopleCount", {
-                    value: display("", extras.relationshipCount)
-                  })
-            ),
-            label: translate(income ? "totalInvited" : "relationship")
-          }
-        ]
+        detail: income ? t("analytics.income.totalInvitedNote") : undefined,
+        detailTerms: income
+          ? undefined
+          : [
+              {
+                ...term(
+                  "relationship",
+                  extras?.relationshipCount == null
+                    ? "—"
+                    : t("analytics.creatorCards.peopleCount", {
+                        value: display("", extras.relationshipCount)
+                      })
+                ),
+                label: translate("relationship")
+              }
+            ]
       },
       {
         tone: "blue" as const,

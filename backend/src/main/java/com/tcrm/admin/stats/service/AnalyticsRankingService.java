@@ -328,9 +328,7 @@ public class AnalyticsRankingService {
             : new Summary(priorMetrics, sellingProducts(before), null, null, null, null),
         prior == null ? null : StatsOverviewService.changes(metrics, priorMetrics),
         rows,
-        List.of(
-            new UnavailableDTO("refundUnits", "REFUND_QUANTITY_PENDING"),
-            new UnavailableDTO("settlementAmount", "WEIDIAN_SETTLEMENT_PENDING")));
+        List.of(new UnavailableDTO("refundUnits", "REFUND_QUANTITY_PENDING")));
   }
 
   private static List<Row> productRows(
@@ -592,6 +590,23 @@ public class AnalyticsRankingService {
                       Collectors.toMap(
                           OrderStatsApi.InviterCommissionDTO::inviterId, Function.identity()))
               : Map.<Long, OrderStatsApi.InviterCommissionDTO>of();
+      boolean showPrepay =
+          canSeeInviterCommission && scope.shopId() == null && scope.productKeyword() == null;
+      var applicants =
+          matched.stream()
+              .filter(id -> scope.ownerId() == null || scope.ownerId().equals(id))
+              .toList();
+      var creatorFilter = scope.matchedKolIds();
+      if (scope.kolId() != null) {
+        creatorFilter =
+            creatorFilter == null || creatorFilter.contains(scope.kolId())
+                ? List.of(scope.kolId())
+                : List.of();
+      }
+      var prepayByApplicant =
+          showPrepay
+              ? prepays.paidByApplicant(applicants, creatorFilter, period.from(), period.until())
+              : Map.<Long, BigDecimal>of();
       rows =
           rows.stream()
               .map(
@@ -607,9 +622,11 @@ public class AnalyticsRankingService {
                                 creator == null ? null : creator.name(),
                                 best.netSalesAmount(),
                                 creator == null ? null : creator.kolCode()),
-                        commission == null
-                            ? null
-                            : commission.estimated().add(commission.actual()));
+                        commission == null ? null : commission.estimated().add(commission.actual()),
+                        showPrepay && matchedIds.contains(row.entityId())
+                            ? prepayByApplicant.getOrDefault(
+                                row.entityId(), BigDecimal.ZERO.setScale(2))
+                            : null);
                   })
               .toList();
       long newInvitations =
@@ -670,7 +687,9 @@ public class AnalyticsRankingService {
 
   private static List<UnavailableDTO> inviterUnavailable(InviterCards cards, boolean authorized) {
     var fields = new ArrayList<UnavailableDTO>();
-    fields.add(new UnavailableDTO("prepayExpense", "INVITER_FINANCE_DASHBOARD_PENDING"));
+    if (!authorized) {
+      fields.add(new UnavailableDTO("prepayExpense", "COMMISSION_FORBIDDEN"));
+    }
     fields.add(new UnavailableDTO("totalExpense", "INVITER_FINANCE_DASHBOARD_PENDING"));
     if (!authorized || cards.totalCommission() == null) {
       fields.add(
@@ -732,7 +751,17 @@ public class AnalyticsRankingService {
     }
     return new CreatorCards(
         valid,
-        eligible.stream().filter(k -> k.bdUserId() != null).count(),
+        income
+            ? firstInvitations(scope).stream()
+                .filter(i -> scope.ownerId() == null || scope.ownerId().equals(i.bdUserId()))
+                .filter(i -> scope.inviterId() == null || scope.inviterId().equals(i.bdUserId()))
+                .filter(
+                    i ->
+                        scope.matchedInviterIds() == null
+                            || scope.matchedInviterIds().contains(i.bdUserId()))
+                .filter(i -> shopCreators == null || shopCreators.contains(i.kolId()))
+                .count()
+            : eligible.stream().filter(k -> k.bdUserId() != null).count(),
         orders.creatorSpuCount(scope, period.from(), period.until()),
         commission == null ? null : commission.total(),
         commission == null || commission.total() == null || commission.clawback() == null
@@ -1028,6 +1057,7 @@ public class AnalyticsRankingService {
       String relationStatus,
       BestCreator bestCreator,
       BigDecimal totalEstimatedCommission,
+      BigDecimal prepayExpense,
       Long onSaleShopCount,
       Long linkedCreatorCount,
       CreatorMoney creatorMoney) {
@@ -1081,6 +1111,7 @@ public class AnalyticsRankingService {
           null,
           null,
           null,
+          null,
           null);
     }
 
@@ -1110,12 +1141,13 @@ public class AnalyticsRankingService {
           relationStatus,
           bestCreator,
           totalEstimatedCommission,
+          prepayExpense,
           onSaleShopCount,
           linkedCreatorCount,
           money);
     }
 
-    Row withInviterMetrics(BestCreator best, BigDecimal commission) {
+    Row withInviterMetrics(BestCreator best, BigDecimal commission, BigDecimal prepay) {
       return new Row(
           id,
           name,
@@ -1141,6 +1173,7 @@ public class AnalyticsRankingService {
           relationStatus,
           best,
           commission,
+          prepay,
           onSaleShopCount,
           linkedCreatorCount,
           creatorMoney);
@@ -1170,6 +1203,7 @@ public class AnalyticsRankingService {
           linkCount,
           commissionRate,
           relationStatus,
+          null,
           null,
           null,
           counts == null ? null : counts.onSaleShopCount(),

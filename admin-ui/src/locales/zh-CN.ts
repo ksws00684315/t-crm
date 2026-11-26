@@ -79,6 +79,8 @@ const zhCN = {
       amount: "金额",
       status: "状态",
       settlementNo: "结算单号",
+      applicationNo: "申请单号",
+      applicationStatuses: { PENDING_REVIEW: "待审核", PENDING_PAYMENT: "待支付", PAID: "已支付" },
       types: { COMMISSION: "佣金", PREPAY: "预付款" },
       directions: { INCREASE: "增加", DECREASE: "减少" },
       statuses: {
@@ -90,6 +92,10 @@ const zhCN = {
       }
     },
     income: {
+      sellingCreators: "有销售达人数",
+      totalInvitedCreators: "总邀请达人数",
+      totalInvitedNote: "总邀请达人数按历史累计去重统计",
+      commissionStatus: "佣金状态",
       ranking: "达人明细",
       identity: "达人名 / 社媒 / ID",
       relationship: "达人状态",
@@ -353,7 +359,7 @@ const zhCN = {
       coverage: "SPU／SKU",
       kolCount: "达人数",
       settlementFormula: "按微店流水入账时间汇总应收增加减应收减少。",
-      settlementEmpty: "暂无流水数据",
+      settlementEmpty: "暂无可用结算金额",
       settlementScoped: "仅支持店铺范围",
       identity: "店铺名称及编号",
       ranking: "店铺经营排行",
@@ -394,7 +400,6 @@ const zhCN = {
       kolCount: "成交达人数/关联达人数",
       paidOrderCount: "订单数",
       netSalesAmount: "净销售额",
-      settlementAmount: "结算金额",
       ranking: "商品排行",
       rankingCount: "共 {count} 个商品",
       net: "净销售额",
@@ -418,8 +423,7 @@ const zhCN = {
         completedRefundAmount:
           "按退款完结时间累计该商品的成功退款金额，仅纳入能关联到该商品订单行的退款。",
         netSalesAmount:
-          "所选期间的销售额减去同批已支付订单在 30 个北京时间自然日内完结的成功退款金额。",
-        settlementAmount: "按平台结算流水归属到该商品的结算金额。商品级结算流水待接入。"
+          "所选期间的销售额减去同批已支付订单在 30 个北京时间自然日内完结的成功退款金额。"
       }
     },
     "kol-ranking": {
@@ -524,7 +528,7 @@ const zhCN = {
         netSalesAmount: "销售额减去同批订单在 30 个北京时间自然日内完结的成功退款金额。",
         amountRefundRate: "所选期间内完结的成功退款金额除以同期销售额。",
         averageOrderAmount: "所选期间的销售额除以已支付订单数。",
-        prepayExpense: "预付已打款的支出金额。看板数据待接入。",
+        prepayExpense: "按预付款实际打款时间统计，归入申请时的商务。预付款不分摊到店铺或商品。",
         totalExpense: "已支付的佣金支出加预付支出。看板数据待接入。",
         activeInviters: "当前账户和公司成员关系均启用、且具备商务资格的邀请人数。按当前状态统计。",
         totalInviters: "当前可见的商务邀请人，包括仍可查到历史邀请或业绩的停用邀请人。",
@@ -1993,6 +1997,8 @@ const zhCN = {
     limitHint: "单个文件不超过 20MB、20000 行"
   },
   mapping: {
+    sourceItemSearch: "原商品ID",
+    productNameSearch: "商品名关键词",
     searchTip: "请输入达人编号、原商品编码或专属商品 ID 查询",
     confirmRebuild:
       "将按当前对应关系、达人、商品与店铺状态重建全部中转链接索引，在后台执行。确定开始吗？",

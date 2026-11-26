@@ -107,6 +107,34 @@ public class CreatorFundFlowService implements CreatorFundFlowApi {
   }
 
   @Override
+  @Transactional(readOnly = true)
+  public PageResult<Application> applications(AccountDTO user, Query query) {
+    if (user.tenantId() == null) {
+      throw new BusinessException(ErrorCode.AUTH_FORBIDDEN);
+    }
+    return TenantScope.callCompany(
+        user.tenantId(),
+        () -> {
+          var scope = displayScope(user, query);
+          var rows =
+              flows.applications(
+                  user.tenantId(),
+                  query.creatorId(),
+                  query.shopId(),
+                  scope.owner(),
+                  scope.visible(),
+                  query.from(),
+                  query.until());
+          long offset = (long) (query.page() - 1) * query.size();
+          return new PageResult<>(
+              rows.stream().skip(offset).limit(query.size()).toList(),
+              rows.size(),
+              query.page(),
+              query.size());
+        });
+  }
+
+  @Override
   @Transactional(readOnly = true, isolation = Isolation.REPEATABLE_READ)
   public Totals totals(AccountDTO user, Query query) {
     if (user.tenantId() == null) {

@@ -13,10 +13,13 @@ import com.tcrm.admin.stats.service.AnalyticsDetailService;
 import com.tcrm.admin.stats.service.AnalyticsDetailService.Board;
 import com.tcrm.admin.stats.service.AnalyticsDetailService.CreatorRow;
 import com.tcrm.admin.stats.service.AnalyticsDetailService.Detail;
+import com.tcrm.admin.stats.service.AnalyticsDetailService.SettlementLedger;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.Positive;
 import jakarta.validation.constraints.PositiveOrZero;
 import jakarta.validation.constraints.Size;
+import java.time.LocalDate;
+import org.springframework.format.annotation.DateTimeFormat;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.ModelAttribute;
 import org.springframework.web.bind.annotation.RequestMapping;
@@ -46,6 +49,17 @@ public class AnalyticsDetailController {
       @RequestParam(required = false) Integer page,
       @RequestParam(required = false) Integer size) {
     return R.ok(details.shopSettlementFlows(filters.toFilter(), page, size));
+  }
+
+  @GetMapping("/settlement-ledger")
+  @SaCheckPermission("commission:view")
+  public R<SettlementLedger> settlementLedger(
+      @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate startDate,
+      @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate endDate,
+      @RequestParam(required = false) @Positive Long shopId,
+      @RequestParam(required = false) Integer page,
+      @RequestParam(required = false) Integer size) {
+    return R.ok(details.settlementLedger(startDate, endDate, shopId, page, size));
   }
 
   @GetMapping("/best-sellers/details")

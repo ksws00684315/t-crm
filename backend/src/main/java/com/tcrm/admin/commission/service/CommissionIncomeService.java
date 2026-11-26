@@ -58,6 +58,19 @@ public class CommissionIncomeService implements CreatorPrepayApi {
         : prepayMoneyMap(finance.prepayPaidSums(creatorIds, from, until));
   }
 
+  @Override
+  public Map<Long, BigDecimal> paidByApplicant(
+      Collection<Long> applicantIds, Collection<Long> creatorIds, Instant from, Instant until) {
+    if (applicantIds.isEmpty() || (creatorIds != null && creatorIds.isEmpty())) {
+      return Map.of();
+    }
+    var result = new HashMap<Long, BigDecimal>();
+    for (var row : finance.prepayPaidByApplicant(applicantIds, creatorIds, from, until)) {
+      result.put(row.applicantId(), row.amountCny());
+    }
+    return result;
+  }
+
   private static final Comparator<PaymentLine> NEWEST_PAYMENT =
       Comparator.comparing(
               PaymentLine::paidAt, Comparator.nullsFirst(Comparator.<Instant>naturalOrder()))

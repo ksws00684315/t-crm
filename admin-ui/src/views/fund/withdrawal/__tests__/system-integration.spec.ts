@@ -25,7 +25,7 @@ vi.mock("@/api/commission/finance", () => ({
   getIncome: vi.fn(),
   getConfig: vi.fn(),
   saveConfig: vi.fn(),
-  listSettlements: vi.fn(),
+  listSettlementLedger: vi.fn(),
   listFinanceTasks: vi.fn(),
   getWithdrawal: vi.fn(),
   reviewWithdrawal: vi.fn(),
@@ -62,7 +62,12 @@ beforeEach(() => {
   };
   const demo = createFinanceDemo();
   vi.mocked(api.getConfig).mockResolvedValue(demo.getConfig("SUPER_ADMIN", "data"));
-  vi.mocked(api.listSettlements).mockResolvedValue(demo.settlements("SUPER_ADMIN", "data", {}));
+  vi.mocked(api.listSettlementLedger).mockResolvedValue({
+    settledGoodsAmount: "0",
+    pendingAmount: "0",
+    platformFeeAmount: "0",
+    activity: { items: [], total: "0", page: 1, size: 20 }
+  });
   vi.mocked(api.listFinanceTasks).mockResolvedValue(
     (() => {
       const result = demo.listWithdrawals("SUPER_ADMIN", "data", {});
@@ -107,7 +112,7 @@ describe("commission pages inside the existing application", () => {
       wrapper.unmount();
     }
     expect(api.listFinanceTasks).toHaveBeenCalled();
-    expect(api.listSettlements).toHaveBeenCalled();
+    expect(api.listSettlementLedger).toHaveBeenCalled();
     expect(api.getConfig).toHaveBeenCalled();
   });
 

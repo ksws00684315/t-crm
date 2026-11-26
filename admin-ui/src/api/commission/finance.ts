@@ -26,6 +26,34 @@ import type {
 } from "./finance-types";
 
 type Demo = FinanceDemo;
+export interface SettlementLedgerRow {
+  id: string;
+  occurredAt: string;
+  tradeType: string | null;
+  amount: string | number | null;
+  billType: string | null;
+  balance: string | number | null;
+  orderNo: string | null;
+  creatorName: string | null;
+  creatorCode: string | null;
+  commissionAmount: string | number | null;
+}
+export interface SettlementLedger {
+  settledGoodsAmount: string | number;
+  pendingAmount: string | number;
+  platformFeeAmount: string | number;
+  activity: Page<SettlementLedgerRow>;
+}
+export function listSettlementLedger(params: {
+  startDate: string;
+  endDate: string;
+  shopId?: string;
+  page: number;
+  size: number;
+}): Promise<SettlementLedger> {
+  return http.request({ method: "get", url: "/stats/settlement-ledger", params });
+}
+
 const previewBuild = financePreview;
 let demo: Demo | undefined;
 function financeError(status: number, errorCode = "COMMON_INTERNAL_ERROR"): never {

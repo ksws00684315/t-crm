@@ -20,12 +20,15 @@ import com.tcrm.admin.order.api.OrderEvidenceApi.ProductBreakdown;
 import com.tcrm.admin.order.api.OrderEvidenceApi.ProductGroup;
 import com.tcrm.admin.order.api.OrderEvidenceApi.ProductOrderCounts;
 import com.tcrm.admin.order.api.OrderEvidenceApi.Selection;
+import com.tcrm.admin.order.api.OrderEvidenceApi.SettlementLedgerRow;
+import com.tcrm.admin.order.api.OrderEvidenceApi.SettlementLedgerTotals;
 import com.tcrm.admin.order.api.OrderStatsApi;
 import com.tcrm.admin.order.api.OrderStatsApi.RankDimension;
 import com.tcrm.admin.order.api.OrderStatsApi.RankFactsDTO;
 import com.tcrm.admin.order.api.OrderStatsApi.ScopeDTO;
 import com.tcrm.admin.product.api.ShopAccessApi;
 import com.tcrm.admin.product.api.ShopAccessDTO;
+import com.tcrm.admin.security.api.AccountDTO;
 import com.tcrm.admin.security.api.CurrentUserContext;
 import com.tcrm.admin.security.api.DataScope;
 import com.tcrm.admin.shared.BusinessException;
@@ -49,6 +52,7 @@ class AnalyticsDetailServiceTest {
   private final KolApi creators = mock(KolApi.class);
   private final OrderStatsApi orders = mock(OrderStatsApi.class);
   private final BdUserApi inviters = mock(BdUserApi.class);
+  private final CurrentUserContext current = mock(CurrentUserContext.class);
   private final AnalyticsDetailService details =
       new AnalyticsDetailService(
           overview,
@@ -58,8 +62,65 @@ class AnalyticsDetailServiceTest {
           orders,
           inviters,
           mock(CreatorFundFlowApi.class),
-          mock(CurrentUserContext.class));
+          current);
   private final LocalDate day = LocalDate.of(2026, 11, 3);
+
+  @Test
+  void settlementLedgerUsesBeijingDatesAndAuthorizedShopAndOwnerScopes() {
+    var account = mock(AccountDTO.class);
+    when(current.user()).thenReturn(account);
+    when(account.tenantId()).thenReturn(4L);
+    when(account.id()).thenReturn(9L);
+    when(account.ownScope()).thenReturn(true);
+    when(overview.canViewCommission()).thenReturn(true);
+    when(shops.listShops()).thenReturn(List.of(new ShopAccessDTO(1L, "Shop", "remote", 1, "S1")));
+    var period = new StatsPeriod(day, day);
+    var scope = new ScopeDTO(4, 9L, 1L, null, null, List.of(1L));
+    var entry =
+        new SettlementLedgerRow(
+            10L,
+            period.from(),
+            "Expense",
+            new BigDecimal("-0.39"),
+            "Fee",
+            null,
+            "859193293611419",
+            "Creator",
+            "KOL0001",
+            new BigDecimal("10.00"));
+    var cumulative = StatsPeriod.resolve(null, null, true);
+    when(evidence.settlementLedgerTotals(scope, cumulative.from(), cumulative.until()))
+        .thenReturn(new SettlementLedgerTotals(new BigDecimal("65.00"), new BigDecimal("1.04")));
+    when(orders.totals(scope, cumulative.from(), cumulative.until()))
+        .thenReturn(
+            new OrderStatsApi.TotalsDTO(
+                2,
+                2,
+                new BigDecimal("100"),
+                new BigDecimal("20"),
+                new BigDecimal("30"),
+                1,
+                period.from()));
+    when(evidence.settlementLedger(scope, period.from(), period.until(), 2, 20))
+        .thenReturn(new PageResult<>(List.of(entry), 21, 2, 20));
+
+    var result = details.settlementLedger(day, day, 1L, 2, 20);
+
+    assertThat(result.settledGoodsAmount()).isEqualByComparingTo("65.00");
+    assertThat(result.pendingAmount()).isEqualByComparingTo("15.00");
+    assertThat(result.platformFeeAmount()).isEqualByComparingTo("1.04");
+    assertThat(result.activity().items()).containsExactly(entry);
+    assertThatThrownBy(() -> details.settlementLedger(day, day, 2L, 1, 20))
+        .isInstanceOf(BusinessException.class);
+    verify(evidence).settlementLedger(scope, period.from(), period.until(), 2, 20);
+  }
+
+  @Test
+  void settlementLedgerRejectsRequestsWithoutFinancialPermission() {
+    assertThatThrownBy(() -> details.settlementLedger(day, day, null, 1, 20))
+        .isInstanceOf(BusinessException.class);
+    verifyNoInteractions(current, shops, evidence);
+  }
 
   @Test
   void carriesProductCodeKeywordAndOwnerScopeToEvidencePage() {

@@ -154,6 +154,9 @@ describe("Kol item page", () => {
       page: 1,
       size: 20,
       linkCode: undefined,
+      sourceItemId: undefined,
+      targetItemId: undefined,
+      productKeyword: undefined,
       kolKeyword: undefined,
       shopId: undefined,
       status: undefined
@@ -162,7 +165,7 @@ describe("Kol item page", () => {
     expect(wrapper.text()).toContain("商品");
     expect(wrapper.text()).toContain("商品销售额");
     expect(wrapper.text()).toContain("清理状态");
-    expect(wrapper.text()).toContain("KPL-ABCDEF123456");
+    expect(wrapper.find("thead").text()).not.toContain("链接编码");
     expect(
       wrapper.findAll('[data-test="identity-name"]').some(item => item.text() === "Alice")
     ).toBe(true);
@@ -195,6 +198,9 @@ describe("Kol item page", () => {
     });
     const wrapper = await mountPage();
     await wrapper.find('[data-test="link-code"]').setValue("kpl-abcdef123456");
+    await wrapper.find('[data-test="sourceItemId"]').setValue("123");
+    await wrapper.find('[data-test="targetItemId"]').setValue("456");
+    await wrapper.find('[data-test="productKeyword"]').setValue("杯");
     const [kolSelect, shopSelect] = wrapper.findAllComponents({ name: "ElSelect" });
     await kolSelect.props("remoteMethod")("alice");
     await flushPromises();
@@ -206,6 +212,9 @@ describe("Kol item page", () => {
       expect.objectContaining({
         page: 1,
         linkCode: "kpl-abcdef123456",
+        sourceItemId: "123",
+        targetItemId: "456",
+        productKeyword: "杯",
         kolKeyword: "KOL-TAA001",
         shopId: "1"
       })
@@ -267,7 +276,7 @@ describe("Kol item page", () => {
     vi.mocked(kolItemApi.getKolItem).mockResolvedValue(detail);
     const open = vi.spyOn(window, "open").mockImplementation(() => null);
     const wrapper = await mountPage();
-    const line = dataRow(wrapper, row.linkCode);
+    const line = dataRow(wrapper, row.targetItemId);
     await line.get('[data-test="open-target"]').trigger("click");
     expect(open).toHaveBeenCalledWith(row.targetItemUrl, "_blank", "noopener");
     await line.get('[data-test="view"]').trigger("click");
@@ -297,7 +306,7 @@ describe("Kol item page", () => {
     signIn("SUPER_ADMIN", "ALL");
     vi.mocked(kolItemApi.getKolItem).mockResolvedValue({ ...detail, kolName: null, kolCode: null });
     const wrapper = await mountPage();
-    await dataRow(wrapper, row.linkCode).get('[data-test="view"]').trigger("click");
+    await dataRow(wrapper, row.targetItemId).get('[data-test="view"]').trigger("click");
     await flushPromises();
     expect(findTest(wrapper, "detail-drawer").text()).toContain("-（-）");
     wrapper.unmount();
@@ -319,7 +328,7 @@ describe("Kol item page", () => {
     });
     vi.mocked(kolItemApi.getKolItem).mockRejectedValue(new Error("missing"));
     const wrapper = await mountPage();
-    await dataRow(wrapper, row.linkCode).get('[data-test="view"]').trigger("click");
+    await dataRow(wrapper, row.targetItemId).get('[data-test="view"]').trigger("click");
     await flushPromises();
     expect(wrapper.find('[data-test="detail-drawer"]').exists()).toBe(false);
     expect(document.body.querySelector('[data-test="detail-drawer"]')).toBeNull();

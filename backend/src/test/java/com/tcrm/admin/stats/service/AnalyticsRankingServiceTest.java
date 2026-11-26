@@ -201,6 +201,35 @@ class AnalyticsRankingServiceTest {
   }
 
   @Test
+  void showsPaidPrepaysForTheOriginalApplicantEvenWithoutSales() {
+    var bd = new BdUserDTO(9L, "bd1", "Original", true);
+    var other = new BdUserDTO(10L, "bd2", "Current", true);
+    when(inviters.listUsable()).thenReturn(List.of(bd, other));
+    when(inviters.listByIds(any())).thenReturn(List.of(bd, other));
+    when(creators.listAll()).thenReturn(List.of(new KolRefDTO(11L, "K1", "Alice", true, 10L)));
+    var until = new StatsPeriod(DAY, DAY).until();
+    when(prepays.paidByApplicant(any(), eq(null), eq(FROM), eq(until)))
+        .thenReturn(Map.of(9L, new BigDecimal("75.00")));
+
+    var unauthorized = service.query(Board.INVITER, FILTER, null, 1, 20, null, null);
+    assertThat(unauthorized.ranking().items()).allMatch(row -> row.prepayExpense() == null);
+    assertThat(unauthorized.unavailable())
+        .anyMatch(
+            f -> f.field().equals("prepayExpense") && f.reason().equals("COMMISSION_FORBIDDEN"));
+    org.mockito.Mockito.verifyNoInteractions(prepays);
+
+    when(current.effectivePermissions(account)).thenReturn(List.of("commission:view"));
+    var result = service.query(Board.INVITER, FILTER, null, 1, 20, "invitedCount", "desc");
+    assertThat(result.ranking().items())
+        .hasSize(2)
+        .allSatisfy(
+            row ->
+                assertThat(row.prepayExpense())
+                    .isEqualByComparingTo(row.entityId() == 9L ? "75.00" : "0.00"));
+    assertThat(result.unavailable()).noneMatch(f -> f.field().equals("prepayExpense"));
+  }
+
+  @Test
   void filtersInviterProductSalesAndHonorsCommissionAccess() {
     var bd = new BdUserDTO(9L, "bd1", "First", true);
     var creator = new KolRefDTO(11L, "K1", "Alice", true, 9L);
@@ -239,6 +268,7 @@ class AnalyticsRankingServiceTest {
               assertThat(row.bestCreator().code()).isEqualTo("K1");
               assertThat(row.bestCreator().netSalesAmount()).isEqualByComparingTo("10");
               assertThat(row.totalEstimatedCommission()).isEqualByComparingTo("8");
+              assertThat(row.prepayExpense()).isNull();
             });
   }
 
@@ -322,6 +352,13 @@ class AnalyticsRankingServiceTest {
                 new KolRefDTO(12L, "K2", "Invalid", false, 9L),
                 new KolRefDTO(13L, "K3", "Prepay only", true, 9L)));
     when(creators.findIdsByKeyword("creator@example.test")).thenReturn(List.of(11L, 12L, 13L));
+    when(ownership.createdBetween(any(), any()))
+        .thenReturn(
+            List.of(
+                new KolOwnershipDTO(11L, 9L, FROM.minusSeconds(200), FROM),
+                new KolOwnershipDTO(11L, 10L, FROM, null),
+                new KolOwnershipDTO(12L, 9L, FROM.minusSeconds(100), null),
+                new KolOwnershipDTO(13L, 9L, FROM.minusSeconds(100), null)));
     when(creators.analyticsProfiles(any(), any()))
         .thenReturn(
             Map.of(
@@ -345,6 +382,7 @@ class AnalyticsRankingServiceTest {
     var income = service.income(filters, CreatorStatus.PROMOTING, 1, 20, null, null);
 
     var cards = income.summary().creatorCards();
+    assertThat(cards.relationshipCount()).isEqualTo(2);
     assertThat(cards.totalCommission()).isEqualByComparingTo("1200");
     assertThat(cards.commissionBeforeClawback()).isEqualByComparingTo("1250");
     assertThat(cards.commissionClawback()).isEqualByComparingTo("50");

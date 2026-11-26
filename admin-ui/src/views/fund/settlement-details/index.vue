@@ -1,324 +1,291 @@
 <script setup lang="ts">
-import { computed, onBeforeUnmount, onMounted, reactive, ref, watch } from "vue";
+import { computed, onMounted, ref } from "vue";
 import { useI18n } from "vue-i18n";
-import { subscribeNarrow } from "@/utils/sidebar";
-import FinancePreviewNotice from "@/components/FinancePreviewNotice.vue";
-import FinanceUnavailable from "@/components/FinanceUnavailable.vue";
-import { listSettlements } from "@/api/commission/finance";
-import type { Settlement } from "@/api/commission/finance-types";
 import DataTable, { type DataColumn } from "@/components/DataTable.vue";
 import ListSearch from "@/components/ListSearch.vue";
 import CopyText from "@/components/CopyText.vue";
-import RowActions from "@/components/RowActions.vue";
-import CommissionTable from "@/components/CommissionTable.vue";
-import { formatRate } from "@/utils/rate";
-import { formatInstant, formatNameWithCode, formatPrice } from "@/utils/format";
+import {
+  listSettlementLedger,
+  type SettlementLedgerRow,
+  type SettlementLedger
+} from "@/api/commission/finance";
 import { listShops } from "@/api/product/shop";
 import type { ShopOptionVO } from "@/api/types";
-import { useUserStore } from "@/stores/user";
-import { financeApiReady, previewContext } from "@/utils/finance";
+import { dates, validDates } from "@/views/analytics/board";
+import { formatAmountWithCurrency, formatInstant, formatNameWithCode } from "@/utils/format";
 import { notifyError } from "@/utils/notify";
+import { useUserStore } from "@/stores/user";
+
 defineOptions({ name: "SettlementDetailsPage" });
-const { t, locale } = useI18n();
-const userStore = useUserStore();
-/** The shop options endpoint needs product:view; this page itself only needs commission:view. */
-const canFilterShop = computed(() => userStore.can("product:view"));
-const narrow = ref(false);
-let unsubscribe: (() => void) | undefined;
-onMounted(() => {
-  unsubscribe = subscribeNarrow(value => (narrow.value = value));
-});
-onBeforeUnmount(() => unsubscribe?.());
-const filters = reactive({ orderNo: "", channel: "", shopId: "" });
-const applied = ref({ ...filters });
+const { t } = useI18n();
+const user = useUserStore();
+const canFilterShop = computed(() => user.can("product:view"));
+const text = (key: string) => t(`finance.settlementLedger.${key}`);
+const rangeOf = (days: number): [string, string] => {
+  const { startDate, endDate } = dates(days);
+  return [startDate, endDate];
+};
+const range = ref<[string, string] | null>(rangeOf(7));
+const shopId = ref<string>();
 const shops = ref<ShopOptionVO[]>([]);
-const rows = ref<Settlement[]>([]);
-const total = ref(0);
+const applied = ref({ ...dates(7), shopId: undefined as string | undefined });
+const ledger = ref<SettlementLedger>();
 const page = ref(1);
 const size = ref(20);
 const loading = ref(false);
 const failed = ref(false);
-const detail = ref<Settlement>();
-const open = ref(false);
-const columns = computed<DataColumn[]>(() =>
-  [
-    "orderNo",
-    "channel",
-    "shop",
-    "creator",
-    "payment",
-    "refund",
-    "weidianWithdrawable",
-    "commission",
-    "rate",
-    "accountStatus",
-    "businessAt",
-    "actions"
-  ].map(key => ({
-    key,
-    prop: key,
-    label: t(`finance.${key}`),
-    minWidth:
-      key === "businessAt"
-        ? 200
-        : key === "orderNo"
-          ? 210
-          : key === "weidianWithdrawable"
-            ? { "zh-CN": 160, "en-US": 190 }
-            : locale.value === "en-US"
-              ? 180
-              : 140,
-    amount: ["payment", "refund", "weidianWithdrawable", "commission"].includes(key),
-    align: (["orderNo", "shop", "creator"].includes(key) ? "left" : "center") as "left" | "center",
-    tooltip: true
-  }))
+const invalidRange = ref(false);
+let request = 0;
+
+const columns = computed<DataColumn[]>(() => [
+  { key: "occurredAt", label: text("time"), minWidth: 155, align: "left" },
+  { key: "tradeType", label: text("tradeType"), minWidth: 100 },
+  { key: "amount", label: text("amount"), minWidth: 115, amount: true },
+  { key: "billType", label: text("billType"), minWidth: 135, align: "left" },
+  { key: "balance", label: text("balance"), minWidth: 110, amount: true },
+  { key: "orderNo", label: t("finance.orderNo"), minWidth: 160, align: "left" },
+  { key: "creator", label: text("creator"), minWidth: 155, align: "left" },
+  { key: "commissionAmount", label: text("commission"), minWidth: 115, amount: true }
+]);
+const presets = [7, 30, 90] as const;
+const selectedPreset = computed(() =>
+  presets.find(days => {
+    const [startDate, endDate] = rangeOf(days);
+    return startDate === range.value?.[0] && endDate === range.value?.[1];
+  })
 );
-const lineColumns = computed<DataColumn[]>(() =>
-  ["product", "amountType", "direction", "amount", "rate", "subject", "creator"].map(key => ({
-    key,
-    label: t(`finance.${key}`),
-    minWidth: 180,
-    amount: key === "amount",
-    align: (["product", "subject", "creator"].includes(key) ? "left" : "center") as
-      "left" | "center"
-  }))
-);
-const chips = computed(() =>
-  Object.entries(applied.value)
-    .filter(([, value]) => value)
-    .map(([key, value]) => ({
-      key,
-      label: t(`finance.${key}`),
-      text:
-        key === "channel" ? t("finance.weidian") : key === "shopId" ? shopChipText(value) : value
-    }))
-);
-function shopChipText(id: string) {
-  const shop = shops.value.find(item => item.id === id);
-  return shop ? formatNameWithCode(shop.shopName, shop.shopCode) : id;
+function amount(value: string | number | null | undefined): string {
+  if (value == null) return "—";
+  const [whole, decimals = ""] = String(value).split(".");
+  return formatAmountWithCurrency(`${whole}.${decimals.padEnd(2, "0")}`);
 }
-async function loadShops() {
-  if (!canFilterShop.value) return;
-  try {
-    shops.value = await listShops();
-  } catch (error) {
-    notifyError(error);
-  }
+function signedAmount(value: SettlementLedgerRow["amount"]): string {
+  return (Number(value) > 0 ? "+" : "") + amount(value);
+}
+function tradeType(row: SettlementLedgerRow): string {
+  if (row.tradeType === "收入") return text("income");
+  if (row.tradeType === "支出") return text("expense");
+  return row.tradeType || "—";
 }
 async function load() {
-  if (!financeApiReady) return;
+  const current = ++request;
   loading.value = true;
   failed.value = false;
   try {
-    const result = await listSettlements({ ...applied.value, page: page.value, size: size.value });
-    rows.value = result.items;
-    total.value = Number(result.total);
+    const result = await listSettlementLedger({
+      ...applied.value,
+      page: page.value,
+      size: size.value
+    });
+    if (current === request) ledger.value = result;
   } catch (error) {
-    rows.value = [];
-    total.value = 0;
+    if (current !== request) return;
     failed.value = true;
+    ledger.value = undefined;
     notifyError(error);
   } finally {
-    loading.value = false;
+    if (current === request) loading.value = false;
   }
 }
 function search() {
-  applied.value = { ...filters };
+  const [startDate, endDate] = range.value ?? ["", ""];
+  invalidRange.value = !validDates({ startDate, endDate }) || endDate > dates(1).endDate;
+  if (invalidRange.value) return;
+  applied.value = { startDate, endDate, shopId: shopId.value || undefined };
   page.value = 1;
   void load();
 }
+function selectPeriod(days: number) {
+  range.value = rangeOf(days);
+  search();
+}
 function reset() {
-  Object.assign(filters, { orderNo: "", channel: "", shopId: "" });
-  search();
+  shopId.value = undefined;
+  selectPeriod(7);
 }
-function remove(key: string) {
-  filters[key as keyof typeof filters] = "";
-  search();
+function onPage(value: number) {
+  page.value = value;
+  void load();
 }
-function actions(row: Settlement) {
-  if (!row.id) return [];
-  return [
-    {
-      key: "view",
-      testId: "settlement-view",
-      label: t("finance.view"),
-      onClick: () => {
-        detail.value = row;
-        open.value = true;
-      }
-    }
-  ];
+function onSize(value: number) {
+  size.value = value;
+  page.value = 1;
+  void load();
 }
-watch([page, size], load);
-watch(
-  () => [previewContext.role, previewContext.scenario],
-  () => {
-    open.value = false;
-    search();
-  }
-);
-onMounted(load);
-onMounted(loadShops);
+onMounted(() => {
+  void load();
+  if (canFilterShop.value)
+    void listShops()
+      .then(result => {
+        shops.value = result;
+      })
+      .catch(notifyError);
+});
 </script>
+
 <template>
-  <FinanceUnavailable v-if="!financeApiReady" />
-  <div v-else class="settlement-page" data-test="settlement-page">
-    <FinancePreviewNotice />
-    <div class="finance-content">
-      <ListSearch :chips="chips" @search="search" @reset="reset" @remove="remove"
-        ><template #primary>
-          <el-form-item :label="t('finance.orderNo')"
-            ><el-input v-model="filters.orderNo" data-test="settlement-order" clearable
-          /></el-form-item>
-          <el-form-item :label="t('finance.channel')"
-            ><el-select v-model="filters.channel" clearable class="filter-w-sm"
-              ><el-option :label="t('finance.weidian')" value="WEIDIAN" /></el-select
-          ></el-form-item>
-          <el-form-item v-if="canFilterShop" :label="t('finance.shopId')"
-            ><el-select
-              v-model="filters.shopId"
-              clearable
-              filterable
-              class="filter-w-md"
-              data-test="settlement-shop-id"
-              ><el-option
-                v-for="shop in shops"
-                :key="shop.id"
-                :label="formatNameWithCode(shop.shopName, shop.shopCode)"
-                :value="shop.id" /></el-select
-          ></el-form-item> </template
-      ></ListSearch>
-      <p>{{ t("finance.weidianWithdrawableNote") }}</p>
-      <el-alert v-if="failed" :title="t('finance.loadFailed')" type="error" :closable="false" />
-      <DataTable
-        v-model:page="page"
-        v-model:size="size"
-        table-id="commission-settlements"
-        fill-available-height
-        :rows="rows"
-        :columns="columns"
-        :total="total"
-        :loading="loading"
-        :filter-count="chips.length"
-        @refresh="load"
-        @clear-filters="reset"
-      >
-        <template #cell-orderNo="{ row }"><CopyText :value="row.orderNo" /></template
-        ><template #cell-channel>{{ t("finance.weidian") }}</template>
-        <template #cell-creator="{ row }">{{
-          row.kolNames.length > 1 ? t("finance.multiple") : row.kolNames[0]
-        }}</template><template #cell-rate="{ row }">{{
-          row.rates.length > 1
-            ? t("finance.multiple")
-            : row.rates[0]
-              ? formatRate(row.rates[0])
-              : t("finance.unverified")
-        }}</template>
-        <template
-          v-for="key in ['payment', 'refund', 'commission']"
-          :key="key"
-          #[`cell-${key}`]="{ row }"
-          >{{
-            row[key] === null
-              ? t(row.scopeLimited ? "finance.scopeLimited" : "finance.unverified")
-              : formatPrice(row[key], "CNY")
-          }}</template><template #cell-weidianWithdrawable="{ row }">{{
-          row.weidianWithdrawable === null ? "-" : formatPrice(row.weidianWithdrawable, "CNY")
-        }}</template>
-        <template #cell-accountStatus="{ row }"
-          ><el-tag :type="row.status === 'POSTED' ? 'success' : 'warning'">{{
-            t(`finance.${row.status ?? "UNVERIFIED"}`)
-          }}</el-tag></template
-        ><template #cell-businessAt="{ row }">{{ formatInstant(row.businessAt) }}</template
-        ><template #actions="{ row }"><RowActions :actions="actions(row)" /></template>
-      </DataTable>
-      <el-drawer
-        v-model="open"
-        :title="t('finance.settlementDetail')"
-        size="min(1180px, 96vw)"
-        destroy-on-close
-      >
-        <div v-if="detail" class="detail" data-test="settlement-detail">
-          <el-alert
-            v-if="detail.scopeLimited"
-            :title="t('finance.scopeLimited')"
-            type="info"
-            :closable="false"
-          />
-          <h2><CopyText :value="detail.orderNo" /></h2>
-          <el-descriptions :column="narrow ? 1 : 2" border
-            ><el-descriptions-item
-              v-for="key in ['payment', 'refund', 'commission'] as const"
-              :key="key"
-              :label="t(`finance.${key}`)"
-              >{{
-                detail[key] === null
-                  ? t(detail.scopeLimited ? "finance.scopeLimited" : "finance.unverified")
-                  : formatPrice(detail[key], "CNY")
-              }}</el-descriptions-item
-            ><el-descriptions-item :label="t('finance.weidianWithdrawable')">{{
-              detail.weidianWithdrawable === null
-                ? "-"
-                : formatPrice(detail.weidianWithdrawable, "CNY")
-            }}</el-descriptions-item></el-descriptions
-          >
-          <DataTable
-            table-id="settlement-item-movements"
-            :rows="detail.lines"
-            :columns="lineColumns"
-            :total="detail.lines.length"
-            :paged="false"
-            plain
-          >
-            <template #cell-product="{ row }">{{ row.product }}</template><template
-              #cell-amountType
-              >{{ t("finance.commissionType") }}</template
-            ><template #cell-direction="{ row }">{{
-              t(`finance.${row.direction ?? "CREDIT"}`)
-            }}</template
-            ><template #cell-amount="{ row }">{{
-              row.commission === null ? t("finance.unverified") : formatPrice(row.commission, "CNY")
-            }}</template
-            ><template #cell-rate="{ row }">{{
-              row.rate == null ? t("finance.unverified") : formatRate(row.rate)
-            }}</template
-            ><template #cell-subject>{{ t("finance.creator") }}</template
-            ><template #cell-creator="{ row }">{{ row.kol }}</template>
-          </DataTable>
-          <h2>{{ t("finance.commissionLines") }}</h2>
-          <CommissionTable :rows="detail.lines" table-id="settlement-commission-evidence" />
+  <div class="settlement-ledger" data-test="settlement-page">
+    <h1>{{ t("route.settlementDetails") }}</h1>
+    <section class="settlement-ledger__wallet" :aria-label="text('accountOverview')">
+      <div class="settlement-ledger__heading">
+        <span>{{ text("settledGoods") }}</span>
+        <span class="settlement-ledger__muted">{{ text("asOfNow") }}</span>
+      </div>
+      <strong data-test="wallet-settled">{{ amount(ledger?.settledGoodsAmount) }}</strong>
+      <div class="settlement-ledger__secondary">
+        <div>
+          <span>{{ text("pending") }}</span>
+          <b data-test="wallet-pending">{{ amount(ledger?.pendingAmount) }}</b>
         </div>
-      </el-drawer>
-    </div>
+        <div>
+          <span>{{ text("platformFee") }}</span>
+          <b data-test="wallet-platform-fee">{{ amount(ledger?.platformFeeAmount) }}</b>
+        </div>
+      </div>
+    </section>
+
+    <ListSearch hide-title @search="search" @reset="reset">
+      <template #primary>
+        <el-form-item :label="text('period')">
+          <el-date-picker
+            v-model="range"
+            type="daterange"
+            value-format="YYYY-MM-DD"
+            :start-placeholder="text('startDate')"
+            :end-placeholder="text('endDate')"
+            :clearable="false"
+          />
+        </el-form-item>
+        <el-form-item :label="text('recent')">
+          <el-button-group>
+            <el-button
+              v-for="days in presets"
+              :key="days"
+              :data-test="`period-${days}`"
+              :type="selectedPreset === days ? 'primary' : 'default'"
+              plain
+              :aria-pressed="selectedPreset === days"
+              @click="selectPeriod(days)"
+            >
+              {{ text(`days${days}`) }}
+            </el-button>
+          </el-button-group>
+        </el-form-item>
+        <el-form-item v-if="canFilterShop" :label="t('finance.shopId')">
+          <el-select
+            v-model="shopId"
+            clearable
+            filterable
+            class="filter-w-md"
+            data-test="settlement-shop-id"
+            :placeholder="t('common.all')"
+          >
+            <el-option
+              v-for="shop in shops"
+              :key="shop.id"
+              :label="formatNameWithCode(shop.shopName, shop.shopCode)"
+              :value="shop.id"
+            />
+          </el-select>
+        </el-form-item>
+      </template>
+    </ListSearch>
+    <el-alert v-if="invalidRange" :title="text('invalidRange')" type="warning" :closable="false" />
+
+    <DataTable
+      table-id="shop-settlement-ledger"
+      scroll-with-page
+      :rows="ledger?.activity.items ?? []"
+      :columns="columns"
+      :total="Number(ledger?.activity.total ?? 0)"
+      :page="page"
+      :size="size"
+      :loading="loading"
+      :failed="failed"
+      @refresh="load"
+      @retry="load"
+      @update:page="onPage"
+      @update:size="onSize"
+    >
+      <template #title
+        ><h2>{{ text("transactions") }}</h2></template
+      >
+      <template #cell-occurredAt="{ row }">{{ formatInstant(row.occurredAt) }}</template>
+      <template #cell-tradeType="{ row }">{{ tradeType(row) }}</template>
+      <template #cell-amount="{ row }">
+        <span
+          :class="{
+            'settlement-ledger__credit': Number(row.amount) > 0,
+            'settlement-ledger__debit': Number(row.amount) < 0
+          }"
+          >{{ signedAmount(row.amount) }}</span
+        >
+      </template>
+      <template #cell-billType="{ row }">{{ row.billType || "—" }}</template>
+      <template #cell-balance="{ row }">{{ amount(row.balance) }}</template>
+      <template #cell-orderNo="{ row }">
+        <CopyText v-if="row.orderNo" :value="row.orderNo" />
+        <span v-else>—</span>
+      </template>
+      <template #cell-creator="{ row }">
+        {{
+          row.creatorName
+            ? formatNameWithCode(row.creatorName, row.creatorCode)
+            : row.creatorCode || "—"
+        }}
+      </template>
+      <template #cell-commissionAmount="{ row }">{{ amount(row.commissionAmount) }}</template>
+    </DataTable>
   </div>
 </template>
+
 <style scoped>
-.finance-content {
-  display: flex;
-  flex-direction: column;
-  flex: 1;
-  min-height: 0;
-  min-width: 0;
+.settlement-ledger {
+  display: grid;
   gap: var(--tcrm-space-4);
 }
-.settlement-page,
-.detail {
-  flex: 1;
-  min-height: 0;
-  display: flex;
-  flex-direction: column;
-  gap: var(--tcrm-space-4);
-  min-width: 0;
-}
-p {
+.settlement-ledger h1,
+.settlement-ledger h2,
+.settlement-ledger p {
   margin: 0;
+}
+.settlement-ledger__wallet {
+  display: grid;
+  gap: var(--tcrm-space-2);
+  padding: var(--tcrm-space-5);
+  background: var(--tcrm-color-card);
+  border: 1px solid var(--tcrm-color-border);
+  border-radius: var(--tcrm-radius-card);
+}
+.settlement-ledger__heading,
+.settlement-ledger__secondary > div {
+  display: flex;
+  align-items: baseline;
+  flex-wrap: wrap;
+  gap: var(--tcrm-space-2);
+}
+.settlement-ledger__heading {
+  justify-content: space-between;
+}
+.settlement-ledger__wallet strong {
+  font-size: var(--tcrm-font-size-metric, 28px);
+  font-variant-numeric: tabular-nums;
+}
+.settlement-ledger__secondary {
+  display: flex;
+  flex-wrap: wrap;
+  column-gap: var(--tcrm-space-6, 24px);
+  row-gap: var(--tcrm-space-2);
+  padding-top: var(--tcrm-space-3);
+  border-top: 1px solid var(--tcrm-color-border);
+}
+.settlement-ledger__muted {
   color: var(--tcrm-color-text-secondary);
-  font-size: var(--tcrm-font-size-help);
-  line-height: var(--tcrm-line-height-help);
 }
-h2 {
-  font-size: var(--tcrm-font-size-section);
-  line-height: var(--tcrm-line-height-section);
-  margin: 0;
+.settlement-ledger__credit {
+  color: var(--tcrm-color-success);
+}
+.settlement-ledger__debit {
+  color: var(--tcrm-color-danger);
 }
 </style>

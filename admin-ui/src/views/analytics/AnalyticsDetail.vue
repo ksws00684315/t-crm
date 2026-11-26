@@ -9,9 +9,9 @@ import CreatorIdentity from "./CreatorIdentity.vue";
 import ChartPanel from "@/components/dashboard/ChartPanel.vue";
 import {
   queryAnalyticsDetail,
-  queryCreatorFundFlows,
+  queryCreatorFundApplications,
   queryCreatorIncomeOrders,
-  type CreatorFundFlow,
+  type CreatorFundApplication,
   queryInviterCreators,
   queryProductBreakdown,
   queryShopSettlementFlows,
@@ -115,19 +115,30 @@ function orderNumberSpan({ column, rowIndex }: { column: { property: string }; r
   return { rowspan: span, colspan: span ? 1 : 0 };
 }
 const flowRows = ref<SettlementFlowRow[]>([]);
-const fundFlows = ref<CreatorFundFlow[]>([]);
-const fundStatusColors: Record<CreatorFundFlow["status"], string> = {
-  FROZEN: "var(--tcrm-color-warning)",
-  AVAILABLE: "var(--tcrm-color-success)",
-  WITHDRAWN: "var(--tcrm-color-primary-text)",
-  CLAWBACK: "var(--tcrm-color-danger)",
-  PREPAID: "var(--tcrm-color-text-secondary)"
+const fundFlows = ref<CreatorFundApplication[]>([]);
+const fundStatusColors: Record<CreatorFundApplication["status"], string> = {
+  PENDING_REVIEW: "var(--tcrm-color-warning)",
+  PENDING_PAYMENT: "var(--tcrm-color-primary-text)",
+  PAID: "var(--tcrm-color-success)"
 };
+const orderStatusColors: Record<string, string> = {
+  PAID: "var(--tcrm-color-warning)",
+  SHIPPED: "var(--tcrm-color-primary-text)",
+  RECEIVED: "var(--tcrm-color-primary-text)",
+  COMPLETED: "var(--tcrm-color-success)",
+  REFUNDING: "var(--tcrm-color-danger)",
+  CLOSED: "var(--tcrm-color-text-secondary)"
+};
+const orderCommissionTags = {
+  FROZEN: "warning",
+  AVAILABLE: "success",
+  WITHDRAWN: "primary"
+} as const;
 const fundFlowColumns = computed<DataColumn[]>(() =>
-  (["fundType", "direction", "orderNo", "amount", "status", "settlementNo"] as const).map(key => ({
+  (["fundType", "amount", "status", "applicationNo"] as const).map(key => ({
     key,
     label: t(`analytics.fundFlows.${key}`),
-    minWidth: key === "orderNo" || key === "settlementNo" ? 152 : 108,
+    minWidth: key === "applicationNo" ? 152 : 108,
     amount: key === "amount"
   }))
 );
@@ -300,11 +311,6 @@ const cards = computed(() => {
   }
   if (product.value || peopleBoard.value) {
     const m = props.row.metrics;
-    const settlement = product.value
-      ? props.row.settlementAmount
-      : inviter.value
-        ? inviterOverview.value?.settlementAmount
-        : creatorOverview.value?.settlementAmount;
     const lastCard = inviter.value
       ? {
           key: "effectiveCount",
@@ -333,14 +339,20 @@ const cards = computed(() => {
         value: amount(key),
         hint: termHint(key)
       })),
-      {
-        key: "settlementAmount",
-        label: local("settlementAmount"),
-        value: formatMoney(
-          typeof settlement === "string" || typeof settlement === "number" ? settlement : null
-        ),
-        hint: termHint("settlementAmount")
-      },
+      ...(peopleBoard.value
+        ? [
+            {
+              key: "settlementAmount",
+              label: local("settlementAmount"),
+              value: formatMoney(
+                inviter.value
+                  ? inviterOverview.value?.settlementAmount
+                  : creatorOverview.value?.settlementAmount
+              ),
+              hint: termHint("settlementAmount")
+            }
+          ]
+        : []),
       {
         key: "amountRefundRate",
         label: t("analytics.amountRefundRate"),
@@ -408,6 +420,7 @@ const orderColumns = computed<DataColumn[]>(() => {
   if (props.income) {
     return [
       { key: "orderNo", label: local("orderPaidTime"), minWidth: 174, align: "left" },
+      { key: "orderStatus", label: t("order.orderStatus"), minWidth: 105 },
       { key: "shopName", label: t("analytics.shop"), minWidth: 110 },
       { key: "amount", label: t("analytics.salesAmount"), minWidth: 112, amount: true },
       { key: "refundAmount", label: local("refundAmount"), minWidth: 112, amount: true },
@@ -422,7 +435,8 @@ const orderColumns = computed<DataColumn[]>(() => {
         label: t("analytics.kol-ranking.estimatedCommission"),
         minWidth: 112,
         amount: true
-      }
+      },
+      { key: "commissionStatus", label: t("analytics.income.commissionStatus"), minWidth: 105 }
     ];
   }
   const refund = tab.value === "REFUNDS";
@@ -731,7 +745,7 @@ async function load(): Promise<void> {
     if (section === "fund-flows") {
       if (!fundFlowsAllowed.value) return;
       const { entityId, shopId, startDate, endDate, cumulative } = props.filters;
-      const result = await queryCreatorFundFlows({
+      const result = await queryCreatorFundApplications({
         entityId,
         shopId,
         startDate,
@@ -1075,32 +1089,27 @@ function changeSize(next: number): void {
         @update:size="changeSize"
       >
         <template #cell-fundType="{ row: entry }">
-          {{ t(`analytics.fundFlows.types.${entry.fundType}`) }}
-        </template>
-        <template #cell-direction="{ row: entry }">
           <el-tag
             round
             effect="light"
             size="small"
-            :type="entry.direction === 'INCREASE' ? 'success' : 'danger'"
+            :type="entry.fundType === 'COMMISSION' ? 'primary' : 'warning'"
           >
-            {{ t(`analytics.fundFlows.directions.${entry.direction}`) }}
+            {{ t(`analytics.fundFlows.types.${entry.fundType}`) }}
           </el-tag>
-        </template>
-        <template #cell-orderNo="{ row: entry }">
-          <CopyText v-if="entry.orderNo" :value="entry.orderNo" />
-          <span v-else>—</span>
         </template>
         <template #cell-amount="{ row: entry }">
           {{ formatAmountWithCurrency(entry.amount) }}
         </template>
         <template #cell-status="{ row: entry }">
-          <span :style="{ color: fundStatusColors[entry.status as CreatorFundFlow['status']] }">
-            {{ t(`analytics.fundFlows.statuses.${entry.status}`) }}
+          <span
+            :style="{ color: fundStatusColors[entry.status as CreatorFundApplication['status']] }"
+          >
+            {{ t(`analytics.fundFlows.applicationStatuses.${entry.status}`) }}
           </span>
         </template>
-        <template #cell-settlementNo="{ row: entry }">
-          <CopyText v-if="entry.settlementNo" :value="entry.settlementNo" />
+        <template #cell-applicationNo="{ row: entry }">
+          <CopyText v-if="entry.applicationNo" :value="entry.applicationNo" />
           <span v-else>—</span>
         </template>
       </DataTable>
@@ -1293,6 +1302,27 @@ function changeSize(next: number): void {
         </template>
         <template #cell-estimatedCommission="{ row: entry }">
           {{ skuMoney(entry.estimatedCommission) }}
+        </template>
+        <template #cell-orderStatus="{ row: entry }">
+          <span
+            v-if="entry.orderStatus && orderStatusColors[entry.orderStatus]"
+            :style="{ color: orderStatusColors[entry.orderStatus] }"
+          >
+            {{ t(`order.listStatus.${entry.orderStatus}`) }}
+          </span>
+          <span v-else>—</span>
+        </template>
+        <template #cell-commissionStatus="{ row: entry }">
+          <el-tag
+            v-if="entry.commissionStatus"
+            round
+            effect="light"
+            size="small"
+            :type="orderCommissionTags[entry.commissionStatus as keyof typeof orderCommissionTags]"
+          >
+            {{ t(`analytics.fundFlows.statuses.${entry.commissionStatus}`) }}
+          </el-tag>
+          <span v-else>—</span>
         </template>
         <template #cell-amount="{ row: entry }">
           <span

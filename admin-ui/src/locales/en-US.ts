@@ -70,6 +70,12 @@ const enUS: MessageSchema = {
   },
   analytics: {
     fundFlows: {
+      applicationNo: "Application No.",
+      applicationStatuses: {
+        PENDING_REVIEW: "Pending review",
+        PENDING_PAYMENT: "Pending payment",
+        PAID: "Paid"
+      },
       title: "Fund activity",
       fundType: "Fund type",
       direction: "Direction",
@@ -88,6 +94,10 @@ const enUS: MessageSchema = {
       }
     },
     income: {
+      sellingCreators: "Creators with sales",
+      totalInvitedCreators: "Total invited creators",
+      totalInvitedNote: "Invited creators are counted once across all time.",
+      commissionStatus: "Commission status",
       ranking: "Creator details",
       identity: "Creator / Social / ID",
       relationship: "Creator status",
@@ -366,7 +376,7 @@ const enUS: MessageSchema = {
       coverage: "SPU / SKU",
       kolCount: "Creators",
       settlementFormula: "Receivables added minus receivables deducted, by Weidian posting date.",
-      settlementEmpty: "No settlement flows",
+      settlementEmpty: "Settlement amount unavailable",
       settlementScoped: "Shop scope only",
       identity: "Shop name / code",
       ranking: "Shop performance ranking",
@@ -412,7 +422,6 @@ const enUS: MessageSchema = {
       kolCount: "Selling / linked creators",
       paidOrderCount: "Orders",
       netSalesAmount: "Net sales",
-      settlementAmount: "Settlement amount",
       ranking: "Product ranking",
       rankingCount: "{count} product | {count} products",
       net: "Net sales",
@@ -445,9 +454,7 @@ const enUS: MessageSchema = {
         completedRefundAmount:
           "Successful refunds linked to this product's order lines, grouped by refund completion date.",
         netSalesAmount:
-          "Sales minus successful refunds on those same paid orders completed within 30 Beijing calendar days.",
-        settlementAmount:
-          "Settlement postings attributable to the product. Product-level settlement data is pending."
+          "Sales minus successful refunds on those same paid orders completed within 30 Beijing calendar days."
       }
     },
     "kol-ranking": {
@@ -568,7 +575,8 @@ const enUS: MessageSchema = {
           "Successful refunds completed during the selected period divided by sales in the same period.",
         averageOrderAmount:
           "Sales divided by the number of paid orders during the selected period.",
-        prepayExpense: "Prepayments with completed payment. Dashboard integration is pending.",
+        prepayExpense:
+          "Prepayments are counted on the payment date and attributed to the applicant. They are not allocated to shops or products.",
         totalExpense:
           "Commission and prepayments with completed payment. Dashboard integration is pending.",
         activeInviters: "Inviter accounts currently enabled and eligible for business development.",
@@ -2082,6 +2090,8 @@ const enUS: MessageSchema = {
     limitHint: "One file, at most 20MB and 20,000 rows"
   },
   mapping: {
+    sourceItemSearch: "Original Product ID",
+    productNameSearch: "Product name keyword",
     searchTip: "Enter a creator code, product code, or exclusive item ID to search.",
     confirmRebuild:
       "Rebuild the tracking-link index from the current mappings, creators, products, and shop status. This runs in the background. Start now?",
