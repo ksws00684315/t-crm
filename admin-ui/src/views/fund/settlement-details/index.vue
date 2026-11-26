@@ -63,8 +63,8 @@ function signedAmount(value: SettlementLedgerRow["amount"]): string {
   return (Number(value) > 0 ? "+" : "") + amount(value);
 }
 function tradeType(row: SettlementLedgerRow): string {
-  if (row.tradeType === "收入") return text("income");
-  if (row.tradeType === "支出") return text("expense");
+  if (row.tradeType === "INCOME") return text("income");
+  if (row.tradeType === "EXPENSE") return text("expense");
   return row.tradeType || "—";
 }
 async function load() {

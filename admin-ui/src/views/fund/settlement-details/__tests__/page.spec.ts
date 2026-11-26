@@ -23,7 +23,7 @@ const ledger = {
       {
         id: "5001",
         occurredAt: "2026-11-24T06:22:17Z",
-        tradeType: "支出",
+        tradeType: "EXPENSE",
         amount: "-0.39",
         billType: "交易手续费",
         balance: null,

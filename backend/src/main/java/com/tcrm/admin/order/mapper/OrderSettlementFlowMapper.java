@@ -166,7 +166,9 @@ public interface OrderSettlementFlowMapper extends BaseMapper<OrderSettlementFlo
           + LEDGER_SCOPE
           + """
           ORDER BY f.trade_time DESC, f.id DESC LIMIT #{size} OFFSET #{offset})
-          SELECT f.id, f.trade_time AS occurred_at, f.trade_type, f.amount_cny AS amount,
+          SELECT f.id, f.trade_time AS occurred_at,
+                 CASE f.trade_type WHEN '收入' THEN 'INCOME' WHEN '支出' THEN 'EXPENSE' ELSE f.trade_type END AS trade_type,
+                 f.amount_cny AS amount,
                  f.trade_sub_type AS bill_type, NULL::numeric AS balance, f.weidian_order_id AS order_no,
                  k.name AS creator_name, k.kol_code AS creator_code, commission.amount AS commission_amount
           FROM paged f
