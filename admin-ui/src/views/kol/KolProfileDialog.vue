@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import CopyText from "@/components/CopyText.vue";
+import PhoneNumberInput from "@/components/PhoneNumberInput.vue";
 import { ElMessage, ElMessageBox } from "element-plus";
 import type { FormInstance, FormRules } from "element-plus";
 import { computed, nextTick, reactive, ref, watch } from "vue";
@@ -279,11 +280,10 @@ async function submit() {
           </div>
         </el-form-item>
         <el-form-item :label="t('kol.whatsapp')" prop="whatsapp">
-          <el-input
+          <PhoneNumberInput
             v-if="profileEditable"
             v-model="form.whatsapp"
             data-test="profile-whatsapp"
-            maxlength="32"
             :placeholder="t('kol.whatsappPlaceholder')"
           />
           <div v-else class="profile-value">
@@ -292,11 +292,10 @@ async function submit() {
           </div>
         </el-form-item>
         <el-form-item :label="t('kol.phone')" prop="phone">
-          <el-input
+          <PhoneNumberInput
             v-if="profileEditable"
             v-model="form.phone"
             data-test="profile-phone"
-            maxlength="32"
             :placeholder="t('kol.phonePlaceholder')"
           />
           <div v-else class="profile-value">

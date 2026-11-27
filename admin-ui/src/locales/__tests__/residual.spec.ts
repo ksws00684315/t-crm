@@ -8,7 +8,9 @@ import { describe, expect, it } from "vitest";
  */
 const ALLOWLIST: Readonly<Record<string, string>> = {
   "views/system/oper-log/index.vue":
-    "Lookup key only: the quick filter matches the Chinese word the backend writes into BD-transfer summaries (task 33 §3.3); the constant renders nothing itself."
+    "Lookup key only: the quick filter matches the Chinese word the backend writes into BD-transfer summaries (task 33 §3.3); the constant renders nothing itself.",
+  "utils/dial-codes.ts":
+    "Data only: the Chinese names of the country calling codes shown in the phone selector (task 161). The 248 region names live in a data file instead of the message packs, as the owner decided on 2026-11-27; the component still picks the name for the active language."
 };
 
 const CHINESE = /[\u4e00-\u9fff]/;
