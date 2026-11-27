@@ -381,6 +381,9 @@ const enUS = {
       submit: "Submit"
     }
   },
+  phone: {
+    countryPlaceholder: "Country/region"
+  },
   register: {
     title: "Creator registration",
     subtitle: "Complete your profile to join the invited workspace",
@@ -399,10 +402,10 @@ const enUS = {
     nameRequired: "Enter your account name (up to 64 characters).",
     socialPairRequired: "Enter both a primary platform and account name, or leave both blank.",
     whatsapp: "WhatsApp (optional)",
-    whatsappInvalid: "Enter a WhatsApp number starting with + and 8–15 digits.",
+    whatsappInvalid: "Enter a valid WhatsApp number: 8–15 digits, including the country code.",
     phone: "Phone number (optional)",
-    phoneInvalid: "Enter a phone number starting with + and 8–15 digits.",
-    phonePlaceholder: "+15551234567",
+    phoneInvalid: "Enter a valid phone number: 8–15 digits, including the country code.",
+    phonePlaceholder: "5551234567",
     platformLabel: "Main platform (optional)",
     platformPlaceholder: "Select a platform",
     platforms: {

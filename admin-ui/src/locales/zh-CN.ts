@@ -927,7 +927,7 @@ const zhCN = {
     kolCode: "达人编号格式为 KOL- 加三位大写字母和至少三位数字，如 KOL-ASD001",
     countryRequired: "请输入国家代码",
     countryPattern: "请输入两位字母国家代码，如 US",
-    whatsapp: "WhatsApp 须为 + 加 8～15 位数字，如 +8613800000000",
+    whatsapp: "号码无效：区号加号码须为 8～15 位数字",
     inviteCodeRequired: "请输入达人邀请码",
     sheetUrlRequired: "请输入达人推广表格地址",
     inviteCode: "邀请码为 1～64 位字母、数字、下划线或连字符",
@@ -1501,6 +1501,9 @@ const zhCN = {
       BALANCED: "均衡"
     }
   },
+  phone: {
+    countryPlaceholder: "国家/地区"
+  },
   kol: {
     /** Query area (03.02): creator ID, name, email. */
     kolId: "达人ID",
@@ -1523,9 +1526,9 @@ const zhCN = {
     saved: "达人已保存",
     editTitle: "基础资料 {code}",
     whatsapp: "WhatsApp",
-    whatsappPlaceholder: "含国际区号，如 +8613800000000",
+    whatsappPlaceholder: "本地号码，如 13800000000",
     phone: "手机号",
-    phonePlaceholder: "含国际区号，如 +8613800000000",
+    phonePlaceholder: "本地号码，如 13800000000",
     phoneWhatsapp: "Phone/WhatsApp",
     primaryPlatform: "社媒平台/ID",
     platformLabel: "核心社媒平台",

@@ -376,6 +376,9 @@ const zhCN: MessageSchema = {
       submit: "提交"
     }
   },
+  phone: {
+    countryPlaceholder: "国家/地区"
+  },
   register: {
     title: "达人注册",
     subtitle: "完善资料，加入受邀的工作空间",
@@ -393,10 +396,10 @@ const zhCN: MessageSchema = {
     nameRequired: "请输入账户名（不超过 64 个字符）。",
     socialPairRequired: "核心社媒平台与核心社媒ID需同时填写，或同时留空。",
     whatsapp: "WhatsApp（选填）",
-    whatsappInvalid: "WhatsApp 须以 + 开头，后接 8～15 位数字。",
+    whatsappInvalid: "WhatsApp 号码无效，区号加号码须为 8～15 位数字。",
     phone: "手机号（选填）",
-    phoneInvalid: "手机号须以 + 开头，后接 8～15 位数字。",
-    phonePlaceholder: "+8613800000000",
+    phoneInvalid: "手机号无效，区号加号码须为 8～15 位数字。",
+    phonePlaceholder: "13800000000",
     platformLabel: "核心社媒平台（选填）",
     platformPlaceholder: "选择平台",
     platforms: {

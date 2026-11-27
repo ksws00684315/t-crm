@@ -290,3 +290,47 @@ describe("creator profile dialog read-only switch and grouped inviter informatio
     wrapper.unmount();
   });
 });
+
+describe("creator phone fields with a country selector (task 161)", () => {
+  beforeEach(() => {
+    document.body.innerHTML = "";
+    setActivePinia(createPinia());
+    vi.mocked(kolApi.editKol).mockReset();
+    vi.mocked(notifyError).mockReset();
+    i18n.global.locale.value = "zh-CN";
+  });
+
+  afterEach(() => {
+    document.body.innerHTML = "";
+    vi.restoreAllMocks();
+  });
+
+  function inputOf(testId: string): HTMLInputElement {
+    // Element Plus forwards fallthrough attributes to the inner <input>, so data-test sits on it.
+    const input = document.body.querySelector(`[data-test="${testId}"]`);
+    if (!(input instanceof HTMLInputElement)) throw new Error(`missing input for ${testId}`);
+    return input;
+  }
+
+  it("splits a stored number and saves it back as E.164", async () => {
+    signIn("STAFF", ["kol:edit"]);
+    const wrapper = await openDialog({ whatsapp: "+491716422826" });
+    await element("profile-edit").trigger("click");
+    await flushPromises();
+
+    expect(inputOf("profile-whatsapp").value).toBe("1716422826");
+    const segment = inputOf("profile-whatsapp").closest(".phone-input");
+    expect(segment?.querySelector(".phone-input__code")?.textContent).toContain("+49");
+
+    await element("profile-whatsapp").setValue("171 642 9999");
+    vi.mocked(kolApi.editKol).mockResolvedValue(null);
+    await element("profile-save").trigger("click");
+    await flushPromises();
+
+    expect(kolApi.editKol).toHaveBeenCalledWith(
+      "9007199254740993",
+      expect.objectContaining({ whatsapp: "+491716429999", phone: null })
+    );
+    wrapper.unmount();
+  });
+});

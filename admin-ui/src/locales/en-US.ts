@@ -1003,7 +1003,7 @@ const enUS: MessageSchema = {
       "The creator code looks like KOL-ASD001: prefix, 3 capital letters, then 3 to 8 digits.",
     countryRequired: "Enter a country code.",
     countryPattern: "Enter a two-letter country code, such as US.",
-    whatsapp: "WhatsApp must be + followed by 8 to 15 digits, for example +8613800000000.",
+    whatsapp: "Enter a valid number: 8 to 15 digits, including the country code.",
     inviteCodeRequired: "Enter the creator invitation code",
     sheetUrlRequired: "Enter the creator promo sheet URL",
     inviteCode: "Invite code must be 1-64 letters, digits, underscores, or hyphens.",
@@ -1584,6 +1584,9 @@ const enUS: MessageSchema = {
       BALANCED: "Balanced"
     }
   },
+  phone: {
+    countryPlaceholder: "Country/region"
+  },
   kol: {
     /** Query area (03.02): creator ID, name, email. */
     kolId: "Creator ID",
@@ -1606,9 +1609,9 @@ const enUS: MessageSchema = {
     saved: "Creator saved",
     editTitle: "Basic info {code}",
     whatsapp: "WhatsApp",
-    whatsappPlaceholder: "With country code, e.g. +8613800000000",
+    whatsappPlaceholder: "Local number, e.g. 13800000000",
     phone: "Phone",
-    phonePlaceholder: "With country code, e.g. +8613800000000",
+    phonePlaceholder: "Local number, e.g. 13800000000",
     phoneWhatsapp: "Phone/WhatsApp",
     primaryPlatform: "Social platform / ID",
     platformLabel: "Main platform",

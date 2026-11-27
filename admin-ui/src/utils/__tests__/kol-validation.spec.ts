@@ -49,9 +49,9 @@ describe("KOL form validation", () => {
   it("checks optional WhatsApp, invite code and sheet URL", () => {
     expect(validateWhatsapp("")).toBeNull();
     expect(validateWhatsapp("+8613800000000")).toBeNull();
-    expect(validateWhatsapp("+1234567")).toContain("WhatsApp");
-    expect(validateWhatsapp("+".padEnd(33, "1"))).toContain("WhatsApp");
-    expect(validateWhatsapp("8613800000000")).toContain("WhatsApp");
+    expect(validateWhatsapp("+1234567")).not.toBeNull();
+    expect(validateWhatsapp("+".padEnd(33, "1"))).not.toBeNull();
+    expect(validateWhatsapp("8613800000000")).not.toBeNull();
 
     expect(validateInviteCode("")).toBeNull();
     expect(validateInviteCode("ABC_123-x")).toBeNull();

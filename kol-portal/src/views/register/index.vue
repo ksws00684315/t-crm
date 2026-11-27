@@ -4,6 +4,7 @@ import { useI18n } from "vue-i18n";
 import { useRoute, useRouter } from "vue-router";
 import { previewRegister, registerKol } from "@/api/register";
 import AuthShell from "@/components/AuthShell.vue";
+import PhoneNumberInput from "@/components/PhoneNumberInput.vue";
 import { useSessionStore } from "@/stores/session";
 import { validEmail, validPassword } from "@/utils/auth";
 import { ApiError } from "@/utils/http/error";
@@ -231,15 +232,19 @@ watch(code, () => {
           />
         </el-form-item>
         <el-form-item :label="t('register.phone')" for="register-phone">
-          <el-input id="register-phone" v-model="phone" autocomplete="tel" :disabled="busy" />
+          <PhoneNumberInput
+            v-model="phone"
+            input-id="register-phone"
+            :disabled="busy"
+            :placeholder="t('register.phonePlaceholder')"
+          />
         </el-form-item>
         <el-form-item :label="t('register.whatsapp')" for="register-whatsapp">
-          <el-input
-            id="register-whatsapp"
+          <PhoneNumberInput
             v-model="whatsapp"
-            autocomplete="tel"
-            :placeholder="t('register.phonePlaceholder')"
+            input-id="register-whatsapp"
             :disabled="busy"
+            :placeholder="t('register.phonePlaceholder')"
           />
         </el-form-item>
         <el-form-item :label="t('register.platformLabel')">

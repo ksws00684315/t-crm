@@ -11,6 +11,7 @@ import { loadSession } from "@/utils/session";
 import { ApiError } from "@/utils/http/error";
 import * as registerApi from "@/api/register";
 import type { AuthSession } from "@/api/auth";
+import PhoneNumberInput from "@/components/PhoneNumberInput.vue";
 import RegisterPage from "../index.vue";
 
 vi.mock("@/api/register", () => ({
@@ -209,6 +210,32 @@ describe("register page (02.01)", () => {
     expect(loadSession()?.token).toBe("reg-token");
   });
 
+  it("registers a WhatsApp number picked through the country selector", async () => {
+    vi.mocked(registerApi.previewRegister).mockResolvedValue({
+      bdUserName: "Alex",
+      tenantName: "Acme"
+    });
+    vi.mocked(registerApi.registerKol).mockResolvedValue(session);
+    const { wrapper } = await page(`/register?code=${CODE}`);
+    await fill(wrapper, {
+      "register-name": "David",
+      "register-email": "david@example.com",
+      "register-password": "register-pass-1",
+      "register-confirm": "register-pass-1",
+      "register-handle": "david"
+    });
+    const whatsapp = wrapper.findAllComponents(PhoneNumberInput)[1];
+    whatsapp.findComponent(ElSelect).vm.$emit("update:modelValue", "DE");
+    await flushPromises();
+    await wrapper.get("#register-whatsapp").setValue("171 642 2826");
+    choosePlatform(wrapper, "TikTok");
+    await wrapper.get("form").trigger("submit");
+    await flushPromises();
+    expect(registerApi.registerKol).toHaveBeenCalledWith(
+      expect.objectContaining({ whatsapp: "+491716422826", phone: null })
+    );
+  });
+
   it("offers sign-in with the email when the address is already registered", async () => {
     vi.mocked(registerApi.previewRegister).mockResolvedValue({
       bdUserName: "Alex",
@@ -298,14 +325,14 @@ describe("register page (02.01)", () => {
 });
 
 describe("register placeholders (task 104)", () => {
-  it("reads the phone placeholder from the language pack in both languages", async () => {
+  it("reads the number placeholder from the language pack in both languages", async () => {
     const { wrapper } = await page("/register");
     expect(wrapper.get("#register-whatsapp").attributes("placeholder")).toBe(
       i18n.global.t("register.phonePlaceholder")
     );
     useLocaleStore().setLocale("zh-CN");
     await flushPromises();
-    expect(wrapper.get("#register-whatsapp").attributes("placeholder")).toBe("+8613800000000");
+    expect(wrapper.get("#register-whatsapp").attributes("placeholder")).toBe("13800000000");
     wrapper.unmount();
   });
 });
